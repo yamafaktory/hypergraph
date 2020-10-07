@@ -87,8 +87,10 @@ where
     /// Add a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
     /// Return the index of the hyperedge.
     pub fn add_hyperedge(&mut self, vertices: &[usize], weight: HE) -> usize {
+        // Insert the new hyperedge.
         self.hyperedges.insert(vertices.to_owned(), weight);
 
+        // Update the vertices so that we keep directly track of the hyperedge.
         for vertex in vertices.iter() {
             let mut set = self.vertices[*vertex].clone();
 
@@ -98,6 +100,7 @@ where
                 .insert(self.vertices.get_index(*vertex).unwrap().0.to_owned(), set);
         }
 
+        // Assume that unwrapping the index can't be none due to previous insertion.
         self.hyperedges.get_index_of(vertices).unwrap()
     }
 

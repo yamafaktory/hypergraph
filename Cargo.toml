@@ -1,0 +1,15 @@
+[package]
+authors = ["Davy Duperron <yamafaktory@gmail.com>"]
+categories = []
+description = ""
+edition = "2018"
+exclude = [".github", "rustfmt.toml"]
+keywords = ["hypergraph", "graph"]
+license = "MIT"
+name = "hypergraph"
+readme = "README.md"
+repository = "https://github.com/yamafaktory/craftql"
+version = "0.1.0"
+
+[dependencies]
+indexmap = "1.6.0"

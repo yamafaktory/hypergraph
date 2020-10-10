@@ -13,3 +13,4 @@ version = "0.1.0"
 
 [dependencies]
 indexmap = "1.6.0"
+itertools = "0.9.0"

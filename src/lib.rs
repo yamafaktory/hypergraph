@@ -4,20 +4,21 @@
 
 //! TODO
 use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
 use std::{fmt, hash::Hash};
 
 /// Hyperedge representation as a growable array of vertices indexes.
-pub type HyperedgeVec = Vec<usize>;
+pub type HyperedgeVertices = Vec<usize>;
 
 /// An Hypergraph composed of generic vertices and hyperedges.
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as an IndexMap whose keys are the weights
     /// and values are an IndexSet containing the hyperedges which are
     /// including the current vertex.
-    vertices: IndexMap<V, IndexSet<HyperedgeVec>>,
+    vertices: IndexMap<V, IndexSet<HyperedgeVertices>>,
     /// Hyperedges are stored as an IndexMap whose keys are a vector of
     /// vertices indexes and values are the weights.
-    hyperedges: IndexMap<HyperedgeVec, HE>,
+    hyperedges: IndexMap<HyperedgeVertices, HE>,
 }
 
 impl<V: Eq + Hash + fmt::Debug, HE: fmt::Debug> fmt::Debug for Hypergraph<V, HE> {
@@ -34,7 +35,7 @@ impl<V> VertexTrait for V where V: Copy + fmt::Debug + Hash + Eq {}
 impl<V, HE> Default for Hypergraph<V, HE>
 where
     V: VertexTrait,
-    HE: Hash,
+    HE: Hash + fmt::Debug,
 {
     fn default() -> Self {
         Hypergraph::new()
@@ -45,7 +46,7 @@ where
 impl<V, HE> Hypergraph<V, HE>
 where
     V: VertexTrait,
-    HE: Hash,
+    HE: Hash + fmt::Debug,
 {
     /// Create a new hypergraph with no allocation.
     pub fn new() -> Self {
@@ -72,7 +73,7 @@ where
     }
 
     /// Get the weight of a vertex from its index.
-    pub fn get_vertex_weight(&mut self, index: usize) -> Option<&V> {
+    pub fn get_vertex_weight(&self, index: usize) -> Option<&V> {
         match self.vertices.get_index(index) {
             Some((weight, _)) => Some(weight),
             None => None,
@@ -80,7 +81,7 @@ where
     }
 
     /// Return the number of vertices in the hypergraph.
-    pub fn count_vertices(&mut self) -> usize {
+    pub fn count_vertices(&self) -> usize {
         self.vertices.len()
     }
 
@@ -105,15 +106,51 @@ where
     }
 
     /// Return the number of hyperedges in the hypergraph.
-    pub fn count_hyperedges(&mut self) -> usize {
+    pub fn count_hyperedges(&self) -> usize {
         self.hyperedges.len()
     }
 
     /// Get the weight of a hyperedge from its index.
-    pub fn get_hyperedge_weight(&mut self, index: usize) -> Option<&HE> {
+    pub fn get_hyperedge_weight(&self, index: usize) -> Option<&HE> {
         match self.hyperedges.get_index(index) {
             Some((_, weight)) => Some(weight),
             None => None,
         }
+    }
+
+    /// Get hyperedge's vertices.
+    pub fn get_hyperedge_vertices(&self, index: usize) -> Option<&HyperedgeVertices> {
+        match self.hyperedges.get_index(index) {
+            Some((vertices, _)) => Some(vertices),
+            None => None,
+        }
+    }
+
+    /// Get the intersections of a set of hyperedges as a vector of vertices.
+    pub fn get_hyperedges_intersections(&self, hyperedges: &[usize]) -> HyperedgeVertices {
+        hyperedges
+            .iter()
+            .filter_map(|index| match self.hyperedges.get_index(*index) {
+                // Only get the unique vertices as a hyperedge might contain a self-loop.
+                Some((vertices, _)) => Some(vertices.iter().unique().collect_vec()),
+                None => None,
+            })
+            .flatten()
+            .sorted()
+            // Map the result to tuples where the second term is an arbitrary value.
+            // The goal is to group them by indexes.
+            .map(|index| (*index, 0))
+            .into_group_map()
+            .iter()
+            // Filter the groups having the same size as the hyperedge.
+            .filter_map(|(index, occurences)| {
+                if occurences.len() == hyperedges.len() {
+                    Some(*index)
+                } else {
+                    None
+                }
+            })
+            .sorted()
+            .collect::<Vec<usize>>()
     }
 }

@@ -40,5 +40,22 @@ fn consume() {
     assert_eq!(graph.get_vertex_weight(0), Some(&a));
     assert_eq!(graph.get_hyperedge_weight(0), Some(&"foo"));
 
+    // Get the vertices of a hyperedge.
+    assert_eq!(graph.get_hyperedge_vertices(0), Some(&vec![0, 1, 1, 3]));
+
+    // Check hyperedges intersections.
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[0, 1]),
+        vec![0 as usize, 3 as usize]
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[0, 1, 2]),
+        vec![3 as usize]
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[0]),
+        vec![0 as usize, 1 as usize, 3 as usize]
+    );
+
     dbg!(graph);
 }

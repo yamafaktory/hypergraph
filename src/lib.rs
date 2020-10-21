@@ -2,23 +2,36 @@
 #![warn(missing_debug_implementations, missing_docs, unreachable_pub)]
 #![deny(unsafe_code, nonstandard_style)]
 
-//! TODO
+//! TODO:
+//! - Deal with out of bound indexes
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use random_color::{Luminosity, RandomColor};
 use std::{fmt, hash::Hash};
 
 /// Hyperedge representation as a growable array of vertices indexes.
 pub type HyperedgeVertices = Vec<usize>;
 
-/// An Hypergraph composed of generic vertices and hyperedges.
+/// Hyperedge index - without weight(s) - representation as a usize.
+pub type HyperedgeIndex = usize;
+
+/// Hyperedge index representation as a tuple of usize.
+pub type WeightedHyperedgeIndex = (HyperedgeIndex, usize);
+
+/// Vertex index representation as a usize.
+pub type VertexIndex = usize;
+
+/// A directed Hypergraph composed of generic vertices and hyperedges.
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as an IndexMap whose keys are the weights
     /// and values are an IndexSet containing the hyperedges which are
     /// including the current vertex.
     vertices: IndexMap<V, IndexSet<HyperedgeVertices>>,
     /// Hyperedges are stored as an IndexMap whose keys are a vector of
-    /// vertices indexes and values are the weights.
-    hyperedges: IndexMap<HyperedgeVertices, HE>,
+    /// vertices indexes and values are an IndexSet of weights.
+    /// Having a IndexSet of weights allows having two or more hyperedges
+    /// containing the same set of vertices (non-simple hypergraph).
+    hyperedges: IndexMap<HyperedgeVertices, IndexSet<HE>>,
 }
 
 impl<V: Eq + Hash + fmt::Debug, HE: fmt::Debug> fmt::Debug for Hypergraph<V, HE> {
@@ -27,15 +40,15 @@ impl<V: Eq + Hash + fmt::Debug, HE: fmt::Debug> fmt::Debug for Hypergraph<V, HE>
     }
 }
 
-/// Shared Trait for vertices.
-pub trait VertexTrait: Copy + fmt::Debug + Hash + Eq {}
+/// Shared Trait for hyperedges and vertices.
+pub trait SharedTrait: Copy + fmt::Debug + Hash + Eq {}
 
-impl<V> VertexTrait for V where V: Copy + fmt::Debug + Hash + Eq {}
+impl<T> SharedTrait for T where T: Copy + fmt::Debug + Hash + Eq {}
 
 impl<V, HE> Default for Hypergraph<V, HE>
 where
-    V: VertexTrait,
-    HE: Hash + fmt::Debug,
+    V: SharedTrait,
+    HE: SharedTrait,
 {
     fn default() -> Self {
         Hypergraph::new()
@@ -45,8 +58,8 @@ where
 /// Hypergraph implementations.
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: VertexTrait,
-    HE: Hash + fmt::Debug,
+    V: SharedTrait,
+    HE: SharedTrait,
 {
     /// Create a new hypergraph with no allocation.
     pub fn new() -> Self {
@@ -63,7 +76,7 @@ where
 
     /// Add a vertex as a custom weight in the hypergraph.
     /// Return the index of the vertex.
-    pub fn add_vertex(&mut self, weight: V) -> usize {
+    pub fn add_vertex(&mut self, weight: V) -> VertexIndex {
         self.vertices
             .entry(weight)
             .or_insert(IndexSet::with_capacity(0));
@@ -73,7 +86,7 @@ where
     }
 
     /// Get the weight of a vertex from its index.
-    pub fn get_vertex_weight(&self, index: usize) -> Option<&V> {
+    pub fn get_vertex_weight(&self, index: VertexIndex) -> Option<&V> {
         match self.vertices.get_index(index) {
             Some((weight, _)) => Some(weight),
             None => None,
@@ -87,10 +100,7 @@ where
 
     /// Add a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
     /// Return the index of the hyperedge.
-    pub fn add_hyperedge(&mut self, vertices: &[usize], weight: HE) -> usize {
-        // Insert the new hyperedge.
-        self.hyperedges.insert(vertices.to_owned(), weight);
-
+    pub fn add_hyperedge(&mut self, vertices: &[usize], weight: HE) -> WeightedHyperedgeIndex {
         // Update the vertices so that we keep directly track of the hyperedge.
         for vertex in vertices.iter() {
             let mut set = self.vertices[*vertex].clone();
@@ -101,25 +111,48 @@ where
                 .insert(self.vertices.get_index(*vertex).unwrap().0.to_owned(), set);
         }
 
-        // Assume that unwrapping the index can't be none due to previous insertion.
-        self.hyperedges.get_index_of(vertices).unwrap()
+        // Insert the new hyperedge with the corresponding weight, get back the indexes.
+        match self.hyperedges.get(vertices) {
+            Some(weights) => {
+                let mut new_weights = weights.clone();
+                let (weight_index, _) = new_weights.insert_full(weight);
+                let (hyperedge_index, _) = self
+                    .hyperedges
+                    .insert_full(vertices.to_owned(), new_weights);
+
+                (hyperedge_index, weight_index)
+            }
+            None => {
+                let mut weights = IndexSet::new();
+                let (weight_index, _) = weights.insert_full(weight);
+                let (hyperedge_index, _) =
+                    self.hyperedges.insert_full(vertices.to_owned(), weights);
+
+                (hyperedge_index, weight_index)
+            }
+        }
     }
 
     /// Return the number of hyperedges in the hypergraph.
     pub fn count_hyperedges(&self) -> usize {
-        self.hyperedges.len()
+        self.hyperedges
+            .iter()
+            .fold(0, |count, (_, weights)| count + weights.len())
     }
 
     /// Get the weight of a hyperedge from its index.
-    pub fn get_hyperedge_weight(&self, index: usize) -> Option<&HE> {
-        match self.hyperedges.get_index(index) {
-            Some((_, weight)) => Some(weight),
+    pub fn get_hyperedge_weight(
+        &self,
+        (hyperedge_index, weight_index): WeightedHyperedgeIndex,
+    ) -> Option<&HE> {
+        match self.hyperedges.get_index(hyperedge_index) {
+            Some((_, weights)) => weights.get_index(weight_index),
             None => None,
         }
     }
 
     /// Get hyperedge's vertices.
-    pub fn get_hyperedge_vertices(&self, index: usize) -> Option<&HyperedgeVertices> {
+    pub fn get_hyperedge_vertices(&self, index: HyperedgeIndex) -> Option<&HyperedgeVertices> {
         match self.hyperedges.get_index(index) {
             Some((vertices, _)) => Some(vertices),
             None => None,
@@ -127,7 +160,7 @@ where
     }
 
     /// Get the intersections of a set of hyperedges as a vector of vertices.
-    pub fn get_hyperedges_intersections(&self, hyperedges: &[usize]) -> HyperedgeVertices {
+    pub fn get_hyperedges_intersections(&self, hyperedges: &[HyperedgeIndex]) -> HyperedgeVertices {
         hyperedges
             .iter()
             .filter_map(|index| match self.hyperedges.get_index(*index) {
@@ -152,5 +185,73 @@ where
             })
             .sorted()
             .collect::<Vec<usize>>()
+    }
+
+    /// Render the hypergraph to Graphviz dot format.
+    pub fn render(&self) {
+        // println!("{:?}", self.hyperedges);
+        // println!("{:?}", self.vertices);
+        // let t = self.hyperedges.iter().fold(
+        //     (Vec::new(), Vec::new()),
+        //     |mut acc: (
+        //         Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
+        //         Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
+        //     ),
+        //      (vertices, weight)| {
+        //         if vertices.len() == 1 {
+        //             acc.1.push((vertices, weight));
+        //         } else {
+        //             acc.0.push((vertices, weight));
+        //         }
+
+        //         acc
+        //     },
+        // );
+
+        // dbg!(t.0);
+        // .fold(String::new(), |acc, (vertices, weight)| {
+        //     format!(
+        //         r#"
+        //         {}
+        //         {} [ color="{}", label={:?} ];
+        //     "#,
+        //         acc,
+        //         vertices.iter().join(" -> ").as_str(),
+        //         RandomColor::new().luminosity(Luminosity::Dark).to_hex(),
+        //         weight
+        //     )
+        // });
+
+        let test: String = self
+            .hyperedges
+            .iter()
+            .fold(String::new(), |acc, (vertices, weight)| {
+                let random_color = RandomColor::new().luminosity(Luminosity::Dark).to_hex();
+
+                format!(
+                    r#"
+                        {}
+                        {} [ color="{}", fontcolor="{}", label={:?} ];
+                    "#,
+                    acc,
+                    vertices.iter().join(" -> ").as_str(),
+                    random_color,
+                    random_color,
+                    weight
+                )
+            });
+
+        let dot = format!(
+            r##"
+    digraph {{
+        edge [ penwidth =0.5, arrowhead=normal, arrowsize=0.5, fontsize=8.0 ];
+        node [ color=gray20, fontsize=8.0, fontcolor=white, style=filled, shape=circle ];
+        rankdir = LR;
+    
+        {}
+    }}"##,
+            test
+        );
+        println!("{}", dot);
     }
 }

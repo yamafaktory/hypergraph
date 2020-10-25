@@ -7,6 +7,7 @@
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use random_color::{Luminosity, RandomColor};
+use std::fmt::Write;
 use std::{fmt, hash::Hash};
 
 /// Hyperedge representation as a growable array of vertices indexes.
@@ -45,13 +46,52 @@ pub trait SharedTrait: Copy + fmt::Debug + Hash + Eq {}
 
 impl<T> SharedTrait for T where T: Copy + fmt::Debug + Hash + Eq {}
 
-impl<V, HE> Default for Hypergraph<V, HE>
+impl<'a, V, HE> Default for Hypergraph<V, HE>
 where
-    V: SharedTrait,
+    V: SharedTrait + ExtendedDebug<'a>,
     HE: SharedTrait,
 {
     fn default() -> Self {
         Hypergraph::new()
+    }
+}
+/// TODO
+pub trait ExtendedDebug<'a> {
+    /// TODO
+    type Debug: 'a;
+
+    /// TODO
+    fn my_debug(self) -> Self::Debug;
+}
+
+impl<'a, T> ExtendedDebug<'a> for &'a T {
+    type Debug = CustomDebug<'a, T>;
+
+    fn my_debug(self) -> Self::Debug {
+        CustomDebug(self)
+    }
+}
+
+/// TODO
+pub struct CustomDebug<'a, T>(&'a T);
+
+impl<'a, T> fmt::Debug for CustomDebug<'a, T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for char in format!("{:?}", &self.0).chars() {
+            match char {
+                '"' | '\\' => f.write_char('\\')?,
+                // \l is for left justified linebreak
+                '\n' => return f.write_str("\\l"),
+                _ => {}
+            };
+
+            f.write_char(char)?
+        }
+
+        Ok(())
     }
 }
 
@@ -189,24 +229,41 @@ where
 
     /// Render the hypergraph to Graphviz dot format.
     pub fn render(&self) {
-        // println!("{:?}", self.hyperedges);
-        // println!("{:?}", self.vertices);
-        // let t = self.hyperedges.iter().fold(
-        //     (Vec::new(), Vec::new()),
-        //     |mut acc: (
-        //         Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
-        //         Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
-        //     ),
-        //      (vertices, weight)| {
-        //         if vertices.len() == 1 {
-        //             acc.1.push((vertices, weight));
-        //         } else {
-        //             acc.0.push((vertices, weight));
-        //         }
+        println!("{:?}", self.hyperedges);
+        println!("{:?}", self.vertices);
 
-        //         acc
-        //     },
-        // );
+        // Partition the hyperedges in two groups, one for the unaries, the other for the rest.
+        // Graphviz dot doesn't provide a way to render a hypergraph. To overcome this issue,
+        // we need to track the unaries and treat them separately.
+        let partitioned_hyperedges = self.hyperedges.iter().fold(
+            (Vec::new(), Vec::new()),
+            |mut acc: (
+                Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
+                Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
+            ),
+             (vertices, weight)| {
+                if vertices.len() == 1 {
+                    acc.1.push((vertices, weight)); // Unaries.
+                } else {
+                    acc.0.push((vertices, weight));
+                }
+
+                acc
+            },
+        );
+        dbg!(partitioned_hyperedges);
+
+        let rendered_vertices =
+            self.vertices
+                .iter()
+                .enumerate()
+                .fold(String::new(), |acc, (index, (weight, _))| {
+                    [
+                        format!(r#"  {} [label="{:?}"];"#, index, weight.my_debug()),
+                        acc,
+                    ]
+                    .join("\n")
+                });
 
         // dbg!(t.0);
         // .fold(String::new(), |acc, (vertices, weight)| {
@@ -222,24 +279,39 @@ where
         //     )
         // });
 
-        let test: String = self
-            .hyperedges
-            .iter()
-            .fold(String::new(), |acc, (vertices, weight)| {
-                let random_color = RandomColor::new().luminosity(Luminosity::Dark).to_hex();
+        // let test: String =
+        //     self.hyperedges
+        //         .iter()
+        //         .fold(String::new(), |acc, (vertices, weights)| {
+        //             let random_color = RandomColor::new().luminosity(Luminosity::Dark).to_hex();
 
-                format!(
-                    r#"
-                        {}
-                        {} [ color="{}", fontcolor="{}", label={:?} ];
-                    "#,
-                    acc,
-                    vertices.iter().join(" -> ").as_str(),
-                    random_color,
-                    random_color,
-                    weight
-                )
-            });
+        //             let t = if vertices.len() == 1 {
+        //                 dbg!(vertices, weights);
+        //                 format!("todo")
+        //             } else {
+        //                 weights.iter().fold(String::new(), |weights_acc, weight| {
+        //                     format!(
+        //                         r#"
+        //                             {}
+        //                             {} [ color="{}", fontcolor="{}", label={:?} ];
+        //                         "#,
+        //                         weights_acc,
+        //                         vertices.iter().join(" -> ").as_str(),
+        //                         random_color,
+        //                         random_color,
+        //                         weight
+        //                     )
+        //                 })
+        //             };
+
+        //             format!(
+        //                 r#"
+        //                     {}
+        //                     {}
+        //                 "#,
+        //                 acc, t
+        //             )
+        //         });
 
         let dot = format!(
             r##"
@@ -250,7 +322,7 @@ where
     
         {}
     }}"##,
-            test
+            rendered_vertices
         );
         println!("{}", dot);
     }

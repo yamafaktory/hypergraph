@@ -17,7 +17,7 @@ fn consume() {
     }
 
     // Create a new hypergraph.
-    let mut graph = Hypergraph::<Vertex, &str>::default();
+    let mut graph = Hypergraph::<Vertex, &str>::new();
 
     // Add some vertices.
     let a = Vertex::new("a");

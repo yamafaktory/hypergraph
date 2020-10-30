@@ -63,7 +63,7 @@ fn consume() {
         vec![0 as usize, 1 as usize, 3 as usize]
     );
 
-    graph.render();
+    graph.render_to_graphviz_dot();
 
     // dbg!(graph);
 }

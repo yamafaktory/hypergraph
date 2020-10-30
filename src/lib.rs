@@ -10,7 +10,14 @@
 //!// Create a new hypergraph.
 //!let mut graph = Hypergraph::<&str, &str>::new();
 //!
+//!// Add two vertices.
+//!assert_eq!(graph.add_vertex("foo"), 0);
+//!assert_eq!(graph.add_vertex("bar"), 1);
 //!
+//!// Add three hyperedges.
+//!assert_eq!(graph.add_hyperedge(&[0], "hyperedge with a unary {foo}"), (0, 0));
+//!assert_eq!(graph.add_hyperedge(&[0, 1, 1], "hyperedge with a self-loop {foo, bar, bar}"), (1, 0));
+//!assert_eq!(graph.add_hyperedge(&[0, 1, 1], "same hyperedge with a self-loop {foo, bar, bar}"), (1, 1));
 //! ```
 //! - Deal with out of bound indexes
 

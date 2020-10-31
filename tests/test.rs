@@ -1,4 +1,4 @@
-extern crate hypergraph;
+#![forbid(rust_2018_idioms)]
 
 use hypergraph::Hypergraph;
 
@@ -17,7 +17,7 @@ fn consume() {
     }
 
     // Create a new hypergraph.
-    let mut graph = Hypergraph::<Vertex, &str>::new();
+    let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
 
     // Add some vertices.
     let a = Vertex::new("a");
@@ -69,8 +69,4 @@ fn consume() {
         graph.get_hyperedges_intersections(&[3]), // should not fail!
         vec![]
     );
-
-    graph.render_to_graphviz_dot();
-
-    // dbg!(graph);
 }

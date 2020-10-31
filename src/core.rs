@@ -3,7 +3,10 @@ pub(super) use crate::private::ExtendedDebug;
 
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use std::{fmt, hash::Hash};
+use std::{
+    fmt::{Debug, Formatter, Result},
+    hash::Hash,
+};
 
 /// Hyperedge representation as a growable array of vertices indexes.
 pub type HyperedgeVertices = Vec<usize>;
@@ -30,22 +33,22 @@ pub struct Hypergraph<V, HE> {
     pub hyperedges: IndexMap<HyperedgeVertices, IndexSet<HE>>,
 }
 
-impl<V: Eq + Hash + fmt::Debug, HE: fmt::Debug> fmt::Debug for Hypergraph<V, HE> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         self.vertices.fmt(f)
     }
 }
 
 /// Shared Trait for hyperedges and vertices.
 /// This is a set of traits that must be implemented to use the library.
-pub trait SharedTrait: Copy + fmt::Debug + Hash + Eq {}
+pub trait SharedTrait: Copy + Debug + Eq + Hash {}
 
-impl<T> SharedTrait for T where T: Copy + fmt::Debug + Hash + Eq {}
+impl<T> SharedTrait for T where T: Copy + Debug + Eq + Hash {}
 
 impl<'a, V, HE> Default for Hypergraph<V, HE>
 where
     V: SharedTrait + ExtendedDebug<'a>,
-    HE: SharedTrait,
+    HE: SharedTrait + ExtendedDebug<'a>,
 {
     fn default() -> Self {
         Hypergraph::new()

@@ -1,4 +1,4 @@
-use std::{fmt, fmt::Write};
+use std::fmt::{Debug, Formatter, Result, Write};
 
 pub trait ExtendedDebug<'a> {
     type Debug: 'a;
@@ -8,11 +8,11 @@ pub trait ExtendedDebug<'a> {
 
 pub struct CustomDebug<'a, T>(&'a T);
 
-impl<'a, T> fmt::Debug for CustomDebug<'a, T>
+impl<'a, T> Debug for CustomDebug<'a, T>
 where
-    T: fmt::Debug,
+    T: Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         for char in format!("{:?}", &self.0).chars() {
             match char {
                 '"' | '\\' => f.write_char('\\')?,

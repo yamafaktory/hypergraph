@@ -125,8 +125,8 @@ mod tests {
         graph.add_vertex(T { name: "b" });
         graph.add_vertex(T { name: "c" });
 
-        graph.add_hyperedge(&[0, 1, 2], T { name: "foo\nbar" });
-        graph.add_hyperedge(&[0, 1, 2], T { name: "sdf" });
+        graph.add_hyperedge(&[0, 1, 2], T { name: "foo" });
+        graph.add_hyperedge(&[0, 1, 2], T { name: "bar" });
 
         graph.render_to_graphviz_dot();
     }

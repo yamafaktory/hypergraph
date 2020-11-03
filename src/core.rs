@@ -14,13 +14,17 @@ pub type HyperedgeVertices = Vec<usize>;
 /// Hyperedge index - without weight(s) - representation as a usize.
 pub type HyperedgeIndex = usize;
 
-/// Hyperedge index representation as a tuple of usize.
+/// Hyperedge weighted index representation as a tuple of usize.
+/// The first element is the index of the hyperedge.
+/// The second element is the distinct index representing one of its weight.
+/// E.g. (0, 0) and (0, 1) are the same hyperedges - connecting the same
+/// vertices in the same order - with distinct weights (non-simple hypergraph).
 pub type WeightedHyperedgeIndex = (HyperedgeIndex, usize);
 
 /// Vertex index representation as a usize.
 pub type VertexIndex = usize;
 
-/// A directed Hypergraph composed of generic vertices and hyperedges.
+/// A directed hypergraph composed of generic vertices and hyperedges.
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as an IndexMap whose keys are the weights
     /// and values are an IndexSet containing the hyperedges which are
@@ -61,12 +65,12 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
-    /// Create a new hypergraph with no allocation.
+    /// Creates a new hypergraph with no allocation.
     pub fn new() -> Self {
         Hypergraph::with_capacity(0, 0)
     }
 
-    /// Create a new hypergraph with the specified capacity.
+    /// Creates a new hypergraph with the specified capacity.
     pub fn with_capacity(vertices: usize, hyperedges: usize) -> Self {
         Hypergraph {
             vertices: IndexMap::with_capacity(vertices),
@@ -74,8 +78,8 @@ where
         }
     }
 
-    /// Add a vertex as a custom weight in the hypergraph.
-    /// Return the index of the vertex.
+    /// Adds a vertex as a custom weight in the hypergraph.
+    /// Returns the index of the vertex.
     pub fn add_vertex(&mut self, weight: V) -> VertexIndex {
         self.vertices
             .entry(weight)
@@ -85,18 +89,18 @@ where
         self.vertices.get_index_of(&weight).unwrap()
     }
 
-    /// Get the weight of a vertex from its index.
+    /// Gets the weight of a vertex from its index.
     pub fn get_vertex_weight(&self, index: VertexIndex) -> Option<&V> {
         self.vertices.get_index(index).map(|(weight, _)| weight)
     }
 
-    /// Return the number of vertices in the hypergraph.
+    /// Returns the number of vertices in the hypergraph.
     pub fn count_vertices(&self) -> usize {
         self.vertices.len()
     }
 
-    /// Add a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
-    /// Return the index of the hyperedge.
+    /// Adds a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
+    /// Returns the weighted index of the hyperedge.
     pub fn add_hyperedge(&mut self, vertices: &[usize], weight: HE) -> WeightedHyperedgeIndex {
         // Update the vertices so that we keep directly track of the hyperedge.
         for vertex in vertices.iter() {
@@ -130,14 +134,14 @@ where
         }
     }
 
-    /// Return the number of hyperedges in the hypergraph.
+    /// Returns the number of hyperedges in the hypergraph.
     pub fn count_hyperedges(&self) -> usize {
         self.hyperedges
             .iter()
             .fold(0, |count, (_, weights)| count + weights.len())
     }
 
-    /// Get the weight of a hyperedge from its index.
+    /// Gets the weight of a hyperedge from its weighted index.
     pub fn get_hyperedge_weight(
         &self,
         (hyperedge_index, weight_index): WeightedHyperedgeIndex,
@@ -148,14 +152,14 @@ where
         }
     }
 
-    /// Get hyperedge's vertices.
+    /// Gets the hyperedge's vertices.
     pub fn get_hyperedge_vertices(&self, index: HyperedgeIndex) -> Option<&HyperedgeVertices> {
         self.hyperedges
             .get_index(index)
             .map(|(vertices, _)| vertices)
     }
 
-    /// Get the intersections of a set of hyperedges as a vector of vertices.
+    /// Gets the intersections of a set of hyperedges as a vector of vertices.
     pub fn get_hyperedges_intersections(&self, hyperedges: &[HyperedgeIndex]) -> HyperedgeVertices {
         hyperedges
             .iter()
@@ -184,7 +188,9 @@ where
     }
 
     /// Render the hypergraph to Graphviz dot format.
+    /// Due to Graphviz dot inability to render hypergraphs out of the box,
+    /// unaries are rendered as vertex peripheries which can't be labelled.
     pub fn render_to_graphviz_dot(&self) {
-        render_to_graphviz_dot(&self);
+        println!("{}", render_to_graphviz_dot(&self));
     }
 }

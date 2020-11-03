@@ -1,14 +1,14 @@
 [package]
 authors = ["Davy Duperron <yamafaktory@gmail.com>"]
-categories = []
-description = ""
+categories = ["data-structures", "graphics", "mathematics"]
+description = "Hypergraph is data structure library to create a directed hypergraph in which an hyperedge can join any number of vertices."
 edition = "2018"
 exclude = [".github", "rustfmt.toml"]
-keywords = ["hypergraph", "graph"]
+keywords = ["data-structure", "graph", "hypergraph"]
 license = "MIT"
 name = "hypergraph"
 readme = "README.md"
-repository = "https://github.com/yamafaktory/craftql"
+repository = "https://github.com/yamafaktory/hypergraph"
 version = "0.1.0"
 
 [dependencies]

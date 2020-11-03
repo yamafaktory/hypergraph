@@ -3,16 +3,24 @@ pub(super) use crate::private::ExtendedDebug;
 
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use random_color::{Luminosity, RandomColor};
 
 fn indent(contents: &str) -> String {
     format!("{: >4}{}", String::new(), contents)
 }
 
-/// Render the hypergraph to Graphviz dot format.
-/// Due to Graphviz dot inability to render hypergraphs out of the box,
-/// unaries are rendered as vertex peripheries which can't be labelled.
-pub(super) fn render_to_graphviz_dot<V, HE>(hypergraph: &Hypergraph<V, HE>)
+#[cfg(test)]
+fn get_random_hex_color() -> String {
+    String::from("#ffffff")
+}
+
+#[cfg(not(test))]
+fn get_random_hex_color() -> String {
+    use random_color::{Luminosity, RandomColor};
+
+    RandomColor::new().luminosity(Luminosity::Dark).to_hex()
+}
+
+pub(super) fn render_to_graphviz_dot<V, HE>(hypergraph: &Hypergraph<V, HE>) -> String
 where
     V: SharedTrait,
     HE: SharedTrait,
@@ -46,7 +54,7 @@ where
                 [
                     acc,
                     weight.iter().fold(String::new(), |weight_acc, weight| {
-                        let random_color = RandomColor::new().luminosity(Luminosity::Dark).to_hex();
+                        let random_color = get_random_hex_color();
 
                         [
                             weight_acc,
@@ -82,7 +90,7 @@ where
                             weight.safe_debug(),
                             // Inject peripheries for unaries.
                             match partitioned_hyperedges.1.get(&index) {
-                                Some(weight) => format!(", peripheries={}", weight.len()),
+                                Some(weight) => format!(", peripheries={}", weight.len() + 1),
                                 None => String::new(),
                             }
                         )
@@ -92,21 +100,17 @@ where
                 .join("\n")
             });
 
-    println!(
-        "{}",
-        [
-            String::from("digraph {"),
-            indent("edge [penwidth=0.5, arrowhead=normal, arrowsize=0.5, fontsize=8.0];"),
-            indent(
-                "node [color=gray20, fontsize=8.0, fontcolor=white, style=filled, shape=circle];"
-            ),
-            indent("rankdir=LR;"),
-            vertices,
-            non_unary_hyperedges,
-            String::from("}"),
-        ]
-        .join("\n")
-    );
+    // Return the rendered graph as String.
+    [
+        String::from("digraph {"),
+        indent("edge [penwidth=0.5, arrowhead=normal, arrowsize=0.5, fontsize=8.0];"),
+        indent("node [color=gray20, fontsize=8.0, fontcolor=white, style=filled, shape=circle];"),
+        indent("rankdir=LR;"),
+        vertices,
+        non_unary_hyperedges,
+        String::from("}"),
+    ]
+    .join("\n")
 }
 
 #[cfg(test)]
@@ -127,7 +131,17 @@ mod tests {
 
         graph.add_hyperedge(&[0, 1, 2], T { name: "foo" });
         graph.add_hyperedge(&[0, 1, 2], T { name: "bar" });
+        graph.add_hyperedge(&[0], T { name: "unary" });
 
-        graph.render_to_graphviz_dot();
+        let rendered_graph = render_to_graphviz_dot(&graph);
+
+        assert!(
+            rendered_graph.contains(r##"0 [label="T {\l    name: \"a\",\l}\l", peripheries=2];"##)
+        );
+        assert!(rendered_graph.contains(r##"1 [label="T {\l    name: \"b\",\l}\l"];"##));
+        assert!(rendered_graph.contains(r##"2 [label="T {\l    name: \"c\",\l}\l"];"##));
+
+        assert!(rendered_graph.contains(r##"0 -> 1 -> 2 [color="#ffffff", fontcolor="#ffffff", label="T {\l    name: \"foo\",\l}\l"];"##));
+        assert!(rendered_graph.contains(r##"0 -> 1 -> 2 [color="#ffffff", fontcolor="#ffffff", label="T {\l    name: \"bar\",\l}\l"];"##));
     }
 }

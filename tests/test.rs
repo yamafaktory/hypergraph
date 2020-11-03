@@ -3,7 +3,7 @@
 use hypergraph::Hypergraph;
 
 #[test]
-fn consume() {
+fn integration() {
     // Create a custom struct.
     #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
     struct Vertex<'a> {
@@ -69,4 +69,6 @@ fn consume() {
         graph.get_hyperedges_intersections(&[3]), // should not fail!
         vec![]
     );
+
+    graph.render_to_graphviz_dot();
 }

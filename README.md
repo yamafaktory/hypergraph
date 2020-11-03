@@ -7,7 +7,7 @@ This library allows you to:
 - represent **non-simple** hypergraphs with two or more hyperedges containing the same set of vertices with different weights
 - represent **self-loops** —i.e., hyperedges containing vertices directed to themselves one or more times
 - represent **unaries** —i.e., hyperedges containing a set with a unique vertex
-- output a representation of a hypergraph using the Graphviz dot format
+- output a representation of a hypergraph using the [Graphviz dot format](https://graphviz.org/doc/info/lang.html)
 
 ## Usage
 

@@ -31,6 +31,7 @@ fn integration() {
 
     // Add some hyperedges.
     assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo"), (0, 0)); // self-loop.
+    assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo_"), (0, 1));
     assert_eq!(graph.add_hyperedge(&[4, 0, 3, 2], "bar"), (1, 0));
     assert_eq!(graph.add_hyperedge(&[3], "woot"), (2, 0)); // unary.
     assert_eq!(graph.add_hyperedge(&[3], "woot"), (2, 0)); // adding the exact same hyperedge results in an update.
@@ -38,7 +39,7 @@ fn integration() {
 
     // Count the vertices and the hyperedges.
     assert_eq!(graph.count_vertices(), 5);
-    assert_eq!(graph.count_hyperedges(), 4);
+    assert_eq!(graph.count_hyperedges(), 5);
 
     // Get the weights of some hyperedges and vertices.
     assert_eq!(graph.get_vertex_weight(0), Some(&a));
@@ -53,22 +54,18 @@ fn integration() {
     assert_eq!(graph.get_hyperedge_vertices(3), None); // should not fail!
 
     // Check hyperedges intersections.
-    assert_eq!(
-        graph.get_hyperedges_intersections(&[0, 1]),
-        vec![0 as usize, 3 as usize]
-    );
-    assert_eq!(
-        graph.get_hyperedges_intersections(&[0, 1, 2]),
-        vec![3 as usize]
-    );
-    assert_eq!(
-        graph.get_hyperedges_intersections(&[0]),
-        vec![0 as usize, 1 as usize, 3 as usize]
-    );
+    assert_eq!(graph.get_hyperedges_intersections(&[0, 1]), vec![0, 3]);
+    assert_eq!(graph.get_hyperedges_intersections(&[0, 1, 2]), vec![3]);
+    assert_eq!(graph.get_hyperedges_intersections(&[0]), vec![0, 1, 3]);
     assert_eq!(
         graph.get_hyperedges_intersections(&[3]), // should not fail!
         vec![]
     );
+
+    // Get the hyperedges connecting some vertices.
+    assert_eq!(graph.get_hyperedges_connections(1, 1), vec![0]);
+    assert_eq!(graph.get_hyperedges_connections(3, 2), vec![1]);
+    assert_eq!(graph.get_hyperedges_connections(3, 0), vec![]); // no match, should stay empty!
 
     graph.render_to_graphviz_dot();
 }

@@ -187,7 +187,40 @@ where
             .collect::<Vec<usize>>()
     }
 
-    /// Render the hypergraph to Graphviz dot format.
+    /// Gets the list of all hyperedges containing a matching connection from
+    /// one vertex to another.
+    pub fn get_hyperedges_connections(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Vec<HyperedgeIndex> {
+        self.vertices
+            .get_index(from)
+            .iter()
+            .fold(Vec::new(), |acc, (_, hyperedges)| {
+                hyperedges
+                    .iter()
+                    .enumerate()
+                    .fold(acc, |hyperedge_acc, (index, hyperedge)| {
+                        hyperedge.iter().tuple_windows::<(_, _)>().fold(
+                            hyperedge_acc,
+                            |index_acc, (window_from, window_to)| {
+                                // Inject the index of the hyperedge if the current window is a match.
+                                if *window_from == from && *window_to == to {
+                                    return index_acc
+                                        .into_iter()
+                                        .chain(vec![index])
+                                        .collect::<Vec<usize>>();
+                                }
+
+                                index_acc
+                            },
+                        )
+                    })
+            })
+    }
+
+    /// Renders the hypergraph to Graphviz dot format.
     /// Due to Graphviz dot inability to render hypergraphs out of the box,
     /// unaries are rendered as vertex peripheries which can't be labelled.
     pub fn render_to_graphviz_dot(&self) {

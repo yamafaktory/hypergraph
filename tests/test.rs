@@ -67,5 +67,11 @@ fn integration() {
     assert_eq!(graph.get_hyperedges_connections(3, 2), vec![1]);
     assert_eq!(graph.get_hyperedges_connections(3, 0), vec![]); // no match, should stay empty!
 
+    // Get the connections from some vertices.
+    assert_eq!(graph.get_vertex_connections(0), vec![1, 3]);
+    assert_eq!(graph.get_vertex_connections(1), vec![1, 3]);
+    assert_eq!(graph.get_vertex_connections(2), vec![]);
+    assert_eq!(graph.get_vertex_connections(3), vec![2]);
+
     graph.render_to_graphviz_dot();
 }

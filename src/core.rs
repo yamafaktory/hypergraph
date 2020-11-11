@@ -187,13 +187,8 @@ where
             .collect::<Vec<usize>>()
     }
 
-    /// Gets the list of all hyperedges containing a matching connection from
-    /// one vertex to another.
-    pub fn get_hyperedges_connections(
-        &self,
-        from: VertexIndex,
-        to: VertexIndex,
-    ) -> Vec<HyperedgeIndex> {
+    /// Private helper function used internally.
+    fn get_connections(&self, from: VertexIndex, to: Option<VertexIndex>) -> Vec<HyperedgeIndex> {
         self.vertices
             .get_index(from)
             .iter()
@@ -205,12 +200,25 @@ where
                         hyperedge.iter().tuple_windows::<(_, _)>().fold(
                             hyperedge_acc,
                             |index_acc, (window_from, window_to)| {
-                                // Inject the index of the hyperedge if the current window is a match.
-                                if *window_from == from && *window_to == to {
-                                    return index_acc
-                                        .into_iter()
-                                        .chain(vec![index])
-                                        .collect::<Vec<usize>>();
+                                match to {
+                                    Some(to) => {
+                                        // Inject the index of the hyperedge if the current window is a match.
+                                        if *window_from == from && *window_to == to {
+                                            return index_acc
+                                                .into_iter()
+                                                .chain(vec![index])
+                                                .collect::<Vec<usize>>();
+                                        }
+                                    }
+                                    None => {
+                                        // Inject the next vertex if the current window is a match.
+                                        if *window_from == from {
+                                            return index_acc
+                                                .into_iter()
+                                                .chain(vec![*window_to])
+                                                .collect::<Vec<usize>>();
+                                        }
+                                    }
                                 }
 
                                 index_acc
@@ -218,6 +226,21 @@ where
                         )
                     })
             })
+    }
+
+    /// Gets the list of all hyperedges containing a matching connection from
+    /// one vertex to another.
+    pub fn get_hyperedges_connections(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Vec<HyperedgeIndex> {
+        self.get_connections(from, Some(to))
+    }
+
+    /// Gets the list of all vertices connected to a given vertex.
+    pub fn get_vertex_connections(&self, from: VertexIndex) -> Vec<VertexIndex> {
+        self.get_connections(from, None)
     }
 
     /// Renders the hypergraph to Graphviz dot format.

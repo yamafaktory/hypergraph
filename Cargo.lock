@@ -37,7 +37,7 @@ checksum = "00d63df3d41950fb462ed38308eea019113ad1508da725bbedcd0fa5a85ef5f7"
 
 [[package]]
 name = "hypergraph"
-version = "0.1.3-alpha.0"
+version = "0.1.3"
 dependencies = [
  "indexmap",
  "itertools",

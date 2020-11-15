@@ -73,5 +73,15 @@ fn integration() {
     assert_eq!(graph.get_vertex_connections(2), vec![]);
     assert_eq!(graph.get_vertex_connections(3), vec![2]);
 
+    // Get some paths via Dijkstra.
+    assert_eq!(
+        graph.get_dijkstra_connections(4, 2),
+        Some(vec![4, 0, 3, 2,])
+    );
+    assert_eq!(graph.get_dijkstra_connections(0, 3), Some(vec![0, 3,]));
+    assert_eq!(graph.get_dijkstra_connections(0, 4), None);
+    assert_eq!(graph.get_dijkstra_connections(1, 1), Some(vec![1,]));
+    assert_eq!(graph.get_dijkstra_connections(3, 3), Some(vec![3,]));
+
     graph.render_to_graphviz_dot();
 }

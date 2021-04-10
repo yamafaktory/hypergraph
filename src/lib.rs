@@ -20,11 +20,11 @@
 //!
 //!// Add three hyperedges.
 //!let weight_with_unary = "hyperedge with a unary {foo}";
-//!assert_eq!(graph.add_hyperedge(&[0], weight_with_unary), (0, 0));
+//!assert_eq!(graph.add_hyperedge(&[0], weight_with_unary), [0, 0]);
 //!let weight_with_self_loop = "hyperedge with a self-loop {foo, bar, bar}";
-//!assert_eq!(graph.add_hyperedge(&[0, 1, 1], weight_with_self_loop), (1, 0));
+//!assert_eq!(graph.add_hyperedge(&[0, 1, 1], weight_with_self_loop), [1, 0]);
 //!let different_weight_same_set = "hyperedge with identical set of vertices but different weight";
-//!assert_eq!(graph.add_hyperedge(&[0, 1, 1], different_weight_same_set), (1, 1));
+//!assert_eq!(graph.add_hyperedge(&[0, 1, 1], different_weight_same_set), [1, 1]);
 //!
 //!// Count the vertices and the hyperedges.
 //!assert_eq!(graph.count_vertices(), 2);
@@ -33,9 +33,9 @@
 //!// Get the weights of some hyperedges and vertices.
 //!assert_eq!(graph.get_vertex_weight(0), Some(&foo));
 //!assert_eq!(graph.get_vertex_weight(1), Some(&bar));
-//!assert_eq!(graph.get_hyperedge_weight((0, 0)), Some(&weight_with_unary));
-//!assert_eq!(graph.get_hyperedge_weight((1, 0)), Some(&weight_with_self_loop));
-//!assert_eq!(graph.get_hyperedge_weight((1, 1)), Some(&different_weight_same_set));
+//!assert_eq!(graph.get_hyperedge_weight([0, 0]), Some(&weight_with_unary));
+//!assert_eq!(graph.get_hyperedge_weight([1, 0]), Some(&weight_with_self_loop));
+//!assert_eq!(graph.get_hyperedge_weight([1, 1]), Some(&different_weight_same_set));
 //!
 //!// Get the vertices of a hyperedge.
 //!assert_eq!(graph.get_hyperedge_vertices(1), Some(&vec![0, 1, 1]));

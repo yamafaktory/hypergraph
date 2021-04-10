@@ -15,7 +15,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hypergraph = "0.1.1"
+hypergraph = "0.1.5"
 ```
 
 ## Documentation

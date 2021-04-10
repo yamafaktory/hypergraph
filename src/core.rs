@@ -16,12 +16,12 @@ pub type HyperedgeVertices = Vec<usize>;
 /// Hyperedge index - without weight(s) - representation as a usize.
 pub type HyperedgeIndex = usize;
 
-/// Hyperedge weighted index representation as a tuple of usize.
+/// Hyperedge weighted index representation as an array of two usize.
 /// The first element is the index of the hyperedge.
 /// The second element is the distinct index representing one of its weight.
-/// E.g. (0, 0) and (0, 1) are the same hyperedges - connecting the same
+/// E.g. [0, 0] and [0, 1] are two hyperedges - connecting the same
 /// vertices in the same order - with distinct weights (non-simple hypergraph).
-pub type WeightedHyperedgeIndex = (HyperedgeIndex, usize);
+pub type WeightedHyperedgeIndex = [usize; 2];
 
 /// Vertex index representation as a usize.
 pub type VertexIndex = usize;
@@ -123,7 +123,7 @@ where
                     .hyperedges
                     .insert_full(vertices.to_owned(), new_weights);
 
-                (hyperedge_index, weight_index)
+                [hyperedge_index, weight_index]
             }
             None => {
                 let mut weights = IndexSet::new();
@@ -131,8 +131,37 @@ where
                 let (hyperedge_index, _) =
                     self.hyperedges.insert_full(vertices.to_owned(), weights);
 
-                (hyperedge_index, weight_index)
+                [hyperedge_index, weight_index]
             }
+        }
+    }
+
+    /// Update the weight of a hyperedge based on its weighted index.
+    pub fn update_hyperedge_weight(
+        &mut self,
+        [hyperedge_index, weight_index]: WeightedHyperedgeIndex,
+        weight: HE,
+    ) -> bool {
+        match self.hyperedges.get_index_mut(hyperedge_index) {
+            Some((_, weights)) => {
+                // We can't directly replace the value in the set.
+                // First, we need to insert the new weight, it will end up
+                // being at the last position.
+                if !weights.insert(weight) {
+                    return false;
+                };
+
+                // Then get the value by index of the original weight.
+                match weights.clone().get_index(weight_index) {
+                    Some(t) => {
+                        // Last, use swap and remove. It will remove the old weight
+                        // and insert the new one at the index position of the former.
+                        weights.swap_remove(t)
+                    }
+                    None => false,
+                }
+            }
+            None => false,
         }
     }
 
@@ -146,7 +175,7 @@ where
     /// Gets the weight of a hyperedge from its weighted index.
     pub fn get_hyperedge_weight(
         &self,
-        (hyperedge_index, weight_index): WeightedHyperedgeIndex,
+        [hyperedge_index, weight_index]: WeightedHyperedgeIndex,
     ) -> Option<&HE> {
         match self.hyperedges.get_index(hyperedge_index) {
             Some((_, weights)) => weights.get_index(weight_index),

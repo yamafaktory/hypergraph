@@ -1,6 +1,6 @@
 # Hypergraph ![ci](https://github.com/yamafaktory/hypergraph/workflows/ci/badge.svg)
 
-Hypergraph is data structure library to create a directed hypergraph in which an hyperedge can join any number of vertices.
+Hypergraph is data structure library to create a directed hypergraph in which a hyperedge can join any number of vertices.
 
 This library allows you to:
 

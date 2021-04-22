@@ -1,3 +1,4 @@
+#![deny(unsafe_code, nonstandard_style)]
 #![forbid(rust_2018_idioms)]
 
 use hypergraph::Hypergraph;

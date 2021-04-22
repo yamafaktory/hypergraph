@@ -1,5 +1,5 @@
+use crate::core::debug::ExtendedDebug;
 use crate::core::{HyperedgeVertices, Hypergraph, SharedTrait};
-pub(super) use crate::private::ExtendedDebug;
 
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;

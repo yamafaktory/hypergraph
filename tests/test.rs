@@ -84,7 +84,12 @@ fn integration() {
     assert_eq!(graph.get_dijkstra_connections(1, 1), Some(vec![1,]));
     assert_eq!(graph.get_dijkstra_connections(3, 3), Some(vec![3,]));
 
-    // Update a hyperedge. Replace the weight "foo" by "yup".
+    // Update a vertex's weight.
+    let a = Vertex::new("brand new heavies");
+    assert!(graph.update_vertex_weight(0, a));
+    assert_eq!(graph.get_vertex_weight(0), Some(&a));
+
+    // Update a hyperedge's weight.
     graph.update_hyperedge_weight([0, 0], "yup");
     assert_eq!(graph.get_hyperedge_weight([0, 0]), Some(&"yup"));
     assert_eq!(

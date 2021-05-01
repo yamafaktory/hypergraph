@@ -130,6 +130,18 @@ where
 
     /// Update the weight of a vertex based on its index.
     pub fn update_vertex_weight(&mut self, index: VertexIndex, weight: V) -> bool {
-        false
+        match self.vertices.clone().get_index(index) {
+            Some((key, value)) => {
+                // We can't directly replace the value in the map.
+                // First, we need to insert the new weight, it will end up
+                // being at the last position.
+                self.vertices.insert(weight, value.to_owned());
+
+                // Then we use swap and remove. It will remove the old weight
+                // and insert the new one at the index position of the former.
+                self.vertices.swap_remove(key).is_some()
+            }
+            None => false,
+        }
     }
 }

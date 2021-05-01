@@ -79,10 +79,10 @@ where
 
                 // Then get the value by index of the original weight.
                 match weights.clone().get_index(weight_index) {
-                    Some(t) => {
+                    Some(weight) => {
                         // Last, use swap and remove. It will remove the old weight
                         // and insert the new one at the index position of the former.
-                        weights.swap_remove(t)
+                        weights.swap_remove(weight)
                     }
                     None => false,
                 }

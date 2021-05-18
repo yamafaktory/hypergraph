@@ -51,8 +51,21 @@ fn integration() {
     assert_eq!(graph.get_hyperedge_weight([3, 0]), None); // should not fail!
 
     // Get the vertices of a hyperedge.
-    assert_eq!(graph.get_hyperedge_vertices(0), Some(&vec![0, 1, 1, 3]));
+    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0, 1, 1, 3]));
     assert_eq!(graph.get_hyperedge_vertices(3), None); // should not fail!
+
+    // Get the hyperedges of some vertices as vectors of vertices.
+    assert_eq!(
+        graph.get_vertex_hyperedges(0),
+        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2]])
+    );
+    assert_eq!(graph.get_vertex_hyperedges(1), Some(vec![vec![0, 1, 1, 3]]));
+    assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![4, 0, 3, 2]]));
+    assert_eq!(
+        graph.get_vertex_hyperedges(3),
+        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2], vec![3]])
+    );
+    assert_eq!(graph.get_vertex_hyperedges(4), Some(vec![vec![4, 0, 3, 2]]));
 
     // Check hyperedges intersections.
     assert_eq!(graph.get_hyperedges_intersections(&[0, 1]), vec![0, 3]);
@@ -103,6 +116,29 @@ fn integration() {
         "Number of hyperedges should remain the same."
     );
 
+    // Update the vertices of a hyperedge.
+    assert!(graph.update_hyperedge_vertices(0, &[0, 4]));
+    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0, 4]));
+    assert_eq!(
+        graph.get_vertex_hyperedges(0),
+        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2]])
+    );
+    assert_eq!(graph.get_vertex_hyperedges(1), Some(vec![vec![0, 1, 1, 3]]));
+    assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![4, 0, 3, 2]]));
+    assert_eq!(
+        graph.get_vertex_hyperedges(3),
+        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2], vec![3]])
+    );
+    assert_eq!(graph.get_vertex_hyperedges(4), Some(vec![vec![4, 0, 3, 2]]));
+
+    // Remove a vertex.
+    // graph.remove_vertex(1);
+
+    // assert_eq!(graph.get_hyperedge_vertices(0), Some(&vec![0, 3]));
+
+    // assert_eq!(graph.get_vertex_weight(0), Some(&a));
+    // assert_eq!(graph.get_vertex_weight(1), Some(&a));
+
     // Render to graphviz dot format.
-    graph.render_to_graphviz_dot();
+    // graph.render_to_graphviz_dot();
 }

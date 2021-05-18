@@ -38,7 +38,7 @@
 //!assert_eq!(graph.get_hyperedge_weight([1, 1]), Some(&different_weight_same_set));
 //!
 //!// Get the vertices of a hyperedge.
-//!assert_eq!(graph.get_hyperedge_vertices(1), Some(&vec![0, 1, 1]));
+//!assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 1, 1]));
 //!
 //!// Check hyperedges intersections.
 //!assert_eq!(

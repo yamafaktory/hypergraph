@@ -123,12 +123,40 @@ where
         self.get_connections(from, None)
     }
 
+    /// Gets the hyperedges as vectors of vertices of a vertex from its index.
+    pub fn get_vertex_hyperedges(&self, index: VertexIndex) -> Option<Vec<Vec<VertexIndex>>> {
+        self.vertices
+            .get_index(index)
+            .map(|(_, hyperedges)| hyperedges)
+            .map(|index_set| index_set.iter().cloned().collect())
+    }
+
     /// Gets the weight of a vertex from its index.
     pub fn get_vertex_weight(&self, index: VertexIndex) -> Option<&V> {
         self.vertices.get_index(index).map(|(weight, _)| weight)
     }
 
-    /// Update the weight of a vertex based on its index.
+    /// Removes a vertex based on its index.
+    pub fn remove_vertex(&mut self, index: VertexIndex) -> bool {
+        // IndexMap doesn't allow holes by design, see:
+        // https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
+        // As a consequence, we have two options. Either we use shift_remove
+        // and it will result in an expensive regeneration of all the indexes
+        // in the map or we use swap_remove and deal with the fact that the last
+        // element will be swapped in place of the removed one and will thus get
+        // a new index. We use the latter solution for performance reasons.
+        match self.vertices.clone().get_index(index) {
+            Some((key, _)) => {
+                self.vertices.swap_remove(key);
+                dbg!(self.hyperedges.clone());
+                todo!();
+                false
+            }
+            None => false,
+        }
+    }
+
+    /// Updates the weight of a vertex based on its index.
     pub fn update_vertex_weight(&mut self, index: VertexIndex, weight: V) -> bool {
         match self.vertices.clone().get_index(index) {
             Some((key, value)) => {

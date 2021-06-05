@@ -140,7 +140,7 @@ where
         }
     }
 
-    /// Updates the vertices of a hyperedge.
+    /// Updates the vertices of a hyperedge based on its index.
     pub fn update_hyperedge_vertices(
         &mut self,
         hyperedge_index: usize,
@@ -150,7 +150,7 @@ where
             Some((key, value)) => {
                 // Keep track of the initial indexes.
                 let previous_vertices = self.get_hyperedge_vertices(hyperedge_index).unwrap();
-                dbg!(previous_vertices.clone());
+
                 // Find the indexes which have been added.
                 let added = vertices.iter().fold(vec![], |mut acc: Vec<usize>, index| {
                     if !previous_vertices.iter().any(|x| x == index) {
@@ -184,31 +184,59 @@ where
                     })
                     .collect::<Vec<usize>>();
 
+                // Process the updated ones.
                 for index in unchanged.iter() {
-                    self.vertices.get_index(*index).map(|(_, vertex)| {
-                        dbg!(index, vertex);
-                        let r =
+                    if let Some((weight, vertex)) = self.vertices.clone().get_index(*index) {
+                        self.vertices.insert(
+                            *weight,
                             vertex
                                 .iter()
                                 .fold(IndexSet::new(), |mut new_index_set, hyperedge| {
                                     new_index_set.insert(
+                                        // Insert the new ones if it's a match.
                                         if are_arrays_equal(hyperedge, &previous_vertices) {
-                                            vertices
+                                            vertices.to_vec()
                                         } else {
-                                            hyperedge
+                                            hyperedge.clone()
                                         },
                                     );
 
                                     new_index_set
-                                });
-
-                        dbg!(r);
-                    });
+                                }),
+                        );
+                    };
                 }
 
-                // dbg!(self.vertices.clone());
+                // Process the removed ones.
+                for index in removed.iter() {
+                    if let Some((weight, vertex)) = self.vertices.clone().get_index(*index) {
+                        self.vertices.insert(
+                            *weight,
+                            vertex
+                                .iter()
+                                .fold(IndexSet::new(), |mut new_index_set, hyperedge| {
+                                    // Skip the removed ones, i.e. if there's no match.
+                                    if !are_arrays_equal(hyperedge, &previous_vertices) {
+                                        new_index_set.insert(hyperedge.clone());
+                                    }
 
-                // We need to use insert and swap_remove trick here too,
+                                    new_index_set
+                                }),
+                        );
+                    };
+                }
+
+                // Process the added ones.
+                for index in added.iter() {
+                    if let Some((weight, vertex)) = self.vertices.clone().get_index_mut(*index) {
+                        // Insert the new vertices.
+                        vertex.insert(vertices.to_vec());
+
+                        self.vertices.insert(*weight, vertex.clone());
+                    };
+                }
+
+                // We need to use the insert and swap_remove trick here too,
                 // see e.g. the update_vertex_weight method.
                 self.hyperedges.insert(vertices.to_vec(), value.to_owned());
                 self.hyperedges.swap_remove(key).is_some()

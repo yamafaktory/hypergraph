@@ -1,4 +1,4 @@
-use crate::{Hypergraph, SharedTrait, VertexIndex};
+use crate::{HyperedgeVertices, Hypergraph, SharedTrait, VertexIndex};
 
 use indexmap::IndexSet;
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
@@ -124,7 +124,7 @@ where
     }
 
     /// Gets the hyperedges as vectors of vertices of a vertex from its index.
-    pub fn get_vertex_hyperedges(&self, index: VertexIndex) -> Option<Vec<Vec<VertexIndex>>> {
+    pub fn get_vertex_hyperedges(&self, index: VertexIndex) -> Option<Vec<HyperedgeVertices>> {
         self.vertices
             .get_index(index)
             .map(|(_, hyperedges)| hyperedges)

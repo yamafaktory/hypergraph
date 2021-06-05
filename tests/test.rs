@@ -117,19 +117,23 @@ fn integration() {
     );
 
     // Update the vertices of a hyperedge.
+    // Previous vertices were [0, 1, 1, 3]!
     assert!(graph.update_hyperedge_vertices(0, &[0, 4]));
     assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0, 4]));
     assert_eq!(
         graph.get_vertex_hyperedges(0),
-        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2]])
+        Some(vec![vec![0, 4], vec![4, 0, 3, 2]])
     );
-    assert_eq!(graph.get_vertex_hyperedges(1), Some(vec![vec![0, 1, 1, 3]]));
+    assert_eq!(graph.get_vertex_hyperedges(1), Some(vec![]));
     assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![4, 0, 3, 2]]));
     assert_eq!(
         graph.get_vertex_hyperedges(3),
-        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2], vec![3]])
+        Some(vec![vec![4, 0, 3, 2], vec![3]])
     );
-    assert_eq!(graph.get_vertex_hyperedges(4), Some(vec![vec![4, 0, 3, 2]]));
+    assert_eq!(
+        graph.get_vertex_hyperedges(4),
+        Some(vec![vec![4, 0, 3, 2], vec![0, 4]])
+    );
 
     // Remove a vertex.
     // graph.remove_vertex(1);

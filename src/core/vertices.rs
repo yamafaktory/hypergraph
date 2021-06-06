@@ -149,15 +149,34 @@ where
             Some((key, hyperedges)) => {
                 // First, we need to get all the hyperedges' indexes of the
                 // vertex in order to update them accordingly.
+                // We preemptively store the eventual index of the swapped
+                // vertex to avoid extra loops.
+                let last_index = self.count_vertices() - 1;
+                let maybe_swapped_index = if last_index == index {
+                    None
+                } else {
+                    Some(last_index)
+                };
+
                 for hyperedge in hyperedges.iter() {
                     if let Some(hyperedge_index) = self.hyperedges.get_index_of(hyperedge) {
                         self.update_hyperedge_vertices(
                             hyperedge_index,
                             &hyperedge
                                 .iter()
-                                .filter_map(|vertex| {
-                                    if vertex != &index {
-                                        Some(*vertex)
+                                .filter_map(|current_index| {
+                                    if current_index != &index {
+                                        // Inject the current index or the swapped one.
+                                        match maybe_swapped_index {
+                                            Some(swapped_index) => {
+                                                Some(if swapped_index == *current_index {
+                                                    index
+                                                } else {
+                                                    *current_index
+                                                })
+                                            }
+                                            None => Some(*current_index),
+                                        }
                                     } else {
                                         None
                                     }
@@ -167,11 +186,31 @@ where
                     }
                 }
 
+                // We also need to update the other hyperedges which are impacted by this change.
+                if let Some(swapped_index) = maybe_swapped_index {
+                    if let Some(hyperedge_weights) = self.get_vertex_hyperedges(swapped_index) {
+                        for weight in hyperedge_weights.iter() {
+                            if let Some(hyperedge_index) = self.hyperedges.get_index_of(weight) {
+                                self.update_hyperedge_vertices(
+                                    hyperedge_index,
+                                    &weight
+                                        .iter()
+                                        .map(|current_index| {
+                                            if *current_index == swapped_index {
+                                                index
+                                            } else {
+                                                *current_index
+                                            }
+                                        })
+                                        .collect::<Vec<usize>>(),
+                                );
+                            }
+                        }
+                    }
+                }
+
                 // Now we can safely remove the vertex.
                 self.vertices.swap_remove(key).is_some()
-
-                // TODO: last vertex is now first!
-                // WE need to update everything.
             }
             None => false,
         }

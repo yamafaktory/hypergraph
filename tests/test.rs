@@ -21,14 +21,17 @@ fn integration() {
     let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
 
     // Add some vertices.
-    let a = Vertex::new("a");
-    assert_eq!(graph.add_vertex(a), 0);
-    assert_eq!(graph.add_vertex(Vertex::new("b")), 1);
-    assert_eq!(graph.add_vertex(Vertex::new("c")), 2);
-    assert_eq!(graph.add_vertex(Vertex::new("d")), 3);
-    let e = Vertex::new("e");
-    assert_eq!(graph.add_vertex(e), 4);
-    assert_eq!(graph.add_vertex(e), 4); // adding the same vertex results in an update.
+    let vertex_a = Vertex::new("a");
+    let vertex_b = Vertex::new("b");
+    let vertex_c = Vertex::new("c");
+    let vertex_d = Vertex::new("d");
+    let vertex_e = Vertex::new("e");
+    assert_eq!(graph.add_vertex(vertex_a), 0);
+    assert_eq!(graph.add_vertex(vertex_b), 1);
+    assert_eq!(graph.add_vertex(vertex_c), 2);
+    assert_eq!(graph.add_vertex(vertex_d), 3);
+    assert_eq!(graph.add_vertex(vertex_e), 4);
+    assert_eq!(graph.add_vertex(vertex_e), 4); // adding the same vertex results in an update.
 
     // Add some hyperedges.
     assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo"), [0, 0]); // self-loop.
@@ -43,8 +46,8 @@ fn integration() {
     assert_eq!(graph.count_hyperedges(), 5);
 
     // Get the weights of some hyperedges and vertices.
-    assert_eq!(graph.get_vertex_weight(0), Some(&a));
-    assert_eq!(graph.get_vertex_weight(4), Some(&e));
+    assert_eq!(graph.get_vertex_weight(0), Some(&vertex_a));
+    assert_eq!(graph.get_vertex_weight(4), Some(&vertex_e));
     assert_eq!(graph.get_vertex_weight(5), None); // should not fail!
     assert_eq!(graph.get_hyperedge_weight([0, 0]), Some(&"foo"));
     assert_eq!(graph.get_hyperedge_weight([2, 1]), Some(&"leet"));
@@ -98,12 +101,12 @@ fn integration() {
     assert_eq!(graph.get_dijkstra_connections(3, 3), Some(vec![3,]));
 
     // Update a vertex's weight.
-    let a = Vertex::new("brand new heavies");
-    assert!(graph.update_vertex_weight(0, a));
-    assert_eq!(graph.get_vertex_weight(0), Some(&a));
+    let vertex_a = Vertex::new("brand new heavies");
+    assert!(graph.update_vertex_weight(0, vertex_a));
+    assert_eq!(graph.get_vertex_weight(0), Some(&vertex_a));
 
     // Update a hyperedge's weight.
-    graph.update_hyperedge_weight([0, 0], "yup");
+    assert!(graph.update_hyperedge_weight([0, 0], "yup"));
     assert_eq!(graph.get_hyperedge_weight([0, 0]), Some(&"yup"));
     assert_eq!(
         graph.count_vertices(),
@@ -135,7 +138,7 @@ fn integration() {
         Some(vec![vec![4, 0, 3, 2], vec![0, 4]])
     );
 
-    // Remove a vertex with no index alteration.
+    // Remove a vertex with no index alteration since it's the last one.
     assert!(graph.remove_vertex(4));
     assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0])); // was [0, 4] before
     assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 3, 2])); // was [4, 0, 3, 2] before
@@ -144,12 +147,13 @@ fn integration() {
     assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![0, 3, 2]]));
 
     // Remove a vertex with index alteration.
+    // In this case, index swapping is occurring, i.e. vertex of index 3 will become 0.
     assert!(graph.remove_vertex(0));
-    // assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0])); // was [0, 4] before
-    // assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 3, 2])); // was [4, 0, 3, 2] before
-    // assert_eq!(graph.get_vertex_weight(4), None);
-    // assert_eq!(graph.count_vertices(), 4);
-    // assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![0, 3, 2]]));
+    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![])); // was [0] before
+    assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 2])); // was [0, 3, 2] before
+    assert_eq!(graph.get_hyperedge_vertices(2), Some(vec![0])); // was [3] before
+    assert_eq!(graph.get_vertex_weight(3), None); // should be gone
+    assert_eq!(graph.get_vertex_weight(0), Some(&vertex_d)); // index swapping 3 -> 0
 
     // Render to graphviz dot format.
     graph.render_to_graphviz_dot();

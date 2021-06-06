@@ -137,20 +137,41 @@ where
     }
 
     /// Removes a vertex based on its index.
+    /// IndexMap doesn't allow holes by design, see:
+    /// https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
+    /// As a consequence, we have two options. Either we use shift_remove
+    /// and it will result in an expensive regeneration of all the indexes
+    /// in the map or we use swap_remove and deal with the fact that the last
+    /// element will be swapped in place of the removed one and will thus get
+    /// a new index. We use the latter solution for performance reasons.
     pub fn remove_vertex(&mut self, index: VertexIndex) -> bool {
-        // IndexMap doesn't allow holes by design, see:
-        // https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
-        // As a consequence, we have two options. Either we use shift_remove
-        // and it will result in an expensive regeneration of all the indexes
-        // in the map or we use swap_remove and deal with the fact that the last
-        // element will be swapped in place of the removed one and will thus get
-        // a new index. We use the latter solution for performance reasons.
         match self.vertices.clone().get_index(index) {
-            Some((key, _)) => {
-                self.vertices.swap_remove(key);
-                dbg!(self.hyperedges.clone());
-                todo!();
-                false
+            Some((key, hyperedges)) => {
+                // First, we need to get all the hyperedges' indexes of the
+                // vertex in order to update them accordingly.
+                for hyperedge in hyperedges.iter() {
+                    if let Some(hyperedge_index) = self.hyperedges.get_index_of(hyperedge) {
+                        self.update_hyperedge_vertices(
+                            hyperedge_index,
+                            &hyperedge
+                                .iter()
+                                .filter_map(|vertex| {
+                                    if vertex != &index {
+                                        Some(*vertex)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<usize>>(),
+                        );
+                    }
+                }
+
+                // Now we can safely remove the vertex.
+                self.vertices.swap_remove(key).is_some()
+
+                // TODO: last vertex is now first!
+                // WE need to update everything.
             }
             None => false,
         }

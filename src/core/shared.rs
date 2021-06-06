@@ -1,4 +1,4 @@
-use crate::{HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
+use crate::{Hypergraph, SharedTrait, VertexIndex};
 
 use itertools::Itertools;
 
@@ -12,7 +12,7 @@ where
         &self,
         from: VertexIndex,
         to: Option<VertexIndex>,
-    ) -> Vec<HyperedgeIndex> {
+    ) -> Vec<VertexIndex> {
         self.vertices
             .get_index(from)
             .iter()

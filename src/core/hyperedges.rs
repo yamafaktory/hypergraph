@@ -61,7 +61,7 @@ where
         &self,
         from: VertexIndex,
         to: VertexIndex,
-    ) -> Vec<HyperedgeIndex> {
+    ) -> Vec<VertexIndex> {
         self.get_connections(from, Some(to))
     }
 

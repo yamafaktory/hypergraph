@@ -4,7 +4,7 @@ use crate::{
 };
 
 use indexmap::IndexSet;
-use itertools::Itertools;
+use itertools::{max, Itertools};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -13,7 +13,16 @@ where
 {
     /// Adds a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
     /// Returns the weighted index of the hyperedge.
-    pub fn add_hyperedge(&mut self, vertices: &[usize], weight: HE) -> WeightedHyperedgeIndex {
+    pub fn add_hyperedge(
+        &mut self,
+        vertices: &[usize],
+        weight: HE,
+    ) -> Option<WeightedHyperedgeIndex> {
+        // Safe check to avoid out of bound index!
+        if *max(vertices).unwrap() + 1 > self.vertices.len() {
+            return None;
+        }
+
         // Update the vertices so that we keep directly track of the hyperedge.
         for vertex in vertices.iter() {
             let mut index_set = self.vertices[*vertex].clone();
@@ -27,7 +36,7 @@ where
         }
 
         // Insert the new hyperedge with the corresponding weight, get back the indexes.
-        match self.hyperedges.get(vertices) {
+        Some(match self.hyperedges.get(vertices) {
             Some(weights) => {
                 let mut new_weights = weights.clone();
                 let (weight_index, _) = new_weights.insert_full(weight);
@@ -45,7 +54,7 @@ where
 
                 [hyperedge_index, weight_index]
             }
-        }
+        })
     }
 
     /// Returns the number of hyperedges in the hypergraph.
@@ -109,6 +118,48 @@ where
             })
             .sorted()
             .collect::<Vec<usize>>()
+    }
+
+    /// Removes a hyperedge based on its index.
+    /// IndexMap doesn't allow holes by design, see:
+    /// https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
+    /// As a consequence, we have two options. Either we use shift_remove
+    /// and it will result in an expensive regeneration of all the indexes
+    /// in the map or we use swap_remove and deal with the fact that the last
+    /// element will be swapped in place of the removed one and will thus get
+    /// a new index. We use the latter solution for performance reasons.
+    pub fn remove_hyperedge(
+        &mut self,
+        [hyperedge_index, weight_index]: WeightedHyperedgeIndex,
+    ) -> bool {
+        match self.hyperedges.clone().get_index(hyperedge_index) {
+            Some((vertices, weights)) => {
+                // Either we have multiple weights for the index or only one.
+                // In the first case, we only want to drop the weight.
+                // In the second case, we need to remove the hyperedge completely.
+                if weights.len() > 1 {
+                    let mut new_weights = weights.clone();
+
+                    match self.get_hyperedge_weight([hyperedge_index, weight_index]) {
+                        Some(weight) => {
+                            // Use swap and remove.
+                            // This can potentially alter the indexes but
+                            // only at the hyperedge level.
+                            new_weights.swap_remove(weight);
+
+                            // Update with the new weights.
+                            self.hyperedges
+                                .insert(vertices.to_owned(), new_weights)
+                                .is_some()
+                        }
+                        None => false,
+                    }
+                } else {
+                    todo!()
+                }
+            }
+            None => false,
+        }
     }
 
     /// Updates the weight of a hyperedge based on its weighted index.

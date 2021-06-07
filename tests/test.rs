@@ -34,12 +34,13 @@ fn integration() {
     assert_eq!(graph.add_vertex(vertex_e), 4); // adding the same vertex results in an update.
 
     // Add some hyperedges.
-    assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo"), [0, 0]); // self-loop.
-    assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo_"), [0, 1]);
-    assert_eq!(graph.add_hyperedge(&[4, 0, 3, 2], "bar"), [1, 0]);
-    assert_eq!(graph.add_hyperedge(&[3], "woot"), [2, 0]); // unary.
-    assert_eq!(graph.add_hyperedge(&[3], "woot"), [2, 0]); // adding the exact same hyperedge results in an update.
-    assert_eq!(graph.add_hyperedge(&[3], "leet"), [2, 1]); // another unary on the same vertex with a different weight.
+    assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo"), Some([0, 0])); // self-loop.
+    assert_eq!(graph.add_hyperedge(&[0, 1, 1, 3], "foo_"), Some([0, 1]));
+    assert_eq!(graph.add_hyperedge(&[4, 0, 3, 2], "bar"), Some([1, 0]));
+    assert_eq!(graph.add_hyperedge(&[3], "woot"), Some([2, 0])); // unary.
+    assert_eq!(graph.add_hyperedge(&[3], "woot"), Some([2, 0])); // adding the exact same hyperedge results in an update.
+    assert_eq!(graph.add_hyperedge(&[3], "leet"), Some([2, 1])); // another unary on the same vertex with a different weight.
+    assert_eq!(graph.add_hyperedge(&[9], "nope"), None); // out-of-bound, should return None as no-op.
 
     // Count the vertices and the hyperedges.
     assert_eq!(graph.count_vertices(), 5);
@@ -140,8 +141,8 @@ fn integration() {
 
     // Remove a vertex with no index alteration since it's the last one.
     assert!(graph.remove_vertex(4));
-    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0])); // was [0, 4] before
-    assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 3, 2])); // was [4, 0, 3, 2] before
+    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0])); // was [0, 4] before.
+    assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 3, 2])); // was [4, 0, 3, 2] before.
     assert_eq!(graph.get_vertex_weight(4), None);
     assert_eq!(graph.count_vertices(), 4);
     assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![0, 3, 2]]));
@@ -149,11 +150,24 @@ fn integration() {
     // Remove a vertex with index alteration.
     // In this case, index swapping is occurring, i.e. vertex of index 3 will become 0.
     assert!(graph.remove_vertex(0));
-    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![])); // was [0] before
-    assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 2])); // was [0, 3, 2] before
-    assert_eq!(graph.get_hyperedge_vertices(2), Some(vec![0])); // was [3] before
-    assert_eq!(graph.get_vertex_weight(3), None); // should be gone
-    assert_eq!(graph.get_vertex_weight(0), Some(&vertex_d)); // index swapping 3 -> 0
+    assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![])); // was [0] before.
+    assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 2])); // was [0, 3, 2] before.
+    assert_eq!(graph.get_hyperedge_vertices(2), Some(vec![0])); // was [3] before.
+    assert_eq!(graph.get_vertex_weight(3), None); // should be gone.
+    assert_eq!(graph.get_vertex_weight(0), Some(&vertex_d)); // index swapping 3 -> 0.
+
+    // Remove a multi-weighted hyperedge with no index alteration since it's the last one.
+    assert_eq!(graph.add_hyperedge(&[0], "last"), Some([2, 2])); // add one more for testing reason.
+    assert!(graph.remove_hyperedge([2, 2]));
+    assert_eq!(graph.get_hyperedge_weight([2, 0]), Some(&"woot")); // should still be there.
+    assert_eq!(graph.get_hyperedge_weight([2, 1]), Some(&"leet")); // should still be there too.
+    assert_eq!(graph.get_hyperedge_weight([2, 2]), None); // should be gone.
+
+    // Remove a multi-weighted hyperedge with index alteration.
+    // In this case, index swapping is occurring, i.e. hyperedge of index 1 will become 0.
+    assert!(graph.remove_hyperedge([2, 0]));
+    assert_eq!(graph.get_hyperedge_weight([2, 0]), Some(&"leet")); // was [2, 1] before.
+    assert_eq!(graph.get_hyperedge_weight([2, 1]), None); // should be gone.
 
     // Render to graphviz dot format.
     graph.render_to_graphviz_dot();

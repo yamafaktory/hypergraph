@@ -4,6 +4,7 @@ mod dot;
 #[doc(hidden)]
 pub mod hyperedges;
 mod shared;
+mod utils;
 /// Vertices implementation.
 #[doc(hidden)]
 pub mod vertices;
@@ -41,7 +42,7 @@ pub struct Hypergraph<V, HE> {
     pub vertices: IndexMap<V, IndexSet<HyperedgeVertices>>,
     /// Hyperedges are stored as an IndexMap whose keys are a vector of
     /// vertices indexes and values are an IndexSet of weights.
-    /// Having a IndexSet of weights allows having two or more hyperedges
+    /// Having an IndexSet of weights allows having two or more hyperedges
     /// containing the same set of vertices (non-simple hypergraph).
     pub hyperedges: IndexMap<HyperedgeVertices, IndexSet<HE>>,
 }

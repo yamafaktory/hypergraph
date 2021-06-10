@@ -1,4 +1,4 @@
-use crate::{Hypergraph, SharedTrait, VertexIndex};
+use crate::{HyperedgeVertices, Hypergraph, SharedTrait, VertexIndex};
 
 use indexmap::IndexSet;
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
@@ -123,12 +123,100 @@ where
         self.get_connections(from, None)
     }
 
+    /// Gets the hyperedges as vectors of vertices of a vertex from its index.
+    pub fn get_vertex_hyperedges(&self, index: VertexIndex) -> Option<Vec<HyperedgeVertices>> {
+        self.vertices
+            .get_index(index)
+            .map(|(_, hyperedges)| hyperedges)
+            .map(|index_set| index_set.iter().cloned().collect())
+    }
+
     /// Gets the weight of a vertex from its index.
     pub fn get_vertex_weight(&self, index: VertexIndex) -> Option<&V> {
         self.vertices.get_index(index).map(|(weight, _)| weight)
     }
 
-    /// Update the weight of a vertex based on its index.
+    /// Removes a vertex based on its index.
+    /// IndexMap doesn't allow holes by design, see:
+    /// https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
+    /// As a consequence, we have two options. Either we use shift_remove
+    /// and it will result in an expensive regeneration of all the indexes
+    /// in the map or we use swap_remove and deal with the fact that the last
+    /// element will be swapped in place of the removed one and will thus get
+    /// a new index. We use the latter solution for performance reasons.
+    pub fn remove_vertex(&mut self, index: VertexIndex) -> bool {
+        match self.vertices.clone().get_index(index) {
+            Some((key, hyperedges)) => {
+                // First, we need to get all the hyperedges' indexes of the
+                // vertex in order to update them accordingly.
+                // We preemptively store the eventual index of the swapped
+                // vertex to avoid extra loops.
+                let last_index = self.count_vertices() - 1;
+                let maybe_swapped_index = if last_index == index {
+                    None
+                } else {
+                    Some(last_index)
+                };
+
+                for hyperedge in hyperedges.iter() {
+                    if let Some(hyperedge_index) = self.hyperedges.get_index_of(hyperedge) {
+                        self.update_hyperedge_vertices(
+                            hyperedge_index,
+                            &hyperedge
+                                .iter()
+                                .filter_map(|current_index| {
+                                    if current_index != &index {
+                                        // Inject the current index or the swapped one.
+                                        match maybe_swapped_index {
+                                            Some(swapped_index) => {
+                                                Some(if swapped_index == *current_index {
+                                                    index
+                                                } else {
+                                                    *current_index
+                                                })
+                                            }
+                                            None => Some(*current_index),
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<usize>>(),
+                        );
+                    }
+                }
+
+                // We also need to update the other hyperedges which are impacted by this change.
+                if let Some(swapped_index) = maybe_swapped_index {
+                    if let Some(hyperedge_weights) = self.get_vertex_hyperedges(swapped_index) {
+                        for weight in hyperedge_weights.iter() {
+                            if let Some(hyperedge_index) = self.hyperedges.get_index_of(weight) {
+                                self.update_hyperedge_vertices(
+                                    hyperedge_index,
+                                    &weight
+                                        .iter()
+                                        .map(|current_index| {
+                                            if *current_index == swapped_index {
+                                                index
+                                            } else {
+                                                *current_index
+                                            }
+                                        })
+                                        .collect::<Vec<usize>>(),
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Now we can safely remove the vertex.
+                self.vertices.swap_remove(key).is_some()
+            }
+            None => false,
+        }
+    }
+
+    /// Updates the weight of a vertex based on its index.
     pub fn update_vertex_weight(&mut self, index: VertexIndex, weight: V) -> bool {
         match self.vertices.clone().get_index(index) {
             Some((key, value)) => {

@@ -136,7 +136,6 @@ where
             Some((vertices, weights)) => {
                 // Either we have multiple weights for the index or only one.
                 // In the first case, we only want to drop the weight.
-                // In the second case, we need to remove the hyperedge completely.
                 if weights.len() > 1 {
                     let mut new_weights = weights.clone();
 
@@ -155,7 +154,28 @@ where
                         None => false,
                     }
                 } else {
-                    todo!()
+                    // In the second case, we need to remove the hyperedge completely.
+                    // First update the vertices accordingly.
+                    for index in vertices.iter() {
+                        if let Some((weight, vertex)) = self.vertices.clone().get_index(*index) {
+                            self.vertices.insert(
+                                *weight,
+                                vertex.iter().fold(
+                                    IndexSet::new(),
+                                    |mut new_index_set, hyperedge| {
+                                        if !are_arrays_equal(hyperedge, &vertices) {
+                                            new_index_set.insert(hyperedge.clone());
+                                        }
+
+                                        new_index_set
+                                    },
+                                ),
+                            );
+                        }
+                    }
+
+                    // Finally remove it.
+                    self.hyperedges.swap_remove(vertices).is_some()
                 }
             }
             None => false,

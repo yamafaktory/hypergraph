@@ -156,18 +156,27 @@ fn integration() {
     assert_eq!(graph.get_vertex_weight(3), None); // should be gone.
     assert_eq!(graph.get_vertex_weight(0), Some(&vertex_d)); // index swapping 3 -> 0.
 
-    // Remove a multi-weighted hyperedge with no index alteration since it's the last one.
+    // Remove a multi-weighted hyperedge with no weight index alteration since it's the last one.
     assert_eq!(graph.add_hyperedge(&[0], "last"), Some([2, 2])); // add one more for testing reason.
     assert!(graph.remove_hyperedge([2, 2]));
     assert_eq!(graph.get_hyperedge_weight([2, 0]), Some(&"woot")); // should still be there.
     assert_eq!(graph.get_hyperedge_weight([2, 1]), Some(&"leet")); // should still be there too.
     assert_eq!(graph.get_hyperedge_weight([2, 2]), None); // should be gone.
 
-    // Remove a multi-weighted hyperedge with index alteration.
+    // Remove a multi-weighted hyperedge with weight index alteration.
     // In this case, index swapping is occurring, i.e. hyperedge of index 1 will become 0.
     assert!(graph.remove_hyperedge([2, 0]));
     assert_eq!(graph.get_hyperedge_weight([2, 0]), Some(&"leet")); // was [2, 1] before.
     assert_eq!(graph.get_hyperedge_weight([2, 1]), None); // should be gone.
+
+    // Remove a single-weighted hyperedge.
+    // In this case, the hyperedge index is completely removed.
+    // Index alteration doesn't matter since vertices don't directly store it.
+    assert_eq!(graph.get_hyperedge_vertices(2), Some(vec![0]));
+    assert_eq!(graph.get_vertex_hyperedges(0), Some(vec![vec![0]]));
+    assert!(graph.remove_hyperedge([2, 0]));
+    assert_eq!(graph.get_hyperedge_weight([2, 0]), None); // should be gone.
+    assert_eq!(graph.get_vertex_hyperedges(0), Some(vec![]));
 
     // Render to graphviz dot format.
     graph.render_to_graphviz_dot();

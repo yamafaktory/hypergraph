@@ -2,6 +2,7 @@
 #![forbid(rust_2018_idioms)]
 
 use hypergraph::Hypergraph;
+use indexmap::IndexSet;
 
 #[test]
 fn integration() {
@@ -177,6 +178,25 @@ fn integration() {
     assert!(graph.remove_hyperedge([2, 0]));
     assert_eq!(graph.get_hyperedge_weight([2, 0]), None); // should be gone.
     assert_eq!(graph.get_vertex_hyperedges(0), Some(vec![]));
+
+    assert_eq!(
+        graph
+            .get_hyperedges()
+            .collect::<Vec<(&Vec<usize>, &IndexSet<&str>)>>(),
+        vec![
+            (&vec![], {
+                let mut index_set: IndexSet<&str> = IndexSet::new();
+                index_set.insert("yup");
+                index_set.insert("foo_");
+                &index_set.clone()
+            }),
+            (&vec![0, 2], {
+                let mut index_set: IndexSet<&str> = IndexSet::new();
+                index_set.insert("bar");
+                &index_set.clone()
+            })
+        ]
+    );
 
     // Render to graphviz dot format.
     graph.render_to_graphviz_dot();

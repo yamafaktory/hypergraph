@@ -92,6 +92,6 @@ where
     /// Due to Graphviz dot inability to render hypergraphs out of the box,
     /// unaries are rendered as vertex peripheries which can't be labelled.
     pub fn render_to_graphviz_dot(&self) {
-        println!("{}", render_to_graphviz_dot(&self));
+        println!("{}", render_to_graphviz_dot(self));
     }
 }

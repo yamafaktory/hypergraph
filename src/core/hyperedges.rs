@@ -64,6 +64,11 @@ where
             .fold(0, |count, (_, weights)| count + weights.len())
     }
 
+    // Returns an iterator of all the hyperedges.
+    pub fn get_hyperedges(&self) -> impl Iterator<Item = (&HyperedgeVertices, &IndexSet<HE>)> {
+        self.hyperedges.iter()
+    }
+
     /// Gets the list of all hyperedges containing a matching connection from
     /// one vertex to another.
     pub fn get_hyperedges_connections(
@@ -163,7 +168,7 @@ where
                                 vertex.iter().fold(
                                     IndexSet::new(),
                                     |mut new_index_set, hyperedge| {
-                                        if !are_arrays_equal(hyperedge, &vertices) {
+                                        if !are_arrays_equal(hyperedge, vertices) {
                                             new_index_set.insert(hyperedge.clone());
                                         }
 

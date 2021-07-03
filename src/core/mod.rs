@@ -14,8 +14,10 @@ use dot::render_to_graphviz_dot;
 
 use indexmap::{IndexMap, IndexSet};
 use std::{
+    collections::HashMap,
     fmt::{Debug, Formatter, Result},
     hash::Hash,
+    ops::Index,
 };
 
 /// Hyperedge representation as a growable array of vertices indexes.
@@ -45,6 +47,12 @@ pub struct Hypergraph<V, HE> {
     /// Having an IndexSet of weights allows having two or more hyperedges
     /// containing the same set of vertices (non-simple hypergraph).
     pub hyperedges: IndexMap<HyperedgeVertices, IndexSet<HE>>,
+
+    // TODO
+    hyperedges_count: usize,
+    hyperedges_mapping: HashMap<WeightedHyperedgeIndex, StableHyperedgeWeightedIndex>,
+    vertices_count: usize,
+    vertices_mapping: HashMap<VertexIndex, StableVertexIndex>,
 }
 
 impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
@@ -85,6 +93,12 @@ where
         Hypergraph {
             vertices: IndexMap::with_capacity(vertices),
             hyperedges: IndexMap::with_capacity(hyperedges),
+
+            //
+            hyperedges_count: 0,
+            hyperedges_mapping: HashMap::with_capacity(0),
+            vertices_count: 0,
+            vertices_mapping: HashMap::with_capacity(0),
         }
     }
 
@@ -93,5 +107,27 @@ where
     /// unaries are rendered as vertex peripheries which can't be labelled.
     pub fn render_to_graphviz_dot(&self) {
         println!("{}", render_to_graphviz_dot(self));
+    }
+}
+
+// Use the newtype index pattern.
+// https://matklad.github.io/2018/06/04/newtype-index-pattern.html
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct StableVertexIndex(pub usize);
+
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct StableHyperedgeWeightedIndex(pub usize, pub usize);
+
+impl<V, HE> Index<V> for Hypergraph<V, HE>
+where
+    V: SharedTrait,
+    HE: SharedTrait,
+{
+    type Output = usize;
+
+    fn index(&self, vertex: V) -> &Self::Output {
+        let (index, _, _) = self.vertices.get_full(&vertex).unwrap();
+        dbg!(index);
+        &0
     }
 }

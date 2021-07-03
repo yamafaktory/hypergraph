@@ -1,4 +1,4 @@
-use crate::{HyperedgeVertices, Hypergraph, SharedTrait, VertexIndex};
+use crate::{HyperedgeVertices, Hypergraph, SharedTrait, StableVertexIndex, VertexIndex};
 
 use indexmap::IndexSet;
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
@@ -8,15 +8,31 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
+    fn add_stable_vertex_index(&mut self, unstable_index: VertexIndex) -> StableVertexIndex {
+        match self.vertices_mapping.get(&unstable_index) {
+            Some(stable_vertex_index) => *stable_vertex_index,
+            None => {
+                let stable_index = StableVertexIndex(self.vertices_count);
+
+                self.vertices_mapping.insert(unstable_index, stable_index);
+
+                // Update the counter.
+                self.vertices_count += 1;
+
+                stable_index
+            }
+        }
+    }
+
     /// Adds a vertex as a custom weight in the hypergraph.
     /// Returns the index of the vertex.
-    pub fn add_vertex(&mut self, weight: V) -> VertexIndex {
+    pub fn add_vertex(&mut self, weight: V) -> StableVertexIndex {
         self.vertices
             .entry(weight)
             .or_insert(IndexSet::with_capacity(0));
 
         // Assume that unwrapping the index can't be none due to previous insertion.
-        self.vertices.get_index_of(&weight).unwrap()
+        self.add_stable_vertex_index(self.vertices.get_index_of(&weight).unwrap())
     }
 
     /// Returns the number of vertices in the hypergraph.
@@ -109,7 +125,7 @@ where
                     // Push it to the heap.
                     heap.push(next);
 
-                    // Relaxation, we have now found a better way
+                    // Relaxation, we have now found a better way.
                     distances[vertex_index] = next.distance;
                 }
             }

@@ -1,6 +1,6 @@
 use crate::{
     core::utils::are_arrays_equal, HyperedgeIndex, HyperedgeVertices, Hypergraph, SharedTrait,
-    VertexIndex, WeightedHyperedgeIndex,
+    StableHyperedgeWeightedIndex, VertexIndex, WeightedHyperedgeIndex,
 };
 
 use indexmap::IndexSet;
@@ -11,13 +11,66 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
+    fn add_stable_hyperedge_weighted_index(
+        &mut self,
+        [unstable_hyperedge_index, unstable_weight_index]: WeightedHyperedgeIndex,
+    ) -> StableHyperedgeWeightedIndex {
+        match self
+            .hyperedges_mapping
+            .get(&[unstable_hyperedge_index, unstable_weight_index])
+        {
+            Some(stable_hyperedge_weighted_index) => *stable_hyperedge_weighted_index,
+            None => {
+                let is_first_weight = self
+                    .hyperedges
+                    .get_index(unstable_hyperedge_index)
+                    .unwrap()
+                    .1
+                    .len()
+                    == 1;
+
+                // Here we don't care about the weight index which doesn't
+                // alter the indexes' stability. Also, we don't want to use
+                // hyperedges_count for new non-simple hyperedges.
+                let stable_index = StableHyperedgeWeightedIndex(
+                    if is_first_weight {
+                        self.hyperedges_count
+                    } else {
+                        // Here we have a non-simple hyperedge. We need to get
+                        // the StableHyperedgeWeightedIndex of the first weight
+                        // and inject it.
+                        self.hyperedges_mapping
+                            .get(&[unstable_hyperedge_index, 0])
+                            .unwrap()
+                            .0
+                    },
+                    unstable_weight_index,
+                );
+
+                self.hyperedges_mapping.insert(
+                    [unstable_hyperedge_index, unstable_weight_index],
+                    stable_index,
+                );
+
+                // Update the counter.
+                // We assume that the insertion has already been performed,
+                // hence we can unwrap safely.
+                if is_first_weight {
+                    self.hyperedges_count += 1;
+                }
+
+                stable_index
+            }
+        }
+    }
+
     /// Adds a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
     /// Returns the weighted index of the hyperedge.
     pub fn add_hyperedge(
         &mut self,
         vertices: &[usize],
         weight: HE,
-    ) -> Option<WeightedHyperedgeIndex> {
+    ) -> Option<StableHyperedgeWeightedIndex> {
         // Safe check to avoid out of bound index!
         if *max(vertices).unwrap() + 1 > self.vertices.len() {
             return None;
@@ -44,7 +97,7 @@ where
                     .hyperedges
                     .insert_full(vertices.to_owned(), new_weights);
 
-                [hyperedge_index, weight_index]
+                self.add_stable_hyperedge_weighted_index([hyperedge_index, weight_index])
             }
             None => {
                 let mut weights = IndexSet::new();
@@ -52,7 +105,7 @@ where
                 let (hyperedge_index, _) =
                     self.hyperedges.insert_full(vertices.to_owned(), weights);
 
-                [hyperedge_index, weight_index]
+                self.add_stable_hyperedge_weighted_index([hyperedge_index, weight_index])
             }
         })
     }
@@ -147,8 +200,9 @@ where
                     match self.get_hyperedge_weight([hyperedge_index, weight_index]) {
                         Some(weight) => {
                             // Use swap and remove.
-                            // This can potentially alter the indexes but
-                            // only at the hyperedge level.
+                            // This can potentially alter the indexes but only
+                            // at the internal hyperedge level, i.e. it doesn't
+                            // break the stability of the indexes.
                             new_weights.swap_remove(weight);
 
                             // Update with the new weights.

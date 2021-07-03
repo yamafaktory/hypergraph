@@ -4,7 +4,7 @@
 
 //! Hypergraph is an open-source library built in Rust to represent directed hypergraphs.
 //! ## Example
-//! ```
+//! ```ignore
 //!use hypergraph::Hypergraph;
 //!
 //!// Create a new hypergraph.

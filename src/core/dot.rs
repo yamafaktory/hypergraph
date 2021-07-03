@@ -24,23 +24,19 @@ where
     // Partition the hyperedges in two groups, one for the unaries, the other for the rest.
     // Graphviz dot doesn't provide a way to render a hypergraph. To overcome this issue,
     // we need to track the unaries and treat them separately.
-    let partitioned_hyperedges = hypergraph.hyperedges.iter().fold(
-        (Vec::new(), IndexMap::new()),
-        #[allow(clippy::type_complexity)]
-        |mut acc: (
-            Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
-            IndexMap<usize, &IndexSet<HE>>,
-        ),
-         (vertices, weight)| {
-            if vertices.len() == 1 {
-                acc.1.insert(vertices[0], weight); // Unaries.
-            } else {
-                acc.0.push((vertices, weight));
+    let mut unaries: IndexMap<usize, &IndexSet<HE>> = IndexMap::new();
+    let mut non_unaries: Vec<(&HyperedgeVertices, &IndexSet<HE>)> = Vec::new();
+    for (vertices, weight) in hypergraph.hyperedges.iter() {
+        match vertices.as_slice() {
+            [] => {} // TODO nothing to draw for empty sets?
+            [vertex] => {
+                unaries.insert(*vertex, weight);
             }
-
-            acc
-        },
-    );
+            _ => {
+                non_unaries.push((vertices, weight));
+            }
+        }
+    }
 
     let mut output = Vec::new();
     {
@@ -67,20 +63,17 @@ where
         for (index, (weight, _)) in hypergraph.vertices.iter().enumerate() {
             let mut node = graph.node_named(&index.to_string());
             node.set_label(&format!("{:?}", weight.safe_debug()));
-            if let Some(weight) = partitioned_hyperedges.1.get(&index) {
+            if let Some(weight) = unaries.get(&index) {
                 node.set("peripheries", &(weight.len() + 1).to_string(), false);
             }
         }
 
-        for (vertices, weights) in partitioned_hyperedges.0.iter() {
-            if vertices.len() < 2 {
-                continue; // can't do an edge if zero or one vertices to join!
-            }
+        for (vertices, weights) in non_unaries.iter() {
             let random_color = get_random_hex_color();
             for weight in weights.iter() {
                 graph
                     .edges(vertices.iter().map(|v| v.to_string()))
-                    .unwrap() // shouldn't panic as vertices.len() >= 2
+                    .unwrap() // shouldn't panic as vertices.len() >= 2 checked above
                     .attributes()
                     .set("color", &random_color, true)
                     .set("fontcolor", &random_color, true)

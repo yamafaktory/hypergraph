@@ -1,6 +1,6 @@
 use crate::{
     core::utils::are_arrays_equal, HyperedgeIndex, HyperedgeVertices, Hypergraph, SharedTrait,
-    StableHyperedgeWeightedIndex, VertexIndex, WeightedHyperedgeIndex,
+    StableHyperedgeWeightedIndex, StableVertexIndex, VertexIndex, WeightedHyperedgeIndex,
 };
 
 use indexmap::IndexSet;
@@ -13,55 +13,23 @@ where
 {
     fn add_stable_hyperedge_weighted_index(
         &mut self,
-        [unstable_hyperedge_index, unstable_weight_index]: WeightedHyperedgeIndex,
+        unstable_weighted_hyperedge_index: WeightedHyperedgeIndex,
     ) -> StableHyperedgeWeightedIndex {
         match self
             .hyperedges_mapping_left
-            .get(&[unstable_hyperedge_index, unstable_weight_index])
+            .get(&unstable_weighted_hyperedge_index)
         {
             Some(stable_hyperedge_weighted_index) => *stable_hyperedge_weighted_index,
             None => {
-                let is_first_weight = self
-                    .hyperedges
-                    .get_index(unstable_hyperedge_index)
-                    .unwrap()
-                    .1
-                    .len()
-                    == 1;
+                let stable_index = StableHyperedgeWeightedIndex(self.hyperedges_count);
 
-                // Here we don't care about the weight index which doesn't
-                // alter the indexes' stability. Also, we don't want to use
-                // hyperedges_count for new non-simple hyperedges.
-                let stable_index = StableHyperedgeWeightedIndex(
-                    if is_first_weight {
-                        self.hyperedges_count
-                    } else {
-                        // Here we have a non-simple hyperedge. We need to get
-                        // the StableHyperedgeWeightedIndex of the first weight
-                        // and inject it.
-                        self.hyperedges_mapping_left
-                            .get(&[unstable_hyperedge_index, 0])
-                            .unwrap()
-                            .0
-                    },
-                    unstable_weight_index,
-                );
-
-                self.hyperedges_mapping_left.insert(
-                    [unstable_hyperedge_index, unstable_weight_index],
-                    stable_index,
-                );
-                self.hyperedges_mapping_right.insert(
-                    stable_index,
-                    [unstable_hyperedge_index, unstable_weight_index],
-                );
+                self.hyperedges_mapping_left
+                    .insert(unstable_weighted_hyperedge_index, stable_index);
+                self.hyperedges_mapping_right
+                    .insert(stable_index, unstable_weighted_hyperedge_index);
 
                 // Update the counter.
-                // We assume that the insertion has already been performed,
-                // hence we can unwrap safely.
-                if is_first_weight {
-                    self.hyperedges_count += 1;
-                }
+                self.hyperedges_count += 1;
 
                 stable_index
             }
@@ -72,22 +40,38 @@ where
     /// Returns the weighted index of the hyperedge.
     pub fn add_hyperedge(
         &mut self,
-        vertices: &[usize],
+        vertices: Vec<StableVertexIndex>,
         weight: HE,
     ) -> Option<StableHyperedgeWeightedIndex> {
         // Safe check to avoid out of bound index!
-        if *max(vertices).unwrap() + 1 > self.vertices.len() {
+        if self
+            .vertices_mapping_right
+            .get(&max(vertices).unwrap())
+            .unwrap()
+            + 1
+            > self.vertices.len()
+        {
             return None;
         }
 
+        let unstable_vertices = vertices
+            .iter()
+            .map(|vertex| *self.vertices_mapping_right.get(v).unwrap())
+            .collect::<Vec<usize>>();
+
         // Update the vertices so that we keep directly track of the hyperedge.
         for vertex in vertices.iter() {
-            let mut index_set = self.vertices[*vertex].clone();
+            let unstable_index = *self.vertices_mapping_right.get(vertex).unwrap();
+            let mut index_set = self.vertices[unstable_index].clone();
 
-            index_set.insert(vertices.to_vec());
+            index_set.insert(unstable_vertices);
 
             self.vertices.insert(
-                self.vertices.get_index(*vertex).unwrap().0.to_owned(),
+                self.vertices
+                    .get_index(unstable_index)
+                    .unwrap()
+                    .0
+                    .to_owned(),
                 index_set,
             );
         }
@@ -130,9 +114,9 @@ where
     /// one vertex to another.
     pub fn get_hyperedges_connections(
         &self,
-        from: VertexIndex,
-        to: VertexIndex,
-    ) -> Vec<VertexIndex> {
+        from: StableVertexIndex,
+        to: StableVertexIndex,
+    ) -> Vec<StableVertexIndex> {
         self.get_connections(from, Some(to))
     }
 

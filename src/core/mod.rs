@@ -121,7 +121,7 @@ where
 pub struct StableVertexIndex(pub usize);
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct StableHyperedgeWeightedIndex(pub usize, pub usize);
+pub struct StableHyperedgeWeightedIndex(pub usize);
 
 impl<V, HE> Index<V> for Hypergraph<V, HE>
 where

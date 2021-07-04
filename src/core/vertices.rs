@@ -8,16 +8,16 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
-    fn add_stable_vertex_index(&mut self, unstable_index: VertexIndex) -> StableVertexIndex {
-        match self.vertices_mapping_left.get(&unstable_index) {
+    fn add_stable_vertex_index(&mut self, unstable_vertex_index: VertexIndex) -> StableVertexIndex {
+        match self.vertices_mapping_left.get(&unstable_vertex_index) {
             Some(stable_vertex_index) => *stable_vertex_index,
             None => {
                 let stable_index = StableVertexIndex(self.vertices_count);
 
                 self.vertices_mapping_left
-                    .insert(unstable_index, stable_index);
+                    .insert(unstable_vertex_index, stable_index);
                 self.vertices_mapping_right
-                    .insert(stable_index, unstable_index);
+                    .insert(stable_index, unstable_vertex_index);
 
                 // Update the counter.
                 self.vertices_count += 1;
@@ -48,9 +48,9 @@ where
     /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
     pub fn get_dijkstra_connections(
         &self,
-        from: VertexIndex,
-        to: VertexIndex,
-    ) -> Option<Vec<VertexIndex>> {
+        from: StableVertexIndex,
+        to: StableVertexIndex,
+    ) -> Option<Vec<StableVertexIndex>> {
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         struct Cursor {
             distance: usize,
@@ -73,6 +73,15 @@ where
             }
         }
 
+        // Get the unstable indexes from the mapping.
+        let maybe_unstable_from = self.vertices_mapping_right.get(&from);
+        let maybe_unstable_to = self.vertices_mapping_right.get(&to);
+
+        // Safe-check: return None if one or the other is None.
+        if maybe_unstable_from.is_none() || maybe_unstable_to.is_none() {
+            return None;
+        }
+
         // We need to initialize a vector of length equal to the number of vertices.
         // The default value, as per Dijkstra, must be set to infinity.
         // A value of usize::MAX is used.
@@ -84,20 +93,20 @@ where
         let mut heap = BinaryHeap::new();
 
         // Initialize the first vertex to zero.
-        distances[from] = 0;
+        distances[*maybe_unstable_from.unwrap()] = 0;
 
         // Push the first cursor to the heap.
         heap.push(Cursor {
             distance: 0,
-            index: from,
+            index: *maybe_unstable_from.unwrap(),
         });
 
         // Keep track of the traversal path.
-        let mut path = Vec::<usize>::new();
+        let mut path = Vec::<StableVertexIndex>::new();
 
         while let Some(Cursor { distance, index }) = heap.pop() {
             // End of the traversal.
-            if index == to {
+            if index == *maybe_unstable_to.unwrap() {
                 // We need to inject the index of the target vertex.
                 path.push(to);
 
@@ -112,24 +121,27 @@ where
                 continue;
             }
 
-            // For every connected vertex, try to find the lowest distance.
-            for vertex_index in self.get_vertex_connections(index) {
-                let next = Cursor {
-                    // We assume a distance of one by default.
-                    distance: distance + 1,
-                    index: vertex_index,
-                };
+            if let Some(index) = self.vertices_mapping_left.get(&index) {
+                // For every connected vertex, try to find the lowest distance.
+                for vertex_index in self.get_vertex_connections(*index) {
+                    let unstable_index = *self.vertices_mapping_right.get(&vertex_index).unwrap();
+                    let next = Cursor {
+                        // We assume a distance of one by default.
+                        distance: distance + 1,
+                        index: unstable_index,
+                    };
 
-                // If so, add it to the frontier and continue.
-                if next.distance < distances[next.index] {
-                    // Update the traversal accordingly.
-                    path.push(index);
+                    // If so, add it to the frontier and continue.
+                    if next.distance < distances[next.index] {
+                        // Update the traversal accordingly.
+                        path.push(*index);
 
-                    // Push it to the heap.
-                    heap.push(next);
+                        // Push it to the heap.
+                        heap.push(next);
 
-                    // Relaxation, we have now found a better way.
-                    distances[vertex_index] = next.distance;
+                        // Relaxation, we have now found a better way.
+                        distances[unstable_index] = next.distance;
+                    }
                 }
             }
         }
@@ -138,7 +150,7 @@ where
     }
 
     /// Gets the list of all vertices connected to a given vertex.
-    pub fn get_vertex_connections(&self, from: VertexIndex) -> Vec<VertexIndex> {
+    pub fn get_vertex_connections(&self, from: StableVertexIndex) -> Vec<StableVertexIndex> {
         self.get_connections(from, None)
     }
 

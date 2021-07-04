@@ -37,27 +37,27 @@ fn integration() {
     // Add some hyperedges.
     assert_eq!(
         graph.add_hyperedge(&[0, 1, 1, 3], "foo"), // self-loop.
-        Some(StableHyperedgeWeightedIndex(0, 0))
+        Some(StableHyperedgeWeightedIndex(0))
     );
     assert_eq!(
         graph.add_hyperedge(&[0, 1, 1, 3], "foo_"),
-        Some(StableHyperedgeWeightedIndex(0, 1))
+        Some(StableHyperedgeWeightedIndex(1))
     );
     assert_eq!(
         graph.add_hyperedge(&[4, 0, 3, 2], "bar"),
-        Some(StableHyperedgeWeightedIndex(1, 0))
+        Some(StableHyperedgeWeightedIndex(2))
     );
     assert_eq!(
         graph.add_hyperedge(&[3], "woot"), // unary.
-        Some(StableHyperedgeWeightedIndex(2, 0))
+        Some(StableHyperedgeWeightedIndex(3))
     );
     assert_eq!(
         graph.add_hyperedge(&[3], "woot"), // adding the exact same hyperedge results in an update.
-        Some(StableHyperedgeWeightedIndex(2, 0))
+        Some(StableHyperedgeWeightedIndex(3))
     );
     assert_eq!(
         graph.add_hyperedge(&[3], "leet"), // another unary on the same vertex with a different weight.
-        Some(StableHyperedgeWeightedIndex(2, 1))
+        Some(StableHyperedgeWeightedIndex(4))
     );
     assert_eq!(graph.add_hyperedge(&[9], "nope"), None); // out-of-bound, should return None as no-op.
 
@@ -76,25 +76,25 @@ fn integration() {
     );
     assert_eq!(graph.get_vertex_weight(StableVertexIndex(5)), None); // should not fail!
     assert_eq!(
-        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(0, 0)),
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(0)),
         Some(&"foo")
     );
     assert_eq!(
-        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(2, 1)),
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(4)),
         Some(&"leet")
     );
     assert_eq!(
-        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(3, 0)), // should not fail!
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(5)), // should not fail!
         None
     );
 
     // Get the vertices of a hyperedge.
     assert_eq!(
-        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0, 0)),
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
         Some(vec![0, 1, 1, 3])
     );
     assert_eq!(
-        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(3, 0)), // should not fail!
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(5)), // should not fail!
         None
     );
 
@@ -123,48 +123,84 @@ fn integration() {
     // Check hyperedges intersections.
     assert_eq!(
         graph.get_hyperedges_intersections(&[
-            StableHyperedgeWeightedIndex(0, 0),
-            StableHyperedgeWeightedIndex(1, 0)
+            StableHyperedgeWeightedIndex(0),
+            StableHyperedgeWeightedIndex(2)
         ]),
         vec![0, 3]
     );
     assert_eq!(
         graph.get_hyperedges_intersections(&[
-            StableHyperedgeWeightedIndex(0, 0),
-            StableHyperedgeWeightedIndex(1, 0),
-            StableHyperedgeWeightedIndex(2, 0)
+            StableHyperedgeWeightedIndex(0),
+            StableHyperedgeWeightedIndex(2),
+            StableHyperedgeWeightedIndex(3)
         ]),
         vec![3]
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(0, 0)]),
+        graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(0)]),
         vec![0, 1, 3]
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(3, 0)]), // should not fail!
+        graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(5)]), // should not fail!
         vec![]
     );
 
-    // // Get the hyperedges connecting some vertices.
-    // assert_eq!(graph.get_hyperedges_connections(1, 1), vec![0]);
-    // assert_eq!(graph.get_hyperedges_connections(3, 2), vec![1]);
-    // assert_eq!(graph.get_hyperedges_connections(3, 0), vec![]); // no match, should stay empty!
-
-    // // Get the connections from some vertices.
-    // assert_eq!(graph.get_vertex_connections(0), vec![1, 3]);
-    // assert_eq!(graph.get_vertex_connections(1), vec![1, 3]);
-    // assert_eq!(graph.get_vertex_connections(2), vec![]);
-    // assert_eq!(graph.get_vertex_connections(3), vec![2]);
-
-    // // Get some paths via Dijkstra.
+    // TODO: this is actually wrong!
+    // Get the hyperedges connecting some vertices.
     // assert_eq!(
-    //     graph.get_dijkstra_connections(4, 2),
-    //     Some(vec![4, 0, 3, 2,])
+    //     graph.get_hyperedges_connections(StableVertexIndex(1), StableVertexIndex(1)),
+    //     vec![0]
     // );
-    // assert_eq!(graph.get_dijkstra_connections(0, 3), Some(vec![0, 3,]));
-    // assert_eq!(graph.get_dijkstra_connections(0, 4), None);
-    // assert_eq!(graph.get_dijkstra_connections(1, 1), Some(vec![1,]));
-    // assert_eq!(graph.get_dijkstra_connections(3, 3), Some(vec![3,]));
+    // assert_eq!(
+    //     graph.get_hyperedges_connections(StableVertexIndex(4), StableVertexIndex(2)),
+    //     vec![1]
+    // );
+    // assert_eq!(
+    //     graph.get_hyperedges_connections(StableVertexIndex(3), StableVertexIndex(0)),
+    //     vec![] // no match, should stay empty!
+    // );
+
+    // Get the connections from some vertices.
+    assert_eq!(
+        graph.get_vertex_connections(StableVertexIndex(0)),
+        vec![StableVertexIndex(1), StableVertexIndex(3)]
+    );
+    assert_eq!(
+        graph.get_vertex_connections(StableVertexIndex(1)),
+        vec![StableVertexIndex(1), StableVertexIndex(3)]
+    );
+    assert_eq!(graph.get_vertex_connections(StableVertexIndex(2)), vec![]);
+    assert_eq!(
+        graph.get_vertex_connections(StableVertexIndex(3)),
+        vec![StableVertexIndex(2)]
+    );
+
+    // Get some paths via Dijkstra.
+    assert_eq!(
+        graph.get_dijkstra_connections(StableVertexIndex(4), StableVertexIndex(2)),
+        Some(vec![
+            StableVertexIndex(4),
+            StableVertexIndex(0),
+            StableVertexIndex(3),
+            StableVertexIndex(2),
+        ])
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(StableVertexIndex(0), StableVertexIndex(3)),
+        Some(vec![StableVertexIndex(0), StableVertexIndex(3),])
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(StableVertexIndex(0), StableVertexIndex(4)),
+        None
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(StableVertexIndex(1), StableVertexIndex(1)),
+        Some(vec![StableVertexIndex(1)])
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(StableVertexIndex(3), StableVertexIndex(3)),
+        Some(vec![StableVertexIndex(3)])
+    );
 
     // // Update a vertex's weight.
     // let vertex_a = Vertex::new("brand new heavies");

@@ -9,12 +9,15 @@ where
     HE: SharedTrait,
 {
     fn add_stable_vertex_index(&mut self, unstable_index: VertexIndex) -> StableVertexIndex {
-        match self.vertices_mapping.get(&unstable_index) {
+        match self.vertices_mapping_left.get(&unstable_index) {
             Some(stable_vertex_index) => *stable_vertex_index,
             None => {
                 let stable_index = StableVertexIndex(self.vertices_count);
 
-                self.vertices_mapping.insert(unstable_index, stable_index);
+                self.vertices_mapping_left
+                    .insert(unstable_index, stable_index);
+                self.vertices_mapping_right
+                    .insert(stable_index, unstable_index);
 
                 // Update the counter.
                 self.vertices_count += 1;
@@ -140,16 +143,29 @@ where
     }
 
     /// Gets the hyperedges as vectors of vertices of a vertex from its index.
-    pub fn get_vertex_hyperedges(&self, index: VertexIndex) -> Option<Vec<HyperedgeVertices>> {
-        self.vertices
-            .get_index(index)
-            .map(|(_, hyperedges)| hyperedges)
-            .map(|index_set| index_set.iter().cloned().collect())
+    pub fn get_vertex_hyperedges(
+        &self,
+        stable_vertex_index: StableVertexIndex,
+    ) -> Option<Vec<HyperedgeVertices>> {
+        match self.vertices_mapping_right.get(&stable_vertex_index) {
+            Some(unstable_vertex_index) => self
+                .vertices
+                .get_index(*unstable_vertex_index)
+                .map(|(_, hyperedges)| hyperedges)
+                .map(|index_set| index_set.iter().cloned().collect()),
+            None => None,
+        }
     }
 
     /// Gets the weight of a vertex from its index.
-    pub fn get_vertex_weight(&self, index: VertexIndex) -> Option<&V> {
-        self.vertices.get_index(index).map(|(weight, _)| weight)
+    pub fn get_vertex_weight(&self, stable_vertex_index: StableVertexIndex) -> Option<&V> {
+        match self.vertices_mapping_right.get(&stable_vertex_index) {
+            Some(unstable_vertex_index) => self
+                .vertices
+                .get_index(*unstable_vertex_index)
+                .map(|(weight, _)| weight),
+            None => None,
+        }
     }
 
     /// Removes a vertex based on its index.
@@ -177,7 +193,10 @@ where
                 for hyperedge in hyperedges.iter() {
                     if let Some(hyperedge_index) = self.hyperedges.get_index_of(hyperedge) {
                         self.update_hyperedge_vertices(
-                            hyperedge_index,
+                            *self
+                                .hyperedges_mapping_left
+                                .get(&[hyperedge_index, 0])
+                                .unwrap(),
                             &hyperedge
                                 .iter()
                                 .filter_map(|current_index| {
@@ -204,11 +223,16 @@ where
 
                 // We also need to update the other hyperedges which are impacted by this change.
                 if let Some(swapped_index) = maybe_swapped_index {
-                    if let Some(hyperedge_weights) = self.get_vertex_hyperedges(swapped_index) {
+                    if let Some(hyperedge_weights) = self.get_vertex_hyperedges(
+                        *self.vertices_mapping_left.get(&swapped_index).unwrap(),
+                    ) {
                         for weight in hyperedge_weights.iter() {
                             if let Some(hyperedge_index) = self.hyperedges.get_index_of(weight) {
                                 self.update_hyperedge_vertices(
-                                    hyperedge_index,
+                                    *self
+                                        .hyperedges_mapping_left
+                                        .get(&[hyperedge_index, 0])
+                                        .unwrap(),
                                     &weight
                                         .iter()
                                         .map(|current_index| {

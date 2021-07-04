@@ -66,38 +66,84 @@ fn integration() {
     assert_eq!(graph.count_hyperedges(), 5);
 
     // Get the weights of some hyperedges and vertices.
-    assert_eq!(graph.get_vertex_weight(0), Some(&vertex_a));
-    // assert_eq!(graph.get_vertex_weight(4), Some(&vertex_e));
-    // assert_eq!(graph.get_vertex_weight(5), None); // should not fail!
-    // assert_eq!(graph.get_hyperedge_weight([0, 0]), Some(&"foo"));
-    // assert_eq!(graph.get_hyperedge_weight([2, 1]), Some(&"leet"));
-    // assert_eq!(graph.get_hyperedge_weight([3, 0]), None); // should not fail!
+    assert_eq!(
+        graph.get_vertex_weight(StableVertexIndex(0)),
+        Some(&vertex_a)
+    );
+    assert_eq!(
+        graph.get_vertex_weight(StableVertexIndex(4)),
+        Some(&vertex_e)
+    );
+    assert_eq!(graph.get_vertex_weight(StableVertexIndex(5)), None); // should not fail!
+    assert_eq!(
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(0, 0)),
+        Some(&"foo")
+    );
+    assert_eq!(
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(2, 1)),
+        Some(&"leet")
+    );
+    assert_eq!(
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(3, 0)), // should not fail!
+        None
+    );
 
-    // // Get the vertices of a hyperedge.
-    // assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0, 1, 1, 3]));
-    // assert_eq!(graph.get_hyperedge_vertices(3), None); // should not fail!
+    // Get the vertices of a hyperedge.
+    assert_eq!(
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0, 0)),
+        Some(vec![0, 1, 1, 3])
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(3, 0)), // should not fail!
+        None
+    );
 
-    // // Get the hyperedges of some vertices as vectors of vertices.
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges(0),
-    //     Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2]])
-    // );
-    // assert_eq!(graph.get_vertex_hyperedges(1), Some(vec![vec![0, 1, 1, 3]]));
-    // assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![4, 0, 3, 2]]));
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges(3),
-    //     Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2], vec![3]])
-    // );
-    // assert_eq!(graph.get_vertex_hyperedges(4), Some(vec![vec![4, 0, 3, 2]]));
+    // Get the hyperedges of some vertices as vectors of vertices.
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(0)),
+        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2]])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(1)),
+        Some(vec![vec![0, 1, 1, 3]])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(2)),
+        Some(vec![vec![4, 0, 3, 2]])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(3)),
+        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2], vec![3]])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(4)),
+        Some(vec![vec![4, 0, 3, 2]])
+    );
 
-    // // Check hyperedges intersections.
-    // assert_eq!(graph.get_hyperedges_intersections(&[0, 1]), vec![0, 3]);
-    // assert_eq!(graph.get_hyperedges_intersections(&[0, 1, 2]), vec![3]);
-    // assert_eq!(graph.get_hyperedges_intersections(&[0]), vec![0, 1, 3]);
-    // assert_eq!(
-    //     graph.get_hyperedges_intersections(&[3]), // should not fail!
-    //     vec![]
-    // );
+    // Check hyperedges intersections.
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[
+            StableHyperedgeWeightedIndex(0, 0),
+            StableHyperedgeWeightedIndex(1, 0)
+        ]),
+        vec![0, 3]
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[
+            StableHyperedgeWeightedIndex(0, 0),
+            StableHyperedgeWeightedIndex(1, 0),
+            StableHyperedgeWeightedIndex(2, 0)
+        ]),
+        vec![3]
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(0, 0)]),
+        vec![0, 1, 3]
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(3, 0)]), // should not fail!
+        vec![]
+    );
 
     // // Get the hyperedges connecting some vertices.
     // assert_eq!(graph.get_hyperedges_connections(1, 1), vec![0]);

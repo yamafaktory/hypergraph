@@ -48,11 +48,14 @@ pub struct Hypergraph<V, HE> {
     /// containing the same set of vertices (non-simple hypergraph).
     pub hyperedges: IndexMap<HyperedgeVertices, IndexSet<HE>>,
 
-    // TODO
+    // Mimic a bi-directional map for hyperedges and vertices.
+    // Keep a counter for both for stable index generation.
     hyperedges_count: usize,
-    hyperedges_mapping: HashMap<WeightedHyperedgeIndex, StableHyperedgeWeightedIndex>,
+    hyperedges_mapping_left: HashMap<WeightedHyperedgeIndex, StableHyperedgeWeightedIndex>,
+    hyperedges_mapping_right: HashMap<StableHyperedgeWeightedIndex, WeightedHyperedgeIndex>,
     vertices_count: usize,
-    vertices_mapping: HashMap<VertexIndex, StableVertexIndex>,
+    vertices_mapping_left: HashMap<VertexIndex, StableVertexIndex>,
+    vertices_mapping_right: HashMap<StableVertexIndex, VertexIndex>,
 }
 
 impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
@@ -96,9 +99,11 @@ where
 
             //
             hyperedges_count: 0,
-            hyperedges_mapping: HashMap::with_capacity(0),
+            hyperedges_mapping_left: HashMap::with_capacity(0),
+            hyperedges_mapping_right: HashMap::with_capacity(0),
             vertices_count: 0,
-            vertices_mapping: HashMap::with_capacity(0),
+            vertices_mapping_left: HashMap::with_capacity(0),
+            vertices_mapping_right: HashMap::with_capacity(0),
         }
     }
 

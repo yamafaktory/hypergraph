@@ -36,30 +36,57 @@ fn integration() {
 
     // Add some hyperedges.
     assert_eq!(
-        graph.add_hyperedge(&[0, 1, 1, 3], "foo"), // self-loop.
+        graph.add_hyperedge(
+            vec![
+                StableVertexIndex(0),
+                StableVertexIndex(1),
+                StableVertexIndex(1),
+                StableVertexIndex(3)
+            ],
+            "foo"
+        ), // self-loop.
         Some(StableHyperedgeWeightedIndex(0))
     );
     assert_eq!(
-        graph.add_hyperedge(&[0, 1, 1, 3], "foo_"),
+        graph.add_hyperedge(
+            vec![
+                StableVertexIndex(0),
+                StableVertexIndex(1),
+                StableVertexIndex(1),
+                StableVertexIndex(3)
+            ],
+            "foo_"
+        ),
         Some(StableHyperedgeWeightedIndex(1))
     );
     assert_eq!(
-        graph.add_hyperedge(&[4, 0, 3, 2], "bar"),
+        graph.add_hyperedge(
+            vec![
+                StableVertexIndex(4),
+                StableVertexIndex(0),
+                StableVertexIndex(3),
+                StableVertexIndex(2)
+            ],
+            "bar"
+        ),
         Some(StableHyperedgeWeightedIndex(2))
     );
     assert_eq!(
-        graph.add_hyperedge(&[3], "woot"), // unary.
+        graph.add_hyperedge(vec![StableVertexIndex(3)], "woot"), // unary.
         Some(StableHyperedgeWeightedIndex(3))
     );
     assert_eq!(
-        graph.add_hyperedge(&[3], "woot"), // adding the exact same hyperedge results in an update.
+        graph.add_hyperedge(vec![StableVertexIndex(3)], "woot"), // adding the exact same hyperedge results in an update.
         Some(StableHyperedgeWeightedIndex(3))
     );
     assert_eq!(
-        graph.add_hyperedge(&[3], "leet"), // another unary on the same vertex with a different weight.
+        graph.add_hyperedge(vec![StableVertexIndex(3)], "leet"), // another unary on the same vertex with a different weight.
         Some(StableHyperedgeWeightedIndex(4))
     );
-    assert_eq!(graph.add_hyperedge(&[9], "nope"), None); // out-of-bound, should return None as no-op.
+    assert_eq!(
+        graph.add_hyperedge(vec![StableVertexIndex(9)], "nope"),
+        None // out-of-bound, should return None.
+    );
 
     // Count the vertices and the hyperedges.
     assert_eq!(graph.count_vertices(), 5);
@@ -91,7 +118,12 @@ fn integration() {
     // Get the vertices of a hyperedge.
     assert_eq!(
         graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
-        Some(vec![0, 1, 1, 3])
+        Some(vec![
+            StableVertexIndex(0),
+            StableVertexIndex(1),
+            StableVertexIndex(1),
+            StableVertexIndex(3)
+        ])
     );
     assert_eq!(
         graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(5)), // should not fail!
@@ -101,23 +133,65 @@ fn integration() {
     // Get the hyperedges of some vertices as vectors of vertices.
     assert_eq!(
         graph.get_vertex_hyperedges(StableVertexIndex(0)),
-        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2]])
+        Some(vec![
+            vec![
+                StableVertexIndex(0),
+                StableVertexIndex(1),
+                StableVertexIndex(1),
+                StableVertexIndex(3)
+            ],
+            vec![
+                StableVertexIndex(4),
+                StableVertexIndex(0),
+                StableVertexIndex(3),
+                StableVertexIndex(2)
+            ]
+        ])
     );
     assert_eq!(
         graph.get_vertex_hyperedges(StableVertexIndex(1)),
-        Some(vec![vec![0, 1, 1, 3]])
+        Some(vec![vec![
+            StableVertexIndex(0),
+            StableVertexIndex(1),
+            StableVertexIndex(1),
+            StableVertexIndex(3)
+        ]])
     );
     assert_eq!(
         graph.get_vertex_hyperedges(StableVertexIndex(2)),
-        Some(vec![vec![4, 0, 3, 2]])
+        Some(vec![vec![
+            StableVertexIndex(4),
+            StableVertexIndex(0),
+            StableVertexIndex(3),
+            StableVertexIndex(2)
+        ]])
     );
     assert_eq!(
         graph.get_vertex_hyperedges(StableVertexIndex(3)),
-        Some(vec![vec![0, 1, 1, 3], vec![4, 0, 3, 2], vec![3]])
+        Some(vec![
+            vec![
+                StableVertexIndex(0),
+                StableVertexIndex(1),
+                StableVertexIndex(1),
+                StableVertexIndex(3)
+            ],
+            vec![
+                StableVertexIndex(4),
+                StableVertexIndex(0),
+                StableVertexIndex(3),
+                StableVertexIndex(2)
+            ],
+            vec![StableVertexIndex(3)]
+        ])
     );
     assert_eq!(
         graph.get_vertex_hyperedges(StableVertexIndex(4)),
-        Some(vec![vec![4, 0, 3, 2]])
+        Some(vec![vec![
+            StableVertexIndex(4),
+            StableVertexIndex(0),
+            StableVertexIndex(3),
+            StableVertexIndex(2)
+        ]])
     );
 
     // Check hyperedges intersections.
@@ -202,51 +276,115 @@ fn integration() {
         Some(vec![StableVertexIndex(3)])
     );
 
-    // // Update a vertex's weight.
-    // let vertex_a = Vertex::new("brand new heavies");
-    // assert!(graph.update_vertex_weight(0, vertex_a));
-    // assert_eq!(graph.get_vertex_weight(0), Some(&vertex_a));
+    // Update a vertex's weight.
+    let vertex_a = Vertex::new("brand new heavies");
+    assert!(graph.update_vertex_weight(StableVertexIndex(0), vertex_a));
+    assert_eq!(
+        graph.get_vertex_weight(StableVertexIndex(0)),
+        Some(&vertex_a)
+    );
 
-    // // Update a hyperedge's weight.
-    // assert!(graph.update_hyperedge_weight([0, 0], "yup"));
-    // assert_eq!(graph.get_hyperedge_weight([0, 0]), Some(&"yup"));
-    // assert_eq!(
-    //     graph.count_vertices(),
-    //     5,
-    //     "Number of vertices should remain the same."
-    // );
-    // assert_eq!(
-    //     graph.count_hyperedges(),
-    //     5,
-    //     "Number of hyperedges should remain the same."
-    // );
+    // Update a hyperedge's weight.
+    assert!(graph.update_hyperedge_weight(StableHyperedgeWeightedIndex(0), "yup"));
+    assert_eq!(
+        graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(0)),
+        Some(&"yup")
+    );
+    assert_eq!(
+        graph.count_vertices(),
+        5,
+        "Number of vertices should remain the same."
+    );
+    assert_eq!(
+        graph.count_hyperedges(),
+        5,
+        "Number of hyperedges should remain the same."
+    );
 
-    // // Update the vertices of a hyperedge.
-    // // Previous vertices were [0, 1, 1, 3]!
-    // assert!(graph.update_hyperedge_vertices(0, &[0, 4]));
-    // assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0, 4]));
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges(0),
-    //     Some(vec![vec![0, 4], vec![4, 0, 3, 2]])
-    // );
-    // assert_eq!(graph.get_vertex_hyperedges(1), Some(vec![]));
-    // assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![4, 0, 3, 2]]));
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges(3),
-    //     Some(vec![vec![4, 0, 3, 2], vec![3]])
-    // );
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges(4),
-    //     Some(vec![vec![4, 0, 3, 2], vec![0, 4]])
-    // );
+    // Update the vertices of a hyperedge.
+    // Previous vertices were 0, 1, 1, 3!
+    assert!(graph.update_hyperedge_vertices(
+        StableHyperedgeWeightedIndex(0),
+        vec![StableVertexIndex(0), StableVertexIndex(4)]
+    ));
+    assert_eq!(
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
+        Some(vec![StableVertexIndex(0), StableVertexIndex(4)])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(0)),
+        Some(vec![
+            vec![StableVertexIndex(0), StableVertexIndex(4)],
+            vec![
+                StableVertexIndex(4),
+                StableVertexIndex(0),
+                StableVertexIndex(3),
+                StableVertexIndex(2)
+            ]
+        ])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(1)),
+        Some(vec![])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(2)),
+        Some(vec![vec![
+            StableVertexIndex(4),
+            StableVertexIndex(0),
+            StableVertexIndex(3),
+            StableVertexIndex(2)
+        ]])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(3)),
+        Some(vec![
+            vec![
+                StableVertexIndex(4),
+                StableVertexIndex(0),
+                StableVertexIndex(3),
+                StableVertexIndex(2)
+            ],
+            vec![StableVertexIndex(3)]
+        ])
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(4)),
+        Some(vec![
+            vec![
+                StableVertexIndex(4),
+                StableVertexIndex(0),
+                StableVertexIndex(3),
+                StableVertexIndex(2)
+            ],
+            vec![StableVertexIndex(0), StableVertexIndex(4)]
+        ])
+    );
 
-    // // Remove a vertex with no index alteration since it's the last one.
-    // assert!(graph.remove_vertex(4));
-    // assert_eq!(graph.get_hyperedge_vertices(0), Some(vec![0])); // was [0, 4] before.
-    // assert_eq!(graph.get_hyperedge_vertices(1), Some(vec![0, 3, 2])); // was [4, 0, 3, 2] before.
-    // assert_eq!(graph.get_vertex_weight(4), None);
-    // assert_eq!(graph.count_vertices(), 4);
-    // assert_eq!(graph.get_vertex_hyperedges(2), Some(vec![vec![0, 3, 2]]));
+    // Remove a vertex with no index alteration since it's the last one.
+    assert!(graph.remove_vertex(StableVertexIndex(4)));
+    assert_eq!(
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
+        Some(vec![StableVertexIndex(0)]) // was 0, 4 before.
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(2)),
+        Some(vec![
+            StableVertexIndex(0),
+            StableVertexIndex(3),
+            StableVertexIndex(2)
+        ]) // was 4, 0, 3, 2 before.
+    );
+    assert_eq!(graph.get_vertex_weight(StableVertexIndex(4)), None);
+    assert_eq!(graph.count_vertices(), 4);
+    assert_eq!(
+        graph.get_vertex_hyperedges(StableVertexIndex(2)),
+        Some(vec![vec![
+            StableVertexIndex(0),
+            StableVertexIndex(3),
+            StableVertexIndex(2)
+        ]])
+    );
 
     // // Remove a vertex with index alteration.
     // // In this case, index swapping is occurring, i.e. vertex of index 3 will become 0.

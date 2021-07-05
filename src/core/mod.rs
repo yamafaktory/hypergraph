@@ -20,42 +20,46 @@ use std::{
     ops::Index,
 };
 
-/// Hyperedge representation as a growable array of vertices indexes.
-pub type HyperedgeVertices = Vec<usize>;
+/// Vertex stable index representation as usize.
+/// Use the newtype index pattern.
+/// https://matklad.github.io/2018/06/04/newtype-index-pattern.html
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StableVertexIndex(pub usize);
 
-/// Hyperedge index - without weight(s) - representation as a usize.
-pub type HyperedgeIndex = usize;
+/// Hyperedge stable weighted index representation as a usize.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StableHyperedgeWeightedIndex(pub usize);
 
-/// Hyperedge weighted index representation as an array of two usize.
+/// Vertex unstable index representation as a usize.
+pub type UnstableVertexIndex = usize;
+
+/// Hyperedge unstable weighted index representation as an array of two usize.
 /// The first element is the index of the hyperedge.
 /// The second element is the distinct index representing one of its weight.
 /// E.g. [0, 0] and [0, 1] are two hyperedges - connecting the same
 /// vertices in the same order - with distinct weights (non-simple hypergraph).
-pub type WeightedHyperedgeIndex = [usize; 2];
-
-/// Vertex index representation as a usize.
-pub type VertexIndex = usize;
+pub type UnstableHyperedgeWeightedIndex = [usize; 2];
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as an IndexMap whose keys are the weights
     /// and values are an IndexSet containing the hyperedges which are
     /// including the current vertex.
-    pub vertices: IndexMap<V, IndexSet<HyperedgeVertices>>,
+    pub vertices: IndexMap<V, IndexSet<Vec<UnstableVertexIndex>>>,
     /// Hyperedges are stored as an IndexMap whose keys are a vector of
     /// vertices indexes and values are an IndexSet of weights.
     /// Having an IndexSet of weights allows having two or more hyperedges
     /// containing the same set of vertices (non-simple hypergraph).
-    pub hyperedges: IndexMap<HyperedgeVertices, IndexSet<HE>>,
+    pub hyperedges: IndexMap<Vec<UnstableVertexIndex>, IndexSet<HE>>,
 
     // Mimic a bi-directional map for hyperedges and vertices.
     // Keep a counter for both for stable index generation.
     hyperedges_count: usize,
-    hyperedges_mapping_left: HashMap<WeightedHyperedgeIndex, StableHyperedgeWeightedIndex>,
-    hyperedges_mapping_right: HashMap<StableHyperedgeWeightedIndex, WeightedHyperedgeIndex>,
+    hyperedges_mapping_left: HashMap<UnstableHyperedgeWeightedIndex, StableHyperedgeWeightedIndex>,
+    hyperedges_mapping_right: HashMap<StableHyperedgeWeightedIndex, UnstableHyperedgeWeightedIndex>,
     vertices_count: usize,
-    vertices_mapping_left: HashMap<VertexIndex, StableVertexIndex>,
-    vertices_mapping_right: HashMap<StableVertexIndex, VertexIndex>,
+    vertices_mapping_left: HashMap<UnstableVertexIndex, StableVertexIndex>,
+    vertices_mapping_right: HashMap<StableVertexIndex, UnstableVertexIndex>,
 }
 
 impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
@@ -114,14 +118,6 @@ where
         println!("{}", render_to_graphviz_dot(self));
     }
 }
-
-// Use the newtype index pattern.
-// https://matklad.github.io/2018/06/04/newtype-index-pattern.html
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct StableVertexIndex(pub usize);
-
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct StableHyperedgeWeightedIndex(pub usize);
 
 impl<V, HE> Index<V> for Hypergraph<V, HE>
 where

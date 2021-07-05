@@ -1,5 +1,6 @@
 use crate::core::debug::ExtendedDebug;
-use crate::core::{HyperedgeVertices, Hypergraph, SharedTrait};
+use crate::core::{Hypergraph, SharedTrait};
+use crate::UnstableVertexIndex;
 
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -32,7 +33,7 @@ where
         (Vec::new(), IndexMap::new()),
         #[allow(clippy::type_complexity)]
         |mut acc: (
-            Vec<(&HyperedgeVertices, &IndexSet<HE>)>,
+            Vec<(&Vec<UnstableVertexIndex>, &IndexSet<HE>)>,
             IndexMap<usize, &IndexSet<HE>>,
         ),
          (vertices, weight)| {
@@ -115,6 +116,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::StableVertexIndex;
+
     use super::*;
 
     #[test]
@@ -129,9 +132,23 @@ mod tests {
         graph.add_vertex(T { name: "b" });
         graph.add_vertex(T { name: "c" });
 
-        graph.add_hyperedge(&[0, 1, 2], T { name: "foo" });
-        graph.add_hyperedge(&[0, 1, 2], T { name: "bar" });
-        graph.add_hyperedge(&[0], T { name: "unary" });
+        graph.add_hyperedge(
+            vec![
+                StableVertexIndex(0),
+                StableVertexIndex(1),
+                StableVertexIndex(2),
+            ],
+            T { name: "foo" },
+        );
+        graph.add_hyperedge(
+            vec![
+                StableVertexIndex(0),
+                StableVertexIndex(1),
+                StableVertexIndex(2),
+            ],
+            T { name: "bar" },
+        );
+        graph.add_hyperedge(vec![StableVertexIndex(0)], T { name: "unary" });
 
         let rendered_graph = render_to_graphviz_dot(&graph);
 

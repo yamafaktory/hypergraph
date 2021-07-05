@@ -1,4 +1,4 @@
-use crate::{Hypergraph, SharedTrait, StableVertexIndex, VertexIndex};
+use crate::{Hypergraph, SharedTrait, StableVertexIndex};
 
 use itertools::Itertools;
 

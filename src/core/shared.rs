@@ -18,9 +18,24 @@ where
                 self.vertices.get_index(*from).iter().fold(
                     Vec::new(),
                     |acc: Vec<StableVertexIndex>, (_, hyperedges)| {
-                        hyperedges.iter().enumerate().fold(
-                            acc,
-                            |hyperedge_acc, (index, hyperedge)| {
+                        hyperedges
+                            .iter()
+                            .map(|unstable_index| {
+                                self.get_hyperedge_vertices(
+                                    *self.hyperedges_mapping_left.get(unstable_index).unwrap(),
+                                )
+                                .unwrap()
+                                .iter()
+                                .map(|stable_vertex_index| {
+                                    *self
+                                        .vertices_mapping_right
+                                        .get(stable_vertex_index)
+                                        .unwrap()
+                                })
+                                .collect::<Vec<usize>>()
+                            })
+                            .enumerate()
+                            .fold(acc, |hyperedge_acc, (index, hyperedge)| {
                                 hyperedge.iter().tuple_windows::<(_, _)>().fold(
                                     hyperedge_acc,
                                     |index_acc, (window_from, window_to)| {
@@ -60,8 +75,7 @@ where
                                         index_acc
                                     },
                                 )
-                            },
-                        )
+                            })
                     },
                 )
             }

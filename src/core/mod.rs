@@ -21,7 +21,7 @@ use std::{
 };
 
 /// Vertex stable index representation as usize.
-/// Use the newtype index pattern.
+/// Uses the newtype index pattern.
 /// https://matklad.github.io/2018/06/04/newtype-index-pattern.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StableVertexIndex(pub usize);
@@ -45,7 +45,7 @@ pub struct Hypergraph<V, HE> {
     /// Vertices are stored as an IndexMap whose keys are the weights
     /// and values are an IndexSet containing the hyperedges which are
     /// including the current vertex.
-    pub vertices: IndexMap<V, IndexSet<Vec<UnstableVertexIndex>>>,
+    pub vertices: IndexMap<V, IndexSet<UnstableHyperedgeWeightedIndex>>,
     /// Hyperedges are stored as an IndexMap whose keys are a vector of
     /// vertices indexes and values are an IndexSet of weights.
     /// Having an IndexSet of weights allows having two or more hyperedges

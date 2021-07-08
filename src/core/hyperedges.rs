@@ -58,42 +58,42 @@ where
                     .map(|vertex| *self.vertices_mapping_right.get(vertex).unwrap())
                     .collect::<Vec<usize>>();
 
-                // Update the vertices so that we keep directly track of the hyperedge.
-                for vertex in vertices.iter() {
-                    let unstable_index = *self.vertices_mapping_right.get(vertex).unwrap();
-                    let mut index_set = self.vertices[unstable_index].clone();
-
-                    index_set.insert(unstable_vertices.clone());
-
-                    self.vertices.insert(
-                        self.vertices
-                            .get_index(unstable_index)
-                            .unwrap()
-                            .0
-                            .to_owned(),
-                        index_set,
-                    );
-                }
-
                 // Insert the new hyperedge with the corresponding weight, get back the indexes.
-                Some(match self.hyperedges.get(&unstable_vertices) {
+                let new_hyperedge_weighted_index = match self.hyperedges.get(&unstable_vertices) {
+                    // Some weights are already present, use the existing IndexSet.
                     Some(weights) => {
                         let mut new_weights = weights.clone();
                         let (weight_index, _) = new_weights.insert_full(weight);
                         let (hyperedge_index, _) =
                             self.hyperedges.insert_full(unstable_vertices, new_weights);
 
-                        self.add_stable_hyperedge_weighted_index([hyperedge_index, weight_index])
+                        [hyperedge_index, weight_index]
                     }
+                    // No weights are present, create a new IndexSet.
                     None => {
                         let mut weights = IndexSet::new();
                         let (weight_index, _) = weights.insert_full(weight);
                         let (hyperedge_index, _) =
                             self.hyperedges.insert_full(unstable_vertices, weights);
 
-                        self.add_stable_hyperedge_weighted_index([hyperedge_index, weight_index])
+                        [hyperedge_index, weight_index]
                     }
-                })
+                };
+
+                // Update the vertices so that we keep directly track of the hyperedge.
+                for vertex in vertices.iter() {
+                    let unstable_index = *self.vertices_mapping_right.get(vertex).unwrap();
+                    let mut index_set = self.vertices[unstable_index].clone();
+
+                    index_set.insert(new_hyperedge_weighted_index);
+
+                    self.vertices.insert(
+                        *self.vertices.get_index(unstable_index).unwrap().0,
+                        index_set,
+                    );
+                }
+
+                Some(self.add_stable_hyperedge_weighted_index(new_hyperedge_weighted_index))
             }
             None => None,
         }
@@ -319,7 +319,7 @@ where
             .hyperedges_mapping_right
             .get(&stable_hyperedge_weighted_index)
         {
-            Some([unstable_hyperdge_index, _]) => match self
+            Some([unstable_hyperdge_index, unstable_hyperedge_weight]) => match self
                 .hyperedges
                 .clone()
                 .get_index(*unstable_hyperdge_index)
@@ -386,14 +386,15 @@ where
                                 vertex.iter().fold(
                                     IndexSet::new(),
                                     |mut new_index_set, hyperedge| {
-                                        let unstable_vertices_clone = unstable_vertices.clone();
-
                                         new_index_set.insert(
                                             // Insert the new ones if it's a match.
                                             if are_arrays_equal(hyperedge, &previous_vertices) {
-                                                unstable_vertices_clone
+                                                [
+                                                    *unstable_hyperdge_index,
+                                                    *unstable_hyperedge_weight,
+                                                ]
                                             } else {
-                                                hyperedge.clone()
+                                                *hyperedge
                                             },
                                         );
 
@@ -429,12 +430,13 @@ where
                         if let Some((weight, vertex)) = self.vertices.clone().get_index_mut(*index)
                         {
                             // Insert the new vertices.
-                            vertex.insert(unstable_vertices.clone());
+                            vertex.insert([*unstable_hyperdge_index, *unstable_hyperedge_weight]);
 
                             self.vertices.insert(*weight, vertex.clone());
                         };
                     }
 
+                    // Finally update the hyperedge.
                     // We need to use the insert and swap_remove trick here too,
                     // see e.g. the update_vertex_weight method.
                     self.hyperedges.insert(unstable_vertices, value.clone());

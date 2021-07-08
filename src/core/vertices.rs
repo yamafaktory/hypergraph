@@ -163,23 +163,25 @@ where
         stable_vertex_index: StableVertexIndex,
     ) -> Option<Vec<Vec<StableVertexIndex>>> {
         match self.vertices_mapping_right.get(&stable_vertex_index) {
-            Some(unstable_vertex_index) => self
-                .vertices
-                .get_index(*unstable_vertex_index)
-                .map(|(_, hyperedges)| hyperedges)
-                .map(|index_set| {
-                    index_set
-                        .iter()
-                        .map(|unstable_vertices| {
-                            unstable_vertices
-                                .iter()
-                                .map(|unstable_vertex| {
-                                    *self.vertices_mapping_left.get(unstable_vertex).unwrap()
-                                })
-                                .collect::<Vec<StableVertexIndex>>()
-                        })
-                        .collect()
-                }),
+            Some(unstable_vertex_index) => {
+                self.vertices
+                    .get_index(*unstable_vertex_index)
+                    .map(|(_, hyperedges)| {
+                        hyperedges
+                            .iter()
+                            .map(|unstable_hyperedge_weighted_index| {
+                                self.get_hyperedge_vertices(
+                                    *self
+                                        .hyperedges_mapping_left
+                                        .get(unstable_hyperedge_weighted_index)
+                                        .unwrap(),
+                                )
+                                .unwrap()
+                            })
+                            .collect()
+                    })
+            }
+
             None => None,
         }
     }
@@ -191,6 +193,7 @@ where
                 .vertices
                 .get_index(*unstable_vertex_index)
                 .map(|(weight, _)| weight),
+
             None => None,
         }
     }
@@ -207,8 +210,6 @@ where
         match self.vertices_mapping_right.clone().get(&index) {
             Some(unstable_index) => match self.vertices.clone().get_index(*unstable_index) {
                 Some((key, hyperedges)) => {
-                    // First, we need to get all the hyperedges' indexes of the
-                    // vertex in order to update them accordingly.
                     // We preemptively store the eventual index of the swapped
                     // vertex to avoid extra loops.
                     let last_index = self.count_vertices() - 1;
@@ -218,40 +219,48 @@ where
                         Some(last_index)
                     };
 
-                    for hyperedge in hyperedges.iter() {
-                        if let Some(hyperedge_index) = self.hyperedges.get_index_of(hyperedge) {
-                            self.update_hyperedge_vertices(
-                                *self
-                                    .hyperedges_mapping_left
-                                    .get(&[hyperedge_index, 0])
-                                    .unwrap(),
-                                hyperedge
-                                    .iter()
-                                    .filter_map(|current_unstable_index| {
-                                        let current_stable_index = self
-                                            .vertices_mapping_left
-                                            .get(current_unstable_index)
-                                            .unwrap();
+                    // First, we need to get all the hyperedges' indexes of the
+                    // vertex in order to update them accordingly.
+                    for [unstable_hyperdge_index, unstable_hyperedge_weight] in hyperedges.iter() {
+                        // Find the stable index.
+                        let stable_hyperedge_weighted_index = *self
+                            .hyperedges_mapping_left
+                            .get(&[*unstable_hyperdge_index, *unstable_hyperedge_weight])
+                            .unwrap();
 
-                                        if current_unstable_index != unstable_index {
-                                            // Inject the current index or the swapped one.
-                                            match maybe_swapped_index {
-                                                Some(swapped_index) => Some(
-                                                    if swapped_index == *current_unstable_index {
-                                                        index
-                                                    } else {
-                                                        *current_stable_index
-                                                    },
-                                                ),
-                                                None => Some(*current_stable_index),
+                        let hyperedge_vertices = self
+                            .get_hyperedge_vertices(stable_hyperedge_weighted_index)
+                            .unwrap();
+
+                        // And update its vertices.
+                        self.update_hyperedge_vertices(
+                            stable_hyperedge_weighted_index,
+                            hyperedge_vertices
+                                .iter()
+                                .filter_map(|current_stable_index| {
+                                    let current_unstable_index = self
+                                        .vertices_mapping_right
+                                        .get(current_stable_index)
+                                        .unwrap();
+
+                                    if current_unstable_index != unstable_index {
+                                        // Inject the current index or the swapped one.
+                                        match maybe_swapped_index {
+                                            Some(swapped_index) => {
+                                                Some(if swapped_index == *current_unstable_index {
+                                                    index
+                                                } else {
+                                                    *current_stable_index
+                                                })
                                             }
-                                        } else {
-                                            None
+                                            None => Some(*current_stable_index),
                                         }
-                                    })
-                                    .collect::<Vec<StableVertexIndex>>(),
-                            );
-                        }
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<StableVertexIndex>>(),
+                        );
                     }
 
                     // We also need to update the other hyperedges which are impacted by this change.
@@ -273,7 +282,7 @@ where
                                         .collect()
                                 })
                                 .collect::<Vec<Vec<usize>>>();
-
+                            dbg!(hyperedge_unstable_weights.clone());
                             for weight in hyperedge_unstable_weights.iter() {
                                 if let Some(hyperedge_index) = self.hyperedges.get_index_of(weight)
                                 {
@@ -300,6 +309,21 @@ where
                                     );
                                 }
                             }
+                        }
+                    }
+
+                    // TODO
+                    match maybe_swapped_index {
+                        Some(a) => {
+                            self.vertices_mapping_left.remove(unstable_index);
+                            self.vertices_mapping_right.remove(&index);
+
+                            self.vertices_mapping_left.insert(a, index);
+                            self.vertices_mapping_right.insert(index, a);
+                        }
+                        None => {
+                            self.vertices_mapping_left.remove(unstable_index);
+                            self.vertices_mapping_right.remove(&index);
                         }
                     }
 

@@ -1,6 +1,7 @@
 use crate::{Hypergraph, SharedTrait, StableVertexIndex, UnstableVertexIndex};
 
 use indexmap::IndexSet;
+use itertools::Itertools;
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
 
 impl<V, HE> Hypergraph<V, HE>
@@ -88,9 +89,7 @@ where
         // We need to initialize a vector of length equal to the number of vertices.
         // The default value, as per Dijkstra, must be set to infinity.
         // A value of usize::MAX is used.
-        let mut distances = (0..self.vertices.len())
-            .map(|_| usize::MAX)
-            .collect::<Vec<usize>>();
+        let mut distances = (0..self.vertices.len()).map(|_| usize::MAX).collect_vec();
 
         // Create an empty binary heap.
         let mut heap = BinaryHeap::new();
@@ -124,9 +123,9 @@ where
                 continue;
             }
 
-            if let Some(index) = self.vertices_mapping_left.get(&index) {
+            if let Some(stable_vertex_index) = self.vertices_mapping_left.get(&index) {
                 // For every connected vertex, try to find the lowest distance.
-                for vertex_index in self.get_vertex_connections(*index) {
+                for vertex_index in self.get_adjacent_vertices_to(*stable_vertex_index) {
                     let unstable_index = *self.vertices_mapping_right.get(&vertex_index).unwrap();
                     let next = Cursor {
                         // We assume a distance of one by default.
@@ -137,7 +136,7 @@ where
                     // If so, add it to the frontier and continue.
                     if next.distance < distances[next.index] {
                         // Update the traversal accordingly.
-                        path.push(*index);
+                        path.push(*stable_vertex_index);
 
                         // Push it to the heap.
                         heap.push(next);
@@ -152,9 +151,14 @@ where
         None
     }
 
-    /// Gets the list of all vertices connected to a given vertex.
-    pub fn get_vertex_connections(&self, from: StableVertexIndex) -> Vec<StableVertexIndex> {
+    /// Gets all the vertices adjacent to a given vertex.
+    pub fn get_adjacent_vertices_to(&self, from: StableVertexIndex) -> Vec<StableVertexIndex> {
         self.get_connections(from, None)
+            .iter()
+            .map(|(_, stable_vertex_index)| *stable_vertex_index)
+            .sorted()
+            .dedup()
+            .collect_vec()
     }
 
     /// Gets the hyperedges as vectors of vertices of a vertex from its index.
@@ -187,12 +191,12 @@ where
     }
 
     /// Gets the weight of a vertex from its index.
-    pub fn get_vertex_weight(&self, stable_vertex_index: StableVertexIndex) -> Option<&V> {
+    pub fn get_vertex_weight(&self, stable_vertex_index: StableVertexIndex) -> Option<V> {
         match self.vertices_mapping_right.get(&stable_vertex_index) {
             Some(unstable_vertex_index) => self
                 .vertices
                 .get_index(*unstable_vertex_index)
-                .map(|(weight, _)| weight),
+                .map(|(weight, _)| *weight),
 
             None => None,
         }
@@ -259,7 +263,7 @@ where
                                         None
                                     }
                                 })
-                                .collect::<Vec<StableVertexIndex>>(),
+                                .collect_vec(),
                         );
                     }
 
@@ -305,7 +309,7 @@ where
                                                     *current_stable_index
                                                 }
                                             })
-                                            .collect::<Vec<StableVertexIndex>>(),
+                                            .collect_vec(),
                                     );
                                 }
                             }

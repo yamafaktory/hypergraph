@@ -46,7 +46,7 @@ where
         // Safe check to avoid out of bound index!
         match self
             .vertices_mapping_right
-            .get(&max(vertices.clone()).unwrap())
+            .get(&max(vertices.to_owned()).unwrap())
         {
             Some(max_stable_index) => {
                 if max_stable_index + 1 > self.vertices.len() {
@@ -56,7 +56,7 @@ where
                 let unstable_vertices = vertices
                     .iter()
                     .map(|vertex| *self.vertices_mapping_right.get(vertex).unwrap())
-                    .collect::<Vec<usize>>();
+                    .collect_vec();
 
                 // Insert the new hyperedge with the corresponding weight, get back the indexes.
                 let new_hyperedge_weighted_index = match self.hyperedges.get(&unstable_vertices) {
@@ -121,6 +121,9 @@ where
         to: StableVertexIndex,
     ) -> Vec<StableVertexIndex> {
         self.get_connections(from, Some(to))
+            .iter()
+            .map(|(_, stable_vertex_index)| *stable_vertex_index)
+            .collect_vec()
     }
 
     /// Gets the hyperedge's vertices.
@@ -146,14 +149,14 @@ where
     pub fn get_hyperedge_weight(
         &self,
         stable_hyperedge_weighted_index: StableHyperedgeWeightedIndex,
-    ) -> Option<&HE> {
+    ) -> Option<HE> {
         match self
             .hyperedges_mapping_right
             .get(&stable_hyperedge_weighted_index)
         {
             Some([hyperedge_index, weight_index]) => {
                 match self.hyperedges.get_index(*hyperedge_index) {
-                    Some((_, weights)) => weights.get_index(*weight_index),
+                    Some((_, weights)) => weights.get_index(*weight_index).cloned(),
                     None => None,
                 }
             }
@@ -196,7 +199,7 @@ where
                 }
             })
             .sorted()
-            .collect::<Vec<usize>>()
+            .collect_vec()
     }
 
     /// Removes a hyperedge based on its index.
@@ -229,7 +232,7 @@ where
                                     // This can potentially alter the indexes but only
                                     // at the internal hyperedge level, i.e. it doesn't
                                     // break the stability of the indexes.
-                                    new_weights.swap_remove(weight);
+                                    new_weights.swap_remove(&weight);
 
                                     // Update with the new weights.
                                     self.hyperedges
@@ -251,7 +254,7 @@ where
                                             IndexSet::new(),
                                             |mut new_index_set, hyperedge| {
                                                 if !are_arrays_equal(hyperedge, vertices) {
-                                                    new_index_set.insert(hyperedge.clone());
+                                                    new_index_set.insert(*hyperedge);
                                                 }
 
                                                 new_index_set
@@ -319,131 +322,195 @@ where
             .hyperedges_mapping_right
             .get(&stable_hyperedge_weighted_index)
         {
-            Some([unstable_hyperdge_index, unstable_hyperedge_weight]) => match self
-                .hyperedges
-                .clone()
-                .get_index(*unstable_hyperdge_index)
-            {
-                Some((key, value)) => {
-                    let unstable_vertices = vertices
-                        .iter()
-                        .map(|vertex| *self.vertices_mapping_right.get(vertex).unwrap())
-                        .collect::<Vec<usize>>();
-
-                    // Keep track of the initial indexes.
-                    let previous_vertices = self
-                        .get_hyperedge_vertices(stable_hyperedge_weighted_index)
-                        .unwrap()
-                        .iter()
-                        .map(|vertex| *self.vertices_mapping_right.get(vertex).unwrap())
-                        .collect::<Vec<usize>>();
-
-                    // Find the indexes which have been added.
-                    let added = vertices.iter().fold(vec![], |mut acc: Vec<usize>, index| {
-                        let unstable_index = self.vertices_mapping_right.get(index).unwrap();
-
-                        if !previous_vertices
+            Some([unstable_hyperedge_index, unstable_hyperedge_weight]) => {
+                match self.hyperedges.clone().get_index(*unstable_hyperedge_index) {
+                    Some((key, value)) => {
+                        let new_vertices = vertices
                             .iter()
-                            .any(|current_index| current_index == unstable_index)
-                        {
-                            acc.push(*unstable_index)
+                            .map(|vertex| *self.vertices_mapping_right.get(vertex).unwrap())
+                            .collect_vec();
+
+                        // Keep track of the initial indexes.
+                        let previous_vertices = self
+                            .get_hyperedge_vertices(stable_hyperedge_weighted_index)
+                            .unwrap()
+                            .iter()
+                            .map(|vertex| *self.vertices_mapping_right.get(vertex).unwrap())
+                            .collect_vec();
+
+                        // Find the indexes which have been added.
+                        let added = new_vertices
+                            .iter()
+                            .fold(vec![], |mut acc: Vec<usize>, index| {
+                                if !previous_vertices
+                                    .iter()
+                                    .any(|current_index| current_index == index)
+                                {
+                                    acc.push(*index)
+                                }
+
+                                acc
+                            })
+                            .into_iter()
+                            .sorted()
+                            .dedup()
+                            .collect_vec();
+
+                        // Find the indexes which have been removed.
+                        let removed = previous_vertices
+                            .iter()
+                            .filter_map(|index| {
+                                if !new_vertices
+                                    .iter()
+                                    .any(|current_index| index == current_index)
+                                {
+                                    Some(*index)
+                                } else {
+                                    None
+                                }
+                            })
+                            .sorted()
+                            .dedup()
+                            .collect_vec();
+
+                        // Finally get the unchanged ones.
+                        let unchanged = previous_vertices
+                            .iter()
+                            .filter_map(|index| {
+                                if !removed.iter().any(|current_index| index == current_index) {
+                                    Some(*index)
+                                } else {
+                                    None
+                                }
+                            })
+                            .sorted()
+                            .dedup()
+                            .collect_vec();
+
+                        // Process the updated ones.
+                        for index in unchanged.iter() {
+                            if let Some((weight, vertex)) = self.vertices.clone().get_index(*index)
+                            {
+                                self.vertices.insert(
+                                    *weight,
+                                    vertex.iter().fold(
+                                        IndexSet::new(),
+                                        |mut new_index_set, hyperedge| {
+                                            new_index_set.insert(
+                                                // Insert the new ones if it's a match.
+                                                if are_arrays_equal(
+                                                    hyperedge,
+                                                    &[
+                                                        *unstable_hyperedge_index,
+                                                        *unstable_hyperedge_weight,
+                                                    ],
+                                                ) {
+                                                    [
+                                                        *unstable_hyperedge_index,
+                                                        *unstable_hyperedge_weight,
+                                                    ]
+                                                } else {
+                                                    *hyperedge
+                                                },
+                                            );
+
+                                            new_index_set
+                                        },
+                                    ),
+                                );
+                            };
                         }
 
-                        acc
-                    });
-
-                    // Find the indexes which have been removed.
-                    let removed = previous_vertices
-                        .iter()
-                        .filter_map(|index| {
-                            if !vertices.iter().any(|current_index| {
-                                index == self.vertices_mapping_right.get(current_index).unwrap()
-                            }) {
-                                Some(*index)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<usize>>();
-
-                    // Finally get the unchanged ones.
-                    let unchanged = previous_vertices
-                        .iter()
-                        .filter_map(|index| {
-                            if !removed.iter().any(|current_index| index == current_index) {
-                                Some(*index)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<usize>>();
-
-                    // Process the updated ones.
-                    for index in unchanged.iter() {
-                        if let Some((weight, vertex)) = self.vertices.clone().get_index(*index) {
-                            self.vertices.insert(
-                                *weight,
-                                vertex.iter().fold(
-                                    IndexSet::new(),
-                                    |mut new_index_set, hyperedge| {
-                                        new_index_set.insert(
-                                            // Insert the new ones if it's a match.
-                                            if are_arrays_equal(hyperedge, &previous_vertices) {
-                                                [
-                                                    *unstable_hyperdge_index,
+                        // Process the removed ones.
+                        for index in removed.iter() {
+                            if let Some((weight, hyperedges)) =
+                                self.vertices.clone().get_index(*index)
+                            {
+                                self.vertices.insert(
+                                    *weight,
+                                    hyperedges.iter().fold(
+                                        IndexSet::new(),
+                                        |mut new_index_set, hyperedge| {
+                                            // Skip the removed ones, i.e. if there's no match.
+                                            if !are_arrays_equal(
+                                                hyperedge,
+                                                &[
+                                                    *unstable_hyperedge_index,
                                                     *unstable_hyperedge_weight,
-                                                ]
-                                            } else {
-                                                *hyperedge
-                                            },
-                                        );
+                                                ],
+                                            ) {
+                                                new_index_set.insert(*hyperedge);
+                                            }
 
-                                        new_index_set
-                                    },
-                                ),
-                            );
-                        };
+                                            new_index_set
+                                        },
+                                    ),
+                                );
+                            };
+                        }
+
+                        // Process the added ones.
+                        for index in added.iter() {
+                            if let Some((vertex_weight, hyperedges)) =
+                                self.vertices.to_owned().get_index_mut(*index)
+                            {
+                                // Insert the new vertices.
+                                hyperedges.insert([
+                                    *unstable_hyperedge_index,
+                                    *unstable_hyperedge_weight,
+                                ]);
+
+                                // Update.
+                                self.vertices.insert(*vertex_weight, hyperedges.to_owned());
+                            };
+                        }
+
+                        // Finally update the hyperedge.
+                        // There are two cases now:
+                        // - one or more hyperdedges exist with the given key
+                        // - no hyperdedges exist with the given key
+                        let (new_key, _) = self.hyperedges.insert_full(
+                            new_vertices.clone(),
+                            match self.hyperedges.get(&new_vertices) {
+                                Some(previous_index_set) => {
+                                    // Get the weight of the current hyperedge.
+                                    let current_hyperedge_weight = self
+                                        .get_hyperedge_weight(stable_hyperedge_weighted_index)
+                                        .unwrap();
+
+                                    // Create a copy of the existing weights.
+                                    let mut new_index_set = previous_index_set.clone();
+
+                                    // Insert the new weight.
+                                    new_index_set.insert(current_hyperedge_weight);
+
+                                    new_index_set
+                                }
+                                None => value.to_owned(),
+                            },
+                        );
+
+                        // In the last step there are two cases:
+                        // - the hyperedge is simple - i.e. it has only one weight
+                        // - the hyperedge is non-simple
+                        if value.len() == 1 {
+                            // Simple case. We can use the swap and remove operations.
+                            // No index mapping is affected.
+                            self.hyperedges.swap_remove(key).is_some()
+                        } else {
+                            // Non-simple case. We need to update the index mapping.
+                            dbg!(new_key, unstable_hyperedge_weight);
+                            self.hyperedges_mapping_right
+                                .insert(
+                                    stable_hyperedge_weighted_index,
+                                    [new_key, *unstable_hyperedge_weight],
+                                )
+                                .is_some()
+                        }
                     }
-
-                    // Process the removed ones.
-                    for index in removed.iter() {
-                        if let Some((weight, vertex)) = self.vertices.clone().get_index(*index) {
-                            self.vertices.insert(
-                                *weight,
-                                vertex.iter().fold(
-                                    IndexSet::new(),
-                                    |mut new_index_set, hyperedge| {
-                                        // Skip the removed ones, i.e. if there's no match.
-                                        if !are_arrays_equal(hyperedge, &previous_vertices) {
-                                            new_index_set.insert(hyperedge.clone());
-                                        }
-
-                                        new_index_set
-                                    },
-                                ),
-                            );
-                        };
-                    }
-
-                    // Process the added ones.
-                    for index in added.iter() {
-                        if let Some((weight, vertex)) = self.vertices.clone().get_index_mut(*index)
-                        {
-                            // Insert the new vertices.
-                            vertex.insert([*unstable_hyperdge_index, *unstable_hyperedge_weight]);
-
-                            self.vertices.insert(*weight, vertex.clone());
-                        };
-                    }
-
-                    // Finally update the hyperedge.
-                    // We need to use the insert and swap_remove trick here too,
-                    // see e.g. the update_vertex_weight method.
-                    self.hyperedges.insert(unstable_vertices, value.clone());
-                    self.hyperedges.swap_remove(key).is_some()
+                    None => false,
                 }
-                None => false,
-            },
+            }
             None => false,
         }
     }

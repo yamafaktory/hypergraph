@@ -64,7 +64,10 @@ pub struct Hypergraph<V, HE> {
 
 impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.vertices.fmt(f)
+        f.debug_struct("Hypergraph")
+            .field("vertices", &self.vertices)
+            .field("hyperedges", &self.hyperedges)
+            .finish()
     }
 }
 

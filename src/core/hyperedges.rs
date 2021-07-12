@@ -129,9 +129,12 @@ where
     /// Gets the hyperedge's vertices.
     pub fn get_hyperedge_vertices(
         &self,
-        stable_hyperedge_index: StableHyperedgeWeightedIndex,
+        stable_hyperedge_weighted_index: StableHyperedgeWeightedIndex,
     ) -> Option<Vec<StableVertexIndex>> {
-        match self.hyperedges_mapping_right.get(&stable_hyperedge_index) {
+        match self
+            .hyperedges_mapping_right
+            .get(&stable_hyperedge_weighted_index)
+        {
             Some([unstable_hyperedge_index, _]) => self
                 .hyperedges
                 .get_index(*unstable_hyperedge_index)
@@ -320,6 +323,7 @@ where
     ) -> bool {
         match self
             .hyperedges_mapping_right
+            .clone()
             .get(&stable_hyperedge_weighted_index)
         {
             Some([unstable_hyperedge_index, unstable_hyperedge_weight]) => {
@@ -499,7 +503,6 @@ where
                             self.hyperedges.swap_remove(key).is_some()
                         } else {
                             // Non-simple case. We need to update the index mapping.
-                            dbg!(new_key, unstable_hyperedge_weight);
                             self.hyperedges_mapping_right
                                 .insert(
                                     stable_hyperedge_weighted_index,

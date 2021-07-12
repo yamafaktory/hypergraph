@@ -1,4 +1,6 @@
-use crate::{Hypergraph, SharedTrait, StableVertexIndex, UnstableVertexIndex};
+use crate::{
+    Hypergraph, SharedTrait, StableHyperedgeWeightedIndex, StableVertexIndex, UnstableVertexIndex,
+};
 
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -161,11 +163,11 @@ where
             .collect_vec()
     }
 
-    /// Gets the hyperedges as vectors of vertices of a vertex from its index.
+    /// Gets the hyperedges of a vertex as indexes.
     pub fn get_vertex_hyperedges(
         &self,
         stable_vertex_index: StableVertexIndex,
-    ) -> Option<Vec<Vec<StableVertexIndex>>> {
+    ) -> Option<Vec<StableHyperedgeWeightedIndex>> {
         match self.vertices_mapping_right.get(&stable_vertex_index) {
             Some(unstable_vertex_index) => {
                 self.vertices
@@ -174,13 +176,10 @@ where
                         hyperedges
                             .iter()
                             .map(|unstable_hyperedge_weighted_index| {
-                                self.get_hyperedge_vertices(
-                                    *self
-                                        .hyperedges_mapping_left
-                                        .get(unstable_hyperedge_weighted_index)
-                                        .unwrap(),
-                                )
-                                .unwrap()
+                                *self
+                                    .hyperedges_mapping_left
+                                    .get(unstable_hyperedge_weighted_index)
+                                    .unwrap()
                             })
                             .collect()
                     })
@@ -188,6 +187,20 @@ where
 
             None => None,
         }
+    }
+
+    /// Gets the hyperedges of a vertex as vectors of vertices.
+    pub fn get_vertex_hyperedges_full(
+        &self,
+        stable_vertex_index: StableVertexIndex,
+    ) -> Option<Vec<Vec<StableVertexIndex>>> {
+        self.get_vertex_hyperedges(stable_vertex_index)
+            .map(|hyperedges| {
+                hyperedges
+                    .iter()
+                    .map(|index| self.get_hyperedge_vertices(*index).unwrap())
+                    .collect()
+            })
     }
 
     /// Gets the weight of a vertex from its index.
@@ -203,141 +216,80 @@ where
     }
 
     /// Removes a vertex based on its index.
-    /// IndexMap doesn't allow holes by design, see:
-    /// https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
-    /// As a consequence, we have two options. Either we use shift_remove
-    /// and it will result in an expensive regeneration of all the indexes
-    /// in the map or we use swap_remove and deal with the fact that the last
-    /// element will be swapped in place of the removed one and will thus get
-    /// a new index. We use the latter solution for performance reasons.
     pub fn remove_vertex(&mut self, index: StableVertexIndex) -> bool {
-        match self.vertices_mapping_right.clone().get(&index) {
-            Some(unstable_index) => match self.vertices.clone().get_index(*unstable_index) {
-                Some((key, hyperedges)) => {
-                    // We preemptively store the eventual index of the swapped
-                    // vertex to avoid extra loops.
-                    let last_index = self.count_vertices() - 1;
-                    let maybe_swapped_index = if last_index == *unstable_index {
-                        None
-                    } else {
-                        Some(last_index)
-                    };
+        // We first need to try to get the unstable index from the mapping.
+        let maybe_unstable_index = self.vertices_mapping_right.get(&index);
 
-                    // First, we need to get all the hyperedges' indexes of the
-                    // vertex in order to update them accordingly.
-                    for [unstable_hyperdge_index, unstable_hyperedge_weight] in hyperedges.iter() {
-                        // Find the stable index.
-                        let stable_hyperedge_weighted_index = *self
-                            .hyperedges_mapping_left
-                            .get(&[*unstable_hyperdge_index, *unstable_hyperedge_weight])
-                            .unwrap();
-
-                        let hyperedge_vertices = self
-                            .get_hyperedge_vertices(stable_hyperedge_weighted_index)
-                            .unwrap();
-
-                        // And update its vertices.
-                        self.update_hyperedge_vertices(
-                            stable_hyperedge_weighted_index,
-                            hyperedge_vertices
-                                .iter()
-                                .filter_map(|current_stable_index| {
-                                    let current_unstable_index = self
-                                        .vertices_mapping_right
-                                        .get(current_stable_index)
-                                        .unwrap();
-
-                                    if current_unstable_index != unstable_index {
-                                        // Inject the current index or the swapped one.
-                                        match maybe_swapped_index {
-                                            Some(swapped_index) => {
-                                                Some(if swapped_index == *current_unstable_index {
-                                                    index
-                                                } else {
-                                                    *current_stable_index
-                                                })
-                                            }
-                                            None => Some(*current_stable_index),
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect_vec(),
-                        );
-                    }
-
-                    // We also need to update the other hyperedges which are impacted by this change.
-                    if let Some(swapped_index) = maybe_swapped_index {
-                        if let Some(hyperedge_weights) = self.get_vertex_hyperedges(
-                            *self.vertices_mapping_left.get(&swapped_index).unwrap(),
-                        ) {
-                            let hyperedge_unstable_weights = hyperedge_weights
-                                .iter()
-                                .map(|hyperedge_weight| {
-                                    hyperedge_weight
-                                        .iter()
-                                        .map(|stable_vertex_index| {
-                                            *self
-                                                .vertices_mapping_right
-                                                .get(stable_vertex_index)
-                                                .unwrap()
-                                        })
-                                        .collect()
-                                })
-                                .collect::<Vec<Vec<usize>>>();
-                            dbg!(hyperedge_unstable_weights.clone());
-                            for weight in hyperedge_unstable_weights.iter() {
-                                if let Some(hyperedge_index) = self.hyperedges.get_index_of(weight)
-                                {
-                                    self.update_hyperedge_vertices(
-                                        *self
-                                            .hyperedges_mapping_left
-                                            .get(&[hyperedge_index, 0])
-                                            .unwrap(),
-                                        weight
-                                            .iter()
-                                            .map(|current_unstable_index| {
-                                                let current_stable_index = self
-                                                    .vertices_mapping_left
-                                                    .get(current_unstable_index)
-                                                    .unwrap();
-
-                                                if *current_unstable_index == swapped_index {
-                                                    index
-                                                } else {
-                                                    *current_stable_index
-                                                }
-                                            })
-                                            .collect_vec(),
-                                    );
-                                }
-                            }
-                        }
-                    }
-
-                    // TODO
-                    match maybe_swapped_index {
-                        Some(a) => {
-                            self.vertices_mapping_left.remove(unstable_index);
-                            self.vertices_mapping_right.remove(&index);
-
-                            self.vertices_mapping_left.insert(a, index);
-                            self.vertices_mapping_right.insert(index, a);
-                        }
-                        None => {
-                            self.vertices_mapping_left.remove(unstable_index);
-                            self.vertices_mapping_right.remove(&index);
-                        }
-                    }
-
-                    // Now we can safely remove the vertex.
-                    self.vertices.swap_remove(key).is_some()
-                }
-                None => false,
-            },
-            None => false,
+        // Safe-check: return false if the index is not in the mapping.
+        if maybe_unstable_index.is_none() {
+            return false;
         }
+
+        // We can safely unwrap for further use.
+        let unstable_index = *maybe_unstable_index.unwrap();
+
+        // IndexMap doesn't allow holes by design, see:
+        // https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
+        // As a consequence, we have two options. Either we use shift_remove
+        // and it will result in an expensive regeneration of all the indexes
+        // in the map or we use swap_remove and deal with the fact that the last
+        // element will be swapped in place of the removed one and will thus get
+        // a new index. We use the latter solution for performance reasons and
+        // might need to update the mapping accordingly.
+        let last_index = self.count_vertices() - 1;
+        let needs_remapping = last_index != unstable_index;
+        // Get the stable index of latest unstable index, i.e. the swapped one.
+        let stable_index_of_swapped_one = self.vertices_mapping_left[&last_index];
+
+        // Iterate through the hyperedges of the vertex.
+        for hyperedge in self.get_vertex_hyperedges(index).unwrap().iter() {
+            // Update the hyperedge's vertices.
+            self.update_hyperedge_vertices(
+                *hyperedge,
+                self.get_hyperedge_vertices(*hyperedge)
+                    .unwrap()
+                    .into_iter()
+                    // Filter out the target vertex which will be dropped.
+                    .filter(|&stable_vertex_index| stable_vertex_index != index)
+                    // Last step: we need to take care of the potential remapping.
+                    .fold(
+                        vec![],
+                        |mut acc: Vec<StableVertexIndex>, current_stable_index| {
+                            acc.push(
+                                if needs_remapping
+                                    && stable_index_of_swapped_one == current_stable_index
+                                {
+                                    index
+                                } else {
+                                    current_stable_index
+                                },
+                            );
+
+                            acc
+                        },
+                    ), // .collect_vec(),
+            );
+        }
+
+        // Now we can safely remove the vertex.
+        let key = self.get_vertex_weight(index).unwrap();
+        let boolean_flag = self.vertices.swap_remove(&key).is_some();
+
+        // Update the mapping if necessary.
+        if needs_remapping {
+            // Remap the stable index of the swapped one to the current unstable one.
+            self.vertices_mapping_left
+                .insert(unstable_index, stable_index_of_swapped_one);
+            self.vertices_mapping_right
+                .insert(stable_index_of_swapped_one, unstable_index);
+        }
+
+        // Now remove the garbage stable and unstable indexes.
+        self.vertices_mapping_left.remove(&last_index);
+        self.vertices_mapping_right.remove(&index);
+
+        // Use the swap and remove operation output as a boolean flag.
+        boolean_flag
     }
 
     /// Updates the weight of a vertex based on its index.

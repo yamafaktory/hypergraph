@@ -32,4 +32,8 @@ where
     /// Error when a vertex weight is not found.
     #[error("Vertex weight {0} not found")]
     VertexWeightNotFound(V),
+
+    /// Error when trying to get the intersections of less than two hyperedges.
+    #[error("At least two hyperedges must be provided to find their intersections")]
+    HyperedgesIntersections,
 }

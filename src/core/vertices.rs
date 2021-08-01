@@ -1,4 +1,4 @@
-use crate::{Hypergraph, SharedTrait, VertexIndex};
+use crate::{HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
 
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -38,6 +38,50 @@ where
         }
     }
 
+    // Private method to get the VertexIndex matching an internal index.
+    pub(crate) fn get_vertex(
+        &self,
+        vertex_index: usize,
+    ) -> Result<VertexIndex, HypergraphError<V, HE>> {
+        match self.vertices_mapping.left.get(&vertex_index) {
+            Some(index) => Ok(*index),
+            None => Err(HypergraphError::InternalVertexIndexNotFound(vertex_index)),
+        }
+    }
+
+    // Private method to get a vector of VertexIndex from a vector of internal indexes.
+    pub(crate) fn get_vertices(
+        &self,
+        vertices: Vec<usize>,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        vertices
+            .iter()
+            .map(|vertex_index| self.get_vertex(*vertex_index))
+            .collect()
+    }
+
+    // Private method to get the internal vertex matching a VertexIndex.
+    pub(crate) fn get_internal_vertex(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<usize, HypergraphError<V, HE>> {
+        match self.vertices_mapping.right.get(&vertex_index) {
+            Some(index) => Ok(*index),
+            None => Err(HypergraphError::VertexIndexNotFound(vertex_index)),
+        }
+    }
+
+    // Private method to get the internal vertices from a vector of VertexIndex.
+    pub(crate) fn get_internal_vertices(
+        &self,
+        vertices: Vec<VertexIndex>,
+    ) -> Result<Vec<usize>, HypergraphError<V, HE>> {
+        vertices
+            .iter()
+            .map(|vertex_index| self.get_internal_vertex(*vertex_index))
+            .collect()
+    }
+
     /// Adds a vertex with a custom weight to the hypergraph.
     /// Returns the index of the vertex.
     pub fn add_vertex(&mut self, weight: V) -> Result<VertexIndex, HypergraphError<V, HE>> {
@@ -48,6 +92,8 @@ where
         let internal_index = self
             .vertices
             .get_index_of(&weight)
+            // This safe-check should always pass since the weight has been
+            // inserted upfront.
             .ok_or(HypergraphError::VertexWeightNotFound(weight))?;
 
         Ok(self.add_vertex_index(internal_index))
@@ -172,62 +218,46 @@ where
     //         .collect_vec()
     // }
 
-    // /// Gets the hyperedges including vertex as indexes.
-    // pub fn get_vertex_hyperedges(
-    //     &self,
-    //     stable_vertex_index: StableVertexIndex,
-    // ) -> Option<Vec<StableHyperedgeWeightedIndex>> {
-    //     match self.vertices_mapping_right.get(&stable_vertex_index) {
-    //         Some(unstable_vertex_index) => {
-    //             self.vertices
-    //                 .get_index(*unstable_vertex_index)
-    //                 .map(|(_, hyperedges)| {
-    //                     hyperedges
-    //                         .iter()
-    //                         .map(|unstable_hyperedge_weighted_index| {
-    //                             // dbg!(
-    //                             //     unstable_hyperedge_weighted_index,
-    //                             //     self.hyperedges_mapping_left.clone(),
-    //                             //     self.hyperedges_mapping_right.clone()
-    //                             // );
-    //                             *self
-    //                                 .hyperedges_mapping_left
-    //                                 .get(unstable_hyperedge_weighted_index)
-    //                                 .unwrap()
-    //                         })
-    //                         .collect()
-    //                 })
-    //         }
+    /// Gets the hyperedges of a vertex as a vector of HyperedgeIndex.
+    pub fn get_vertex_hyperedges(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_vertex(vertex_index)?;
 
-    //         None => None,
-    //     }
-    // }
+        let (_, hyperedges) = self
+            .vertices
+            .get_index(internal_index)
+            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
-    // /// Gets the hyperedges including vertex as vectors of vertices.
-    // pub fn get_vertex_hyperedges_full(
-    //     &self,
-    //     stable_vertex_index: StableVertexIndex,
-    // ) -> Option<Vec<Vec<StableVertexIndex>>> {
-    //     self.get_vertex_hyperedges(stable_vertex_index)
-    //         .map(|hyperedges| {
-    //             hyperedges
-    //                 .iter()
-    //                 .map(|index| self.get_hyperedge_vertices(*index).unwrap())
-    //                 .collect()
-    //         })
-    // }
+        self.get_hyperedges(hyperedges.clone().into_iter().collect_vec())
+    }
 
-    // /// Gets the weight of a vertex from its index.
-    // pub fn get_vertex_weight(&self, stable_vertex_index: StableVertexIndex) -> Option<V> {
-    //     match self.vertices_mapping_right.get(&stable_vertex_index) {
-    //         Some(unstable_vertex_index) => self
-    //             .vertices
-    //             .get_index(*unstable_vertex_index)
-    //             .map(|(weight, _)| *weight),
+    /// Gets the hyperedges of a vertex as a vector of vectors of VertexIndex.
+    pub fn get_full_vertex_hyperedges(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
+        self.get_vertex_hyperedges(vertex_index).map(|hyperedges| {
+            hyperedges
+                .into_iter()
+                .flat_map(|hyperedge_index| self.get_hyperedge_vertices(hyperedge_index))
+                .collect()
+        })
+    }
 
-    //         None => None,
-    //     }
-    // }
+    /// Gets the weight of a vertex from its index.
+    pub fn get_vertex_weight(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<V, HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_vertex(vertex_index)?;
+
+        self.vertices
+            .get_index(internal_index)
+            .map(|(weight, _)| *weight)
+            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))
+    }
 
     // /// Removes a vertex based on its index.
     // pub fn remove_vertex(&mut self, index: StableVertexIndex) -> bool {

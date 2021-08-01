@@ -29,21 +29,47 @@ fn integration() {
     // Create a new hypergraph.
     let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
 
-    // Add some vertices.
+    // Create some vertices.
     let andrea = Vertex::new("andrea");
     let björn = Vertex::new("björn");
     let charlie = Vertex::new("charlie");
     let dana = Vertex::new("dana");
     let enola = Vertex::new("enola");
-    assert_eq!(graph.add_vertex(andrea), Ok(VertexIndex(0)));
-    assert_eq!(graph.add_vertex(björn), Ok(VertexIndex(1)));
-    assert_eq!(graph.add_vertex(charlie), Ok(VertexIndex(2)));
-    assert_eq!(graph.add_vertex(dana), Ok(VertexIndex(3)));
-    assert_eq!(graph.add_vertex(enola), Ok(VertexIndex(4)));
-    assert_eq!(graph.add_vertex(enola), Ok(VertexIndex(4))); // adding the same vertex results in an update.
+
+    // Add those vertices to the hypergraph.
+    assert_eq!(
+        graph.add_vertex(andrea),
+        Ok(VertexIndex(0)),
+        "should add the first vertex"
+    );
+    assert_eq!(
+        graph.add_vertex(björn),
+        Ok(VertexIndex(1)),
+        "should add the second vertex"
+    );
+    assert_eq!(
+        graph.add_vertex(charlie),
+        Ok(VertexIndex(2)),
+        "should add the third vertex"
+    );
+    assert_eq!(
+        graph.add_vertex(dana),
+        Ok(VertexIndex(3)),
+        "should add the fourth vertex"
+    );
+    assert_eq!(
+        graph.add_vertex(enola),
+        Ok(VertexIndex(4)),
+        "should add the fifth vertex"
+    );
+    assert_eq!(
+        graph.add_vertex(enola),
+        Ok(VertexIndex(4)),
+        "should be a no-op since adding the exact same vertex results in an update"
+    );
 
     // Count the vertices.
-    assert_eq!(graph.count_vertices(), 5);
+    assert_eq!(graph.count_vertices(), 5, "should have 5 vertices");
 
     // Add some hyperedges.
     assert_eq!(
@@ -57,7 +83,7 @@ fn integration() {
             "pass the pink ball"
         ),
         Ok(HyperedgeIndex(0)),
-        "this first hyperedge contains a self-loop on the VertexIndex 1"
+        "should add a first hyperedge which contains a self-loop on the VertexIndex 1"
     );
     assert_eq!(
         graph.add_hyperedge(
@@ -70,7 +96,7 @@ fn integration() {
             "pass the yellow ball",
         ),
         Ok(HyperedgeIndex(1)),
-        "this second hyperedge contains the same vertices as the first one"
+        "should add a second hyperedge which contains the same vertices as the first one"
     );
     assert_eq!(
         graph.add_hyperedge(
@@ -83,179 +109,254 @@ fn integration() {
             "share the \"The Disordered Cosmos: A Journey into Dark Matter, Spacetime, and Dreams Deferred\" book"
         ),
         Ok(HyperedgeIndex(2)),
-        "this third hyperedge is unique"
+        "should add a third hyperedge which is unique"
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], "meditate like a Jedi"),
         Ok(HyperedgeIndex(3)),
-        "this fourth hyperedge contains a unary"
+        "should add a fourth hyperedge which contains a unary"
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], "meditate like a Jedi"),
         Ok(HyperedgeIndex(3)),
-        "this is a no-op since adding the exact same hyperedge results in an update"
+        "should be a no-op since adding the exact same hyperedge results in an update"
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], "work out"), 
         Ok(HyperedgeIndex(4)),
-        "this fifth hyperedge contains the same unary as the fourth one but with a different weight"
+        "should add a fifth hyperedge which contains the same unary as the fourth one but with a different weight"
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(9)], "nope"),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(9))),
-        "this is out-of-bound and should return an explicit error"
+        "should be out-of-bound and should return an explicit error"
     );
 
     // Count the hyperedges.
-    assert_eq!(graph.count_hyperedges(), 5);
+    assert_eq!(graph.count_hyperedges(), 5, "should have 5 hyperedges");
 
-    // // Get the weights of some hyperedges and vertices.
-    // assert_eq!(
-    //     graph.get_vertex_weight(StableVertexIndex(0)),
-    //     Some(vertex_a)
-    // );
-    // assert_eq!(
-    //     graph.get_vertex_weight(StableVertexIndex(4)),
-    //     Some(vertex_e)
-    // );
-    // assert_eq!(graph.get_vertex_weight(StableVertexIndex(5)), None); // should not fail!
-    // assert_eq!(
-    //     graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(0)),
-    //     Some("foo")
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(4)),
-    //     Some("leet")
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(5)), // should not fail!
-    //     None
-    // );
+    // Get the weights of some vertices.
+    assert_eq!(
+        graph.get_vertex_weight(VertexIndex(0)),
+        Ok(andrea),
+        "should return Andrea"
+    );
+    assert_eq!(
+        graph.get_vertex_weight(VertexIndex(4)),
+        Ok(enola),
+        "should return Enola"
+    );
+    assert_eq!(
+        graph.get_vertex_weight(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and should return an explicit error"
+    );
 
-    // // Get the vertices of a hyperedge.
-    // assert_eq!(
-    //     graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
-    //     Some(vec![
-    //         StableVertexIndex(0),
-    //         StableVertexIndex(1),
-    //         StableVertexIndex(1),
-    //         StableVertexIndex(3)
-    //     ])
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(5)), // should not fail!
-    //     None
-    // );
+    // Get the weights of some hyperedges.
+    assert_eq!(
+        graph.get_hyperedge_weight(HyperedgeIndex(0)),
+        Ok("pass the pink ball"),
+        "should get the weight of the first hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_weight(HyperedgeIndex(4)),
+        Ok("work out"),
+        "should get the weight of the fifth hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_weight(HyperedgeIndex(5)),
+        Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
+        "should be out-of-bound and should return an explicit error"
+    );
 
-    // // Get the hyperedges of some vertices as vectors of vertices.
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges_full(StableVertexIndex(0)),
-    //     Some(vec![
-    //         vec![
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(3)
-    //         ],
-    //         vec![
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(3)
-    //         ],
-    //         vec![
-    //             StableVertexIndex(4),
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(3),
-    //             StableVertexIndex(2)
-    //         ]
-    //     ])
-    // );
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges_full(StableVertexIndex(1)),
-    //     Some(vec![
-    //         vec![
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(3)
-    //         ],
-    //         vec![
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(3)
-    //         ]
-    //     ])
-    // );
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges_full(StableVertexIndex(2)),
-    //     Some(vec![vec![
-    //         StableVertexIndex(4),
-    //         StableVertexIndex(0),
-    //         StableVertexIndex(3),
-    //         StableVertexIndex(2)
-    //     ]])
-    // );
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges_full(StableVertexIndex(3)),
-    //     Some(vec![
-    //         vec![
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(3)
-    //         ],
-    //         vec![
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(1),
-    //             StableVertexIndex(3)
-    //         ],
-    //         vec![
-    //             StableVertexIndex(4),
-    //             StableVertexIndex(0),
-    //             StableVertexIndex(3),
-    //             StableVertexIndex(2)
-    //         ],
-    //         vec![StableVertexIndex(3)],
-    //         vec![StableVertexIndex(3)]
-    //     ])
-    // );
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges_full(StableVertexIndex(4)),
-    //     Some(vec![vec![
-    //         StableVertexIndex(4),
-    //         StableVertexIndex(0),
-    //         StableVertexIndex(3),
-    //         StableVertexIndex(2)
-    //     ]])
-    // );
+    // Get the vertices of some hyperedges.
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(0)),
+        Ok(vec![
+            VertexIndex(0),
+            VertexIndex(1),
+            VertexIndex(1),
+            VertexIndex(3)
+        ]),
+        "should get the vertices of the first hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(5)),
+        Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
+        "should be out-of-bound and should return an explicit error"
+    );
 
-    // // Check hyperedges intersections.
-    // assert_eq!(
-    //     graph.get_hyperedges_intersections(&[
-    //         StableHyperedgeWeightedIndex(0),
-    //         StableHyperedgeWeightedIndex(2)
-    //     ]),
-    //     vec![0, 3]
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedges_intersections(&[
-    //         StableHyperedgeWeightedIndex(0),
-    //         StableHyperedgeWeightedIndex(2),
-    //         StableHyperedgeWeightedIndex(3)
-    //     ]),
-    //     vec![3]
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(0)]),
-    //     vec![0, 1, 3]
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedges_intersections(&[StableHyperedgeWeightedIndex(5)]), // should not fail!
-    //     vec![]
-    // );
+    // Get the hyperedges of some vertices as vectors of HyperedgeIndex
+    // and vectors of vectors of VertexIndex (full version).
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(0)),
+        Ok(vec![
+            HyperedgeIndex(0),
+            HyperedgeIndex(1),
+            HyperedgeIndex(2)
+        ]),
+        "should get the hyperedges of the first vertex"
+    );
+    assert_eq!(
+        graph.get_full_vertex_hyperedges(VertexIndex(0)),
+        Ok(vec![
+            vec![
+                VertexIndex(0),
+                VertexIndex(1),
+                VertexIndex(1),
+                VertexIndex(3)
+            ],
+            vec![
+                VertexIndex(0),
+                VertexIndex(1),
+                VertexIndex(1),
+                VertexIndex(3)
+            ],
+            vec![
+                VertexIndex(4),
+                VertexIndex(0),
+                VertexIndex(3),
+                VertexIndex(2)
+            ]
+        ]),
+        "should get the hyperedges of the first vertex - full version"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(1)),
+        Ok(vec![HyperedgeIndex(0), HyperedgeIndex(1),]),
+        "should get the hyperedges of the second vertex"
+    );
+    assert_eq!(
+        graph.get_full_vertex_hyperedges(VertexIndex(1)),
+        Ok(vec![
+            vec![
+                VertexIndex(0),
+                VertexIndex(1),
+                VertexIndex(1),
+                VertexIndex(3)
+            ],
+            vec![
+                VertexIndex(0),
+                VertexIndex(1),
+                VertexIndex(1),
+                VertexIndex(3)
+            ]
+        ]),
+        "should get the hyperedges of the second vertex - full version"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(2)),
+        Ok(vec![HyperedgeIndex(2)]),
+        "should get the hyperedges of the third vertex"
+    );
+    assert_eq!(
+        graph.get_full_vertex_hyperedges(VertexIndex(2)),
+        Ok(vec![vec![
+            VertexIndex(4),
+            VertexIndex(0),
+            VertexIndex(3),
+            VertexIndex(2)
+        ]]),
+        "should get the hyperedges of the third vertex - full version"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(3)),
+        Ok(vec![
+            HyperedgeIndex(0),
+            HyperedgeIndex(1),
+            HyperedgeIndex(2),
+            HyperedgeIndex(3),
+            HyperedgeIndex(4)
+        ]),
+        "should get the hyperedges of the fourth vertex"
+    );
+    assert_eq!(
+        graph.get_full_vertex_hyperedges(VertexIndex(3)),
+        Ok(vec![
+            vec![
+                VertexIndex(0),
+                VertexIndex(1),
+                VertexIndex(1),
+                VertexIndex(3)
+            ],
+            vec![
+                VertexIndex(0),
+                VertexIndex(1),
+                VertexIndex(1),
+                VertexIndex(3)
+            ],
+            vec![
+                VertexIndex(4),
+                VertexIndex(0),
+                VertexIndex(3),
+                VertexIndex(2)
+            ],
+            vec![VertexIndex(3)],
+            vec![VertexIndex(3)]
+        ]),
+        "should get the hyperedges of the fourth vertex - full version"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(4)),
+        Ok(vec![HyperedgeIndex(2)]),
+        "should get the hyperedges of the fifth vertex"
+    );
+    assert_eq!(
+        graph.get_full_vertex_hyperedges(VertexIndex(4)),
+        Ok(vec![vec![
+            VertexIndex(4),
+            VertexIndex(0),
+            VertexIndex(3),
+            VertexIndex(2)
+        ]]),
+        "should get the hyperedges of the fifth vertex - full version"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and should return an explicit error"
+    );
+    assert_eq!(
+        graph.get_full_vertex_hyperedges(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and should return an explicit error"
+    );
+
+    // Check hyperedges intersections.
+    assert_eq!(
+        graph.get_hyperedges_intersections(vec![HyperedgeIndex(0), HyperedgeIndex(2)]),
+        Ok(vec![VertexIndex(0), VertexIndex(3)]),
+        "should get two intersections"
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(vec![
+            HyperedgeIndex(0),
+            HyperedgeIndex(2),
+            HyperedgeIndex(3)
+        ]),
+        Ok(vec![VertexIndex(3)]),
+        "should get one intersection"
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(vec![HyperedgeIndex(0), HyperedgeIndex(0),]),
+        Ok(vec![VertexIndex(0), VertexIndex(1), VertexIndex(3)]),
+        "should return all the vertices of a hyperedge intersecting itself"
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(vec![]),
+        Err(HypergraphError::HyperedgesIntersections),
+        "should fail since computing the intersections of less than two hyperedges is not possible"
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(vec![HyperedgeIndex(0)]),
+        Err(HypergraphError::HyperedgesIntersections),
+        "should fail since computing the intersections of less than two hyperedges is not possible"
+    );
+    assert_eq!(
+        graph.get_hyperedges_intersections(vec![HyperedgeIndex(5), HyperedgeIndex(6)]),
+        Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
+        "should be out-of-bound and should return an explicit error"
+    );
 
     // // TODO: this is actually wrong!
     // // Get the hyperedges connecting some vertices.

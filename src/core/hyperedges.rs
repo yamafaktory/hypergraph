@@ -38,19 +38,49 @@ where
         }
     }
 
-    // Private method to check the existence of vertices.
-    fn get_internal_vertices(
+    // Private method to get the HyperedgeIndex matching an internal index.
+    pub(crate) fn get_hyperedge(
         &self,
-        vertices: Vec<VertexIndex>,
-    ) -> Result<Vec<usize>, HypergraphError<V, HE>> {
-        vertices
+        hyperedge_index: usize,
+    ) -> Result<HyperedgeIndex, HypergraphError<V, HE>> {
+        match self.hyperedges_mapping.left.get(&hyperedge_index) {
+            Some(index) => Ok(*index),
+            None => Err(HypergraphError::InternalHyperedgeIndexNotFound(
+                hyperedge_index,
+            )),
+        }
+    }
+
+    // Private method to get a vector of HyperedgeIndex from a vector of internal indexes.
+    pub(crate) fn get_hyperedges(
+        &self,
+        hyperedges: Vec<usize>,
+    ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
+        hyperedges
             .iter()
-            .map(
-                |vertex_index| match self.vertices_mapping.right.get(vertex_index) {
-                    Some(index) => Ok(*index),
-                    None => Err(HypergraphError::VertexIndexNotFound(*vertex_index)),
-                },
-            )
+            .map(|hyperedge_index| self.get_hyperedge(*hyperedge_index))
+            .collect()
+    }
+
+    // Private method to get the internal hyperedge matching a HyperedgeIndex.
+    pub(crate) fn get_internal_hyperedge(
+        &self,
+        hyperedge_index: HyperedgeIndex,
+    ) -> Result<usize, HypergraphError<V, HE>> {
+        match self.hyperedges_mapping.right.get(&hyperedge_index) {
+            Some(index) => Ok(*index),
+            None => Err(HypergraphError::HyperedgeIndexNotFound(hyperedge_index)),
+        }
+    }
+
+    // Private method to get the internal hyperedges from a vector of HyperedgeIndex.
+    pub(crate) fn get_internal_hyperedges(
+        &self,
+        hyperedges: Vec<HyperedgeIndex>,
+    ) -> Result<Vec<usize>, HypergraphError<V, HE>> {
+        hyperedges
+            .iter()
+            .map(|hyperedge_index| self.get_internal_hyperedge(*hyperedge_index))
             .collect()
     }
 
@@ -78,11 +108,6 @@ where
                 .ok_or(HypergraphError::InternalVertexIndexNotFound(vertex))?;
 
             index_set.insert(internal_index);
-
-            // self.vertices.insert(
-            //     *self.vertices.get_index(unstable_index).unwrap().0,
-            //     index_set,
-            // );
         }
 
         Ok(self.add_hyperedge_index(internal_index))
@@ -100,97 +125,108 @@ where
     //     self.hyperedges.iter()
     // }
 
-    // /// Gets the list of all hyperedges containing a matching connection from
-    // /// one vertex to another.
+    /// Gets the list of all hyperedges containing a matching connection from
+    /// one vertex to another.
     // pub fn get_hyperedges_connections(
     //     &self,
-    //     from: StableVertexIndex,
-    //     to: StableVertexIndex,
-    // ) -> Vec<StableVertexIndex> {
+    //     from: VertexIndex,
+    //     to: VertexIndex,
+    // ) -> Vec<VertexIndex> {
     //     self.get_connections(from, Some(to))
     //         .iter()
     //         .map(|(_, stable_vertex_index)| *stable_vertex_index)
     //         .collect_vec()
     // }
 
-    // /// Gets the hyperedge's vertices.
-    // pub fn get_hyperedge_vertices(
-    //     &self,
-    //     stable_hyperedge_weighted_index: StableHyperedgeWeightedIndex,
-    // ) -> Option<Vec<StableVertexIndex>> {
-    //     match self
-    //         .hyperedges_mapping_right
-    //         .get(&stable_hyperedge_weighted_index)
-    //     {
-    //         Some([unstable_hyperedge_index, _]) => self
-    //             .hyperedges
-    //             .get_index(*unstable_hyperedge_index)
-    //             .map(|(vertices, _)| {
-    //                 vertices
-    //                     .iter()
-    //                     .map(|vertex| *self.vertices_mapping_left.get(vertex).unwrap())
-    //                     .collect()
-    //             }),
-    //         None => None,
-    //     }
-    // }
+    /// Gets the vertices of a hyperedge.
+    pub fn get_hyperedge_vertices(
+        &self,
+        hyperedge_index: HyperedgeIndex,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_hyperedge(hyperedge_index)?;
 
-    // /// Gets the weight of a hyperedge from its weighted index.
-    // pub fn get_hyperedge_weight(
-    //     &self,
-    //     stable_hyperedge_weighted_index: StableHyperedgeWeightedIndex,
-    // ) -> Option<HE> {
-    //     match self
-    //         .hyperedges_mapping_right
-    //         .get(&stable_hyperedge_weighted_index)
-    //     {
-    //         Some([hyperedge_index, weight_index]) => {
-    //             match self.hyperedges.get_index(*hyperedge_index) {
-    //                 Some((_, weights)) => weights.get_index(*weight_index).cloned(),
-    //                 None => None,
-    //             }
-    //         }
-    //         None => None,
-    //     }
-    // }
+        let HyperedgeKey { vertices, .. } = self.hyperedges.get_index(internal_index).ok_or(
+            HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+        )?;
 
-    // /// Gets the intersections of a set of hyperedges as a vector of vertices.
-    // pub fn get_hyperedges_intersections(
-    //     &self,
-    //     hyperedges: &[StableHyperedgeWeightedIndex],
-    // ) -> Vec<UnstableVertexIndex> {
-    //     hyperedges
-    //         .iter()
-    //         .filter_map(|stable_hyperedge_weighted_index| {
-    //             match self
-    //                 .hyperedges_mapping_right
-    //                 .get(stable_hyperedge_weighted_index)
-    //             {
-    //                 Some([unstable_hypergraph_index, _]) => self
-    //                     .hyperedges
-    //                     .get_index(*unstable_hypergraph_index)
-    //                     .map(|(vertices, _)| vertices.iter().unique().collect_vec()),
-    //                 None => Some(vec![]),
-    //             }
-    //         })
-    //         .flatten()
-    //         .sorted()
-    //         // Map the result to tuples where the second term is an arbitrary value.
-    //         // The goal is to group them by indexes.
-    //         .map(|index| (*index, 0))
-    //         .into_group_map()
-    //         .iter()
-    //         // Filter the groups having the same size as the hyperedge.
-    //         .filter_map(|(index, occurences)| {
-    //             if occurences.len() == hyperedges.len() {
-    //                 Some(*index)
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .sorted()
-    //         .collect_vec()
-    // }
+        self.get_vertices(vertices.to_owned())
+    }
+
+    /// Gets the weight of a hyperedge from its index.
+    pub fn get_hyperedge_weight(
+        &self,
+        hyperedge_index: HyperedgeIndex,
+    ) -> Result<HE, HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_hyperedge(hyperedge_index)?;
+
+        let hyperedge_key = self
+            .hyperedges
+            .get_index(internal_index)
+            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
+
+        Ok(hyperedge_key.weight)
+    }
+
+    /// Gets the intersections of a set of hyperedges as a vector of vertices.
+    pub fn get_hyperedges_intersections(
+        &self,
+        hyperedges: Vec<HyperedgeIndex>,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        // Keep track of the number of hyperedges.
+        let number_of_hyperedges = hyperedges.len();
+
+        // Early exit if less than two hyperedges are provided.
+        if number_of_hyperedges < 2 {
+            return Err(HypergraphError::HyperedgesIntersections);
+        }
+
+        // Get the internal vertices of the hyperedges and keep the eventual error.
+        let vertices = hyperedges
+            .into_iter()
+            .map(
+                |hyperedge_index| match self.get_internal_hyperedge(hyperedge_index) {
+                    Ok(internal_index) => match self.hyperedges.get_index(internal_index).ok_or(
+                        HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+                    ) {
+                        Ok(HyperedgeKey { vertices, .. }) => {
+                            // Keep the unique vertices.
+                            Ok(vertices.iter().unique().cloned().collect_vec())
+                        }
+                        Err(error) => Err(error),
+                    },
+                    Err(error) => Err(error),
+                },
+            )
+            .collect::<Result<Vec<Vec<usize>>, HypergraphError<V, HE>>>();
+
+        match vertices {
+            Ok(vertices) => {
+                self.get_vertices(
+                    vertices
+                        .into_iter()
+                        // Flatten and sort the vertices.
+                        .flatten()
+                        .sorted()
+                        // Map the result to tuples where the second term is an arbitrary value.
+                        // The goal is to group them by indexes.
+                        .map(|index| (index, 0))
+                        .into_group_map()
+                        .into_iter()
+                        // Filter the groups having the same size as the hyperedge.
+                        .filter_map(|(index, occurences)| {
+                            if occurences.len() == number_of_hyperedges {
+                                Some(index)
+                            } else {
+                                None
+                            }
+                        })
+                        .sorted()
+                        .collect_vec(),
+                )
+            }
+            Err(error) => Err(error),
+        }
+    }
 
     // /// Removes a hyperedge based on its index.
     // /// IndexMap doesn't allow holes by design, see:

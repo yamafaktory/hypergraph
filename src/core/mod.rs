@@ -1,6 +1,7 @@
 mod debug;
 mod dot;
-/// Hyperedges implementation.
+#[doc(hidden)]
+pub mod error;
 #[doc(hidden)]
 pub mod hyperedges;
 mod shared;
@@ -10,12 +11,12 @@ mod utils;
 pub mod vertices;
 
 use debug::ExtendedDebug;
-use dot::render_to_graphviz_dot;
+// use dot::render_to_graphviz_dot;
 
 use indexmap::{IndexMap, IndexSet};
 use std::{
     collections::HashMap,
-    fmt::{Debug, Formatter, Result},
+    fmt::{Debug, Display, Formatter, Result},
     hash::Hash,
     ops::Index,
 };
@@ -24,42 +25,85 @@ use std::{
 /// Uses the newtype index pattern.
 /// https://matklad.github.io/2018/06/04/newtype-index-pattern.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StableVertexIndex(pub usize);
+pub struct VertexIndex(pub usize);
 
-/// Hyperedge stable weighted index representation as a usize.
+impl Display for VertexIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Hyperedge stable index representation as usize.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StableHyperedgeWeightedIndex(pub usize);
+pub struct HyperedgeIndex(pub usize);
 
-/// Vertex unstable index representation as a usize.
-pub type UnstableVertexIndex = usize;
+impl Display for HyperedgeIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.0)
+    }
+}
 
-/// Hyperedge unstable weighted index representation as an array of two usize.
-/// The first element is the index of the hyperedge.
-/// The second element is the distinct index representing one of its weight.
-/// E.g. [0, 0] and [0, 1] are two hyperedges - connecting the same
-/// vertices in the same order - with distinct weights (non-simple hypergraph).
-pub type UnstableHyperedgeWeightedIndex = [usize; 2];
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct HyperedgeKey<HE> {
+    vertices: Vec<usize>,
+    weight: HE,
+}
+
+impl<HE> HyperedgeKey<HE> {
+    pub fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
+        Self { vertices, weight }
+    }
+}
+
+pub struct BiHashMap<Index>
+where
+    Index: SharedTrait,
+{
+    left: HashMap<usize, Index>,
+    right: HashMap<Index, usize>,
+}
+
+impl<Index> BiHashMap<Index>
+where
+    Index: SharedTrait,
+{
+    pub fn new() -> BiHashMap<Index> {
+        Self {
+            left: HashMap::<usize, Index>::with_capacity(0),
+            right: HashMap::<Index, usize>::with_capacity(0),
+        }
+    }
+}
+
+impl<Index> Default for BiHashMap<Index>
+where
+    Index: SharedTrait,
+{
+    fn default() -> Self {
+        BiHashMap::new()
+    }
+}
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as an IndexMap whose keys are the weights
     /// and values are an IndexSet containing the hyperedges which are
     /// including the current vertex.
-    pub vertices: IndexMap<V, IndexSet<UnstableHyperedgeWeightedIndex>>,
+    pub vertices: IndexMap<V, IndexSet<usize>>,
+
     /// Hyperedges are stored as an IndexMap whose keys are a vector of
     /// vertices indexes and values are an IndexSet of weights.
     /// Having an IndexSet of weights allows having two or more hyperedges
     /// containing the same set of vertices (non-simple hypergraph).
-    pub hyperedges: IndexMap<Vec<UnstableVertexIndex>, IndexSet<HE>>,
+    pub hyperedges: IndexSet<HyperedgeKey<HE>>,
 
-    // Mimic a bi-directional map for hyperedges and vertices.
-    // Keep a counter for both for stable index generation.
+    // Mimic bi-directional maps for hyperedges and vertices.
+    hyperedges_mapping: BiHashMap<HyperedgeIndex>,
+    vertices_mapping: BiHashMap<VertexIndex>,
+
+    // Keep stable index generation counters.
     hyperedges_count: usize,
-    hyperedges_mapping_left: HashMap<UnstableHyperedgeWeightedIndex, StableHyperedgeWeightedIndex>,
-    hyperedges_mapping_right: HashMap<StableHyperedgeWeightedIndex, UnstableHyperedgeWeightedIndex>,
     vertices_count: usize,
-    vertices_mapping_left: HashMap<UnstableVertexIndex, StableVertexIndex>,
-    vertices_mapping_right: HashMap<StableVertexIndex, UnstableVertexIndex>,
 }
 
 impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
@@ -73,9 +117,9 @@ impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
 
 /// Shared Trait for hyperedges and vertices.
 /// This is a set of traits that must be implemented to use the library.
-pub trait SharedTrait: Copy + Debug + Eq + Hash {}
+pub trait SharedTrait: Copy + Debug + Display + Eq + Hash {}
 
-impl<T> SharedTrait for T where T: Copy + Debug + Eq + Hash {}
+impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash {}
 
 impl<'a, V, HE> Default for Hypergraph<V, HE>
 where
@@ -102,15 +146,11 @@ where
     pub fn with_capacity(vertices: usize, hyperedges: usize) -> Self {
         Hypergraph {
             vertices: IndexMap::with_capacity(vertices),
-            hyperedges: IndexMap::with_capacity(hyperedges),
-
-            //
+            hyperedges: IndexSet::with_capacity(hyperedges),
+            hyperedges_mapping: BiHashMap::default(),
+            vertices_mapping: BiHashMap::default(),
             hyperedges_count: 0,
-            hyperedges_mapping_left: HashMap::with_capacity(0),
-            hyperedges_mapping_right: HashMap::with_capacity(0),
             vertices_count: 0,
-            vertices_mapping_left: HashMap::with_capacity(0),
-            vertices_mapping_right: HashMap::with_capacity(0),
         }
     }
 
@@ -118,20 +158,20 @@ where
     /// Due to Graphviz dot inability to render hypergraphs out of the box,
     /// unaries are rendered as vertex peripheries which can't be labelled.
     pub fn render_to_graphviz_dot(&self) {
-        println!("{}", render_to_graphviz_dot(self));
+        // println!("{}", render_to_graphviz_dot(self));
     }
 }
 
-impl<V, HE> Index<V> for Hypergraph<V, HE>
-where
-    V: SharedTrait,
-    HE: SharedTrait,
-{
-    type Output = usize;
+// impl<V, HE> Index<V> for Hypergraph<V, HE>
+// where
+//     V: SharedTrait,
+//     HE: SharedTrait,
+// {
+//     type Output = usize;
 
-    fn index(&self, vertex: V) -> &Self::Output {
-        let (index, _, _) = self.vertices.get_full(&vertex).unwrap();
-        dbg!(index);
-        &0
-    }
-}
+//     fn index(&self, vertex: V) -> &Self::Output {
+//         let (index, _, _) = self.vertices.get_full(&vertex).unwrap();
+//         dbg!(index);
+//         &0
+//     }
+// }

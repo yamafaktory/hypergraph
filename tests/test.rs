@@ -129,7 +129,7 @@ fn integration() {
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(9)], "nope"),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(9))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
 
     // Count the hyperedges.
@@ -149,7 +149,7 @@ fn integration() {
     assert_eq!(
         graph.get_vertex_weight(VertexIndex(5)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
 
     // Get the weights of some hyperedges.
@@ -166,7 +166,7 @@ fn integration() {
     assert_eq!(
         graph.get_hyperedge_weight(HyperedgeIndex(5)),
         Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
 
     // Get the vertices of some hyperedges.
@@ -183,7 +183,7 @@ fn integration() {
     assert_eq!(
         graph.get_hyperedge_vertices(HyperedgeIndex(5)),
         Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
 
     // Get the hyperedges of some vertices as vectors of HyperedgeIndex
@@ -314,12 +314,12 @@ fn integration() {
     assert_eq!(
         graph.get_vertex_hyperedges(VertexIndex(5)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
     assert_eq!(
         graph.get_full_vertex_hyperedges(VertexIndex(5)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
 
     // Check hyperedges intersections.
@@ -355,65 +355,87 @@ fn integration() {
     assert_eq!(
         graph.get_hyperedges_intersections(vec![HyperedgeIndex(5), HyperedgeIndex(6)]),
         Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
-        "should be out-of-bound and should return an explicit error"
+        "should be out-of-bound and return an explicit error"
     );
 
-    // // TODO: this is actually wrong!
-    // // Get the hyperedges connecting some vertices.
-    // // assert_eq!(
-    // //     graph.get_hyperedges_connections(StableVertexIndex(1), StableVertexIndex(1)),
-    // //     vec![0]
-    // // );
-    // // assert_eq!(
-    // //     graph.get_hyperedges_connections(StableVertexIndex(4), StableVertexIndex(2)),
-    // //     vec![1]
-    // // );
-    // // assert_eq!(
-    // //     graph.get_hyperedges_connections(StableVertexIndex(3), StableVertexIndex(0)),
-    // //     vec![] // no match, should stay empty!
-    // // );
+    // Get the hyperedges directly connecting a vertex to another.
+    assert_eq!(
+        graph.get_hyperedges_connecting(VertexIndex(1), VertexIndex(1)),
+        Ok(vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+        "should get two matches"
+    );
+    assert_eq!(
+        graph.get_hyperedges_connecting(VertexIndex(4), VertexIndex(0)),
+        Ok(vec![HyperedgeIndex(2)]),
+        "should get one match"
+    );
+    assert_eq!(
+        graph.get_hyperedges_connecting(VertexIndex(3), VertexIndex(0)),
+        Ok(vec![]),
+        "should get no match"
+    );
+    assert_eq!(
+        graph.get_hyperedges_connecting(VertexIndex(5), VertexIndex(0)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and return an explicit error"
+    );
 
-    // // Get the adjacent vertices of a vertex.
-    // assert_eq!(
-    //     graph.get_adjacent_vertices_to(StableVertexIndex(0)),
-    //     vec![StableVertexIndex(1), StableVertexIndex(3)]
-    // );
-    // assert_eq!(
-    //     graph.get_adjacent_vertices_to(StableVertexIndex(1)),
-    //     vec![StableVertexIndex(1), StableVertexIndex(3)]
-    // );
-    // assert_eq!(graph.get_adjacent_vertices_to(StableVertexIndex(2)), vec![]);
-    // assert_eq!(
-    //     graph.get_adjacent_vertices_to(StableVertexIndex(3)),
-    //     vec![StableVertexIndex(2)]
-    // );
+    // Get the adjacent vertices to a vertex.
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(0)),
+        Ok(vec![VertexIndex(1), VertexIndex(3)])
+    );
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(1)),
+        Ok(vec![VertexIndex(1), VertexIndex(3)])
+    );
+    assert_eq!(graph.get_adjacent_vertices_to(VertexIndex(2)), Ok(vec![]));
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(3)),
+        Ok(vec![VertexIndex(2)])
+    );
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and return an explicit error"
+    );
 
-    // // Get some paths via Dijkstra.
-    // assert_eq!(
-    //     graph.get_dijkstra_connections(StableVertexIndex(4), StableVertexIndex(2)),
-    //     Some(vec![
-    //         StableVertexIndex(4),
-    //         StableVertexIndex(0),
-    //         StableVertexIndex(3),
-    //         StableVertexIndex(2),
-    //     ])
-    // );
-    // assert_eq!(
-    //     graph.get_dijkstra_connections(StableVertexIndex(0), StableVertexIndex(3)),
-    //     Some(vec![StableVertexIndex(0), StableVertexIndex(3),])
-    // );
-    // assert_eq!(
-    //     graph.get_dijkstra_connections(StableVertexIndex(0), StableVertexIndex(4)),
-    //     None
-    // );
-    // assert_eq!(
-    //     graph.get_dijkstra_connections(StableVertexIndex(1), StableVertexIndex(1)),
-    //     Some(vec![StableVertexIndex(1)])
-    // );
-    // assert_eq!(
-    //     graph.get_dijkstra_connections(StableVertexIndex(3), StableVertexIndex(3)),
-    //     Some(vec![StableVertexIndex(3)])
-    // );
+    // Get some paths via Dijkstra.
+    assert_eq!(
+        graph.get_dijkstra_connections(VertexIndex(4), VertexIndex(2)),
+        Ok(vec![
+            VertexIndex(4),
+            VertexIndex(0),
+            VertexIndex(3),
+            VertexIndex(2)
+        ]),
+        "should get a path of four vertices"
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(3)),
+        Ok(vec![VertexIndex(0), VertexIndex(3)]),
+        "should get a path of two vertices"
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(4)),
+        Ok(vec![]),
+        "should get an empty path"
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(VertexIndex(1), VertexIndex(1)),
+        Ok(vec![VertexIndex(1)]),
+        "should get a path of one vertex"
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(VertexIndex(3), VertexIndex(3)),
+        Ok(vec![VertexIndex(3)]),
+        "should get a path of one vertex"
+    );
+    assert_eq!(
+        graph.get_dijkstra_connections(VertexIndex(3), VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and return an explicit error"
+    );
 
     // // Update a vertex's weight.
     // let vertex_a = Vertex::new("brand new heavies");

@@ -104,119 +104,124 @@ where
         self.vertices.len()
     }
 
-    // /// Gets a list of the shortest path of vertices between two vertices.
-    // /// The implementation of the algorithm is based on
-    // /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
-    // pub fn get_dijkstra_connections(
-    //     &self,
-    //     from: StableVertexIndex,
-    //     to: StableVertexIndex,
-    // ) -> Option<Vec<StableVertexIndex>> {
-    //     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    //     struct Cursor {
-    //         distance: usize,
-    //         index: usize,
-    //     }
+    /// Gets a list of the shortest path of vertices between two vertices.
+    /// The implementation of the algorithm is based on
+    /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
+    pub fn get_dijkstra_connections(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        struct Cursor {
+            distance: usize,
+            index: usize,
+        }
 
-    //     // Use a custom implementation of Ord as we want a min-heap BinaryHeap.
-    //     impl Ord for Cursor {
-    //         fn cmp(&self, other: &Cursor) -> Ordering {
-    //             other
-    //                 .distance
-    //                 .cmp(&self.distance)
-    //                 .then_with(|| self.distance.cmp(&other.distance))
-    //         }
-    //     }
+        // Use a custom implementation of Ord as we want a min-heap BinaryHeap.
+        impl Ord for Cursor {
+            fn cmp(&self, other: &Cursor) -> Ordering {
+                other
+                    .distance
+                    .cmp(&self.distance)
+                    .then_with(|| self.distance.cmp(&other.distance))
+            }
+        }
 
-    //     impl PartialOrd for Cursor {
-    //         fn partial_cmp(&self, other: &Cursor) -> Option<Ordering> {
-    //             Some(self.cmp(other))
-    //         }
-    //     }
+        impl PartialOrd for Cursor {
+            fn partial_cmp(&self, other: &Cursor) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
 
-    //     // Get the unstable indexes from the mapping.
-    //     let maybe_unstable_from = self.vertices_mapping_right.get(&from);
-    //     let maybe_unstable_to = self.vertices_mapping_right.get(&to);
+        // Get the internal indexes of the vertices.
+        let internal_from = self.get_internal_vertex(from)?;
+        let internal_to = self.get_internal_vertex(to)?;
 
-    //     // Safe-check: return None if one or the other is None.
-    //     if maybe_unstable_from.is_none() || maybe_unstable_to.is_none() {
-    //         return None;
-    //     }
+        // We need to initialize a vector of length equal to the number of vertices.
+        // The default value, as per Dijkstra, must be set to infinity.
+        // A value of usize::MAX is used.
+        let mut distances = (0..self.vertices.len())
+            .map(|_| usize::MAX)
+            .collect::<Vec<usize>>();
 
-    //     // We need to initialize a vector of length equal to the number of vertices.
-    //     // The default value, as per Dijkstra, must be set to infinity.
-    //     // A value of usize::MAX is used.
-    //     let mut distances = (0..self.vertices.len()).map(|_| usize::MAX).collect_vec();
+        // Create an empty binary heap.
+        let mut heap = BinaryHeap::new();
 
-    //     // Create an empty binary heap.
-    //     let mut heap = BinaryHeap::new();
+        // Initialize the first vertex to zero.
+        distances[internal_from] = 0;
 
-    //     // Initialize the first vertex to zero.
-    //     distances[*maybe_unstable_from.unwrap()] = 0;
+        // Push the first cursor to the heap.
+        heap.push(Cursor {
+            distance: 0,
+            index: internal_from,
+        });
 
-    //     // Push the first cursor to the heap.
-    //     heap.push(Cursor {
-    //         distance: 0,
-    //         index: *maybe_unstable_from.unwrap(),
-    //     });
+        // Keep track of the traversal path.
+        let mut path = Vec::<usize>::new();
 
-    //     // Keep track of the traversal path.
-    //     let mut path = Vec::<StableVertexIndex>::new();
+        while let Some(Cursor { distance, index }) = heap.pop() {
+            // End of the traversal.
+            if index == internal_to {
+                // We need to inject the index of the target vertex.
+                path.push(internal_to);
 
-    //     while let Some(Cursor { distance, index }) = heap.pop() {
-    //         // End of the traversal.
-    //         if index == *maybe_unstable_to.unwrap() {
-    //             // We need to inject the index of the target vertex.
-    //             path.push(to);
+                // Remove duplicates generated during the iteration of the algorithm.
+                path.dedup();
 
-    //             // Remove duplicates generated during the iteration of the algorithm.
-    //             path.dedup();
+                return self.get_vertices(path);
+            }
 
-    //             return Some(path);
-    //         }
+            // Skip if a better path has already been found.
+            if distance > distances[index] {
+                continue;
+            }
 
-    //         // Skip if a better path has already been found.
-    //         if distance > distances[index] {
-    //             continue;
-    //         }
+            let mapped_index = self.get_vertex(index)?;
+            let indexes = self.get_adjacent_vertices_to(mapped_index)?;
+            let internal_indexes = self.get_internal_vertices(indexes)?;
 
-    //         if let Some(stable_vertex_index) = self.vertices_mapping_left.get(&index) {
-    //             // For every connected vertex, try to find the lowest distance.
-    //             for vertex_index in self.get_adjacent_vertices_to(*stable_vertex_index) {
-    //                 let unstable_index = *self.vertices_mapping_right.get(&vertex_index).unwrap();
-    //                 let next = Cursor {
-    //                     // We assume a distance of one by default.
-    //                     distance: distance + 1,
-    //                     index: unstable_index,
-    //                 };
+            // For every connected vertex, try to find the lowest distance.
+            for vertex_index in internal_indexes {
+                let next = Cursor {
+                    // We assume a distance of one by default since vertices
+                    // have custom weights.
+                    distance: distance + 1,
+                    index: vertex_index,
+                };
 
-    //                 // If so, add it to the frontier and continue.
-    //                 if next.distance < distances[next.index] {
-    //                     // Update the traversal accordingly.
-    //                     path.push(*stable_vertex_index);
+                // If so, add it to the frontier and continue.
+                if next.distance < distances[next.index] {
+                    // Update the traversal accordingly.
+                    path.push(index);
 
-    //                     // Push it to the heap.
-    //                     heap.push(next);
+                    // Push it to the heap.
+                    heap.push(next);
 
-    //                     // Relaxation, we have now found a better way.
-    //                     distances[unstable_index] = next.distance;
-    //                 }
-    //             }
-    //         }
-    //     }
+                    // Relaxation, we have now found a better way
+                    distances[vertex_index] = next.distance;
+                }
+            }
+        }
 
-    //     None
-    // }
+        // If we reach this point, return an empty vector.
+        Ok(vec![])
+    }
 
-    // /// Gets all the vertices adjacent to a given vertex.
-    // pub fn get_adjacent_vertices_to(&self, from: StableVertexIndex) -> Vec<StableVertexIndex> {
-    //     self.get_connections(from, None)
-    //         .iter()
-    //         .map(|(_, stable_vertex_index)| *stable_vertex_index)
-    //         .sorted()
-    //         .dedup()
-    //         .collect_vec()
-    // }
+    /// Gets the list of all vertices connected to a given vertex.
+    pub fn get_adjacent_vertices_to(
+        &self,
+        from: VertexIndex,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        let results = self.get_connections(from, None)?;
+
+        Ok(results
+            .into_iter()
+            .filter_map(|(_, vertex_index)| vertex_index)
+            .sorted()
+            .dedup()
+            .collect_vec())
+    }
 
     /// Gets the hyperedges of a vertex as a vector of HyperedgeIndex.
     pub fn get_vertex_hyperedges(
@@ -225,12 +230,12 @@ where
     ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
         let internal_index = self.get_internal_vertex(vertex_index)?;
 
-        let (_, hyperedges) = self
+        let (_, hyperedges_index_set) = self
             .vertices
             .get_index(internal_index)
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
-        self.get_hyperedges(hyperedges.clone().into_iter().collect_vec())
+        self.get_hyperedges(hyperedges_index_set.clone().into_iter().collect_vec())
     }
 
     /// Gets the hyperedges of a vertex as a vector of vectors of VertexIndex.

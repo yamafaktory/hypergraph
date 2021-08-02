@@ -125,18 +125,19 @@ where
     //     self.hyperedges.iter()
     // }
 
-    /// Gets the list of all hyperedges containing a matching connection from
-    /// one vertex to another.
-    // pub fn get_hyperedges_connections(
-    //     &self,
-    //     from: VertexIndex,
-    //     to: VertexIndex,
-    // ) -> Vec<VertexIndex> {
-    //     self.get_connections(from, Some(to))
-    //         .iter()
-    //         .map(|(_, stable_vertex_index)| *stable_vertex_index)
-    //         .collect_vec()
-    // }
+    /// Gets the hyperedges directly connecting a vertex to another.
+    pub fn get_hyperedges_connecting(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
+        let results = self.get_connections(from, Some(to))?;
+
+        Ok(results
+            .into_iter()
+            .map(|(hyperedged_index, _)| hyperedged_index)
+            .collect_vec())
+    }
 
     /// Gets the vertices of a hyperedge.
     pub fn get_hyperedge_vertices(

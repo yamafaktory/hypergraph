@@ -94,6 +94,19 @@ where
         // Safely try to get the internal vertices.
         let internal_vertices = self.get_internal_vertices(vertices)?;
 
+        // Return an error if the weight is already assigned to another
+        // hyperedge.
+        // We can't use the contains method here since the key is a combination
+        // of the weight and the vertices.
+        if self.hyperedges.iter().any(
+            |HyperedgeKey {
+                 weight: current_weight,
+                 ..
+             }| { *current_weight == weight },
+        ) {
+            return Err(HypergraphError::HyperedgeWeightAlreadyAssigned(weight));
+        }
+
         // We don't care about the second member of the tuple returned from
         // the insertion since this is an infallible operation.
         let (internal_index, _) = self
@@ -302,42 +315,67 @@ where
     //     }
     // }
 
-    // /// Updates the weight of a hyperedge based on its weighted index.
-    // pub fn update_hyperedge_weight(
-    //     &mut self,
-    //     stable_hyperedge_weighted_index: StableHyperedgeWeightedIndex,
-    //     weight: HE,
-    // ) -> bool {
-    //     match self
-    //         .hyperedges_mapping_right
-    //         .get(&stable_hyperedge_weighted_index)
-    //     {
-    //         Some([hyperedge_index, weight_index]) => {
-    //             match self.hyperedges.get_index_mut(*hyperedge_index) {
-    //                 Some((_, weights)) => {
-    //                     // We can't directly replace the value in the set.
-    //                     // First, we need to insert the new weight, it will end up
-    //                     // being at the last position.
-    //                     if !weights.insert(weight) {
-    //                         return false;
-    //                     };
+    /// Updates the weight of a hyperedge based on its weighted index.
+    pub fn update_hyperedge_weight(
+        &mut self,
+        hyperedge_index: HyperedgeIndex,
+        weight: HE,
+    ) -> Result<(), HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_hyperedge(hyperedge_index)?;
 
-    //                     // Then get the value by index of the original weight.
-    //                     match weights.clone().get_index(*weight_index) {
-    //                         Some(weight) => {
-    //                             // Last, use swap and remove. It will remove the old weight
-    //                             // and insert the new one at the index position of the former.
-    //                             weights.swap_remove(weight)
-    //                         }
-    //                         None => false,
-    //                     }
-    //                 }
-    //                 None => false,
-    //             }
-    //         }
-    //         None => false,
-    //     }
-    // }
+        let HyperedgeKey {
+            vertices,
+            weight: previous_weight,
+        } = self.hyperedges.get_index(internal_index).ok_or(
+            HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+        )?;
+
+        // Return an error if the new weight is the same as the previous one.
+        if weight == *previous_weight {
+            return Err(HypergraphError::HyperedgeWeightUnchanged(
+                hyperedge_index,
+                weight,
+            ));
+        }
+
+        // Return an error if the new weight is already assigned to another
+        // hyperedge.
+        // We can't use the contains method here since the key is a combination
+        // of the weight and the vertices.
+        if self.hyperedges.iter().any(
+            |HyperedgeKey {
+                 weight: current_weight,
+                 ..
+             }| { *current_weight == weight },
+        ) {
+            return Err(HypergraphError::HyperedgeWeightAlreadyAssigned(weight));
+        }
+        // TODO!
+
+        // match self.hyperedges.get_index_mut(*hyperedge_index) {
+        //             Some((_, weights)) => {
+        //                 // We can't directly replace the value in the set.
+        //                 // First, we need to insert the new weight, it will end up
+        //                 // being at the last position.
+        //                 if !weights.insert(weight) {
+        //                     return false;
+        //                 };
+
+        //                 // Then get the value by index of the original weight.
+        //                 match weights.clone().get_index(*weight_index) {
+        //                     Some(weight) => {
+        //                         // Last, use swap and remove. It will remove the old weight
+        //                         // and insert the new one at the index position of the former.
+        //                         weights.swap_remove(weight)
+        //                     }
+        //                     None => false,
+        //                 }
+        //             }
+        //             None => false,
+        //         }
+
+        Ok(())
+    }
 
     // /// Updates the vertices of a hyperedge based on its index.
     // pub fn update_hyperedge_vertices(

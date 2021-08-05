@@ -30,11 +30,11 @@ fn integration() {
     let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
 
     // Create some vertices.
-    let andrea = Vertex::new("andrea");
-    let björn = Vertex::new("björn");
-    let charlie = Vertex::new("charlie");
-    let dana = Vertex::new("dana");
-    let enola = Vertex::new("enola");
+    let andrea = Vertex::new("Andrea");
+    let bjǫrn = Vertex::new("Bjǫrn");
+    let charlie = Vertex::new("Charlie");
+    let dana = Vertex::new("Dana");
+    let enola = Vertex::new("Enola");
 
     // Add those vertices to the hypergraph.
     assert_eq!(
@@ -43,7 +43,7 @@ fn integration() {
         "should add the first vertex"
     );
     assert_eq!(
-        graph.add_vertex(björn),
+        graph.add_vertex(bjǫrn),
         Ok(VertexIndex(1)),
         "should add the second vertex"
     );
@@ -118,8 +118,10 @@ fn integration() {
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], "meditate like a Jedi"),
-        Ok(HyperedgeIndex(3)),
-        "should be a no-op since adding the exact same hyperedge results in an update"
+        Err(HypergraphError::HyperedgeWeightAlreadyAssigned(
+            "meditate like a Jedi"
+        )),
+        "should return an explicit error since this weight is already in use"
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], "work out"), 
@@ -402,14 +404,9 @@ fn integration() {
 
     // Get some paths via Dijkstra.
     assert_eq!(
-        graph.get_dijkstra_connections(VertexIndex(4), VertexIndex(2)),
-        Ok(vec![
-            VertexIndex(4),
-            VertexIndex(0),
-            VertexIndex(3),
-            VertexIndex(2)
-        ]),
-        "should get a path of four vertices"
+        graph.get_dijkstra_connections(VertexIndex(4), VertexIndex(1)),
+        Ok(vec![VertexIndex(4), VertexIndex(0), VertexIndex(1),]),
+        "should get a path of three vertices"
     );
     assert_eq!(
         graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(3)),
@@ -437,13 +434,15 @@ fn integration() {
         "should be out-of-bound and return an explicit error"
     );
 
-    // // Update a vertex's weight.
-    // let vertex_a = Vertex::new("brand new heavies");
-    // assert!(graph.update_vertex_weight(StableVertexIndex(0), vertex_a));
-    // assert_eq!(
-    //     graph.get_vertex_weight(StableVertexIndex(0)),
-    //     Some(vertex_a)
-    // );
+    // Update the weight of a vertex.
+    let bjǫrg = Vertex::new("Bjǫrg");
+    assert_eq!(graph.update_vertex_weight(VertexIndex(1), bjǫrg), Ok(()));
+    assert_eq!(
+        graph.get_vertex_weight(VertexIndex(1)),
+        Ok(bjǫrg),
+        "should return Bjǫrg instead of Bjǫrn"
+    );
+    assert_eq!(graph.count_vertices(), 5, "should still have 5 vertices");
 
     // // Update a hyperedge's weight.
     // assert!(graph.update_hyperedge_weight(StableHyperedgeWeightedIndex(0), "yup"));

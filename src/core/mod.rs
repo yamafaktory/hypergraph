@@ -86,15 +86,14 @@ where
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
 pub struct Hypergraph<V, HE> {
-    /// Vertices are stored as an IndexMap whose keys are the weights
-    /// and values are an IndexSet containing the hyperedges which are
-    /// including the current vertex.
+    /// Vertices are stored as a map whose unique keys are the weights
+    /// and the values are a set of the hyperedges indexes which include
+    // the current vertex.
     pub vertices: IndexMap<V, IndexSet<usize>>,
 
-    /// Hyperedges are stored as an IndexMap whose keys are a vector of
-    /// vertices indexes and values are an IndexSet of weights.
-    /// Having an IndexSet of weights allows having two or more hyperedges
-    /// containing the same set of vertices (non-simple hypergraph).
+    /// Hyperedges are stored as a set whose unique keys are a combination of
+    /// vertices indexes and a weight. Two or more hyperedges can contain
+    /// the exact same vertices (non-simple hypergraph).
     pub hyperedges: IndexSet<HyperedgeKey<HE>>,
 
     // Mimic bi-directional maps for hyperedges and vertices.

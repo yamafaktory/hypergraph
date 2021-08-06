@@ -64,8 +64,8 @@ fn integration() {
     );
     assert_eq!(
         graph.add_vertex(enola),
-        Ok(VertexIndex(4)),
-        "should be a no-op since adding the exact same vertex results in an update"
+        Err(HypergraphError::VertexWeightAlreadyAssigned(enola)),
+        "should return an explicit error since this weight is already in use"
     );
 
     // Count the vertices.
@@ -444,22 +444,57 @@ fn integration() {
     );
     assert_eq!(graph.count_vertices(), 5, "should still have 5 vertices");
 
-    // // Update a hyperedge's weight.
-    // assert!(graph.update_hyperedge_weight(StableHyperedgeWeightedIndex(0), "yup"));
-    // assert_eq!(
-    //     graph.get_hyperedge_weight(StableHyperedgeWeightedIndex(0)),
-    //     Some("yup")
-    // );
-    // assert_eq!(
-    //     graph.count_vertices(),
-    //     5,
-    //     "Number of vertices should remain the same."
-    // );
-    // assert_eq!(
-    //     graph.count_hyperedges(),
-    //     5,
-    //     "Number of hyperedges should remain the same."
-    // );
+    // Update a hyperedge's weight.
+    // First case: the index is the last one, no internal index alteration
+    // occurs.
+    assert_eq!(
+        graph.update_hyperedge_weight(HyperedgeIndex(4), "sleep"),
+        Ok(()),
+        "should update the weight of the fifth hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_weight(HyperedgeIndex(4)),
+        Ok("sleep"),
+        "should get the new weight of the fifth hyperedge"
+    );
+    assert_eq!(
+        graph.count_hyperedges(),
+        5,
+        "should still have 5 hyperedges"
+    );
+    // Second case: the index is not the last one, an internal index alteration
+    // occurs but is anyway fixed by the insertion.
+    assert_eq!(
+        graph.update_hyperedge_weight(HyperedgeIndex(0), "pass the purple ball"),
+        Ok(()),
+        "should update the weight of the first hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_weight(HyperedgeIndex(0)),
+        Ok("pass the purple ball"),
+        "should get the new weight of the first hyperedge"
+    );
+    assert_eq!(
+        graph.count_hyperedges(),
+        5,
+        "should still have 5 hyperedges"
+    );
+    // Check the eventual errors.
+    assert_eq!(
+        graph.update_hyperedge_weight(HyperedgeIndex(0), "pass the purple ball"),
+        Err(HypergraphError::HyperedgeWeightUnchanged(
+            HyperedgeIndex(0),
+            "pass the purple ball"
+        )),
+        "should return an explicit error since this weight has not changed"
+    );
+    assert_eq!(
+        graph.update_hyperedge_weight(HyperedgeIndex(0), "meditate like a Jedi"),
+        Err(HypergraphError::HyperedgeWeightAlreadyAssigned(
+            "meditate like a Jedi"
+        )),
+        "should return an explicit error since this weight is already assigned"
+    );
 
     // // Update the vertices of a hyperedge.
     // // Previous vertices were {0, 1, 1, 3}!

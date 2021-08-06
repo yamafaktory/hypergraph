@@ -249,7 +249,21 @@ where
     // /// and it will result in an expensive regeneration of all the indexes
     // /// in the map or we use swap_remove and deal with the fact that the last
     // /// element will be swapped in place of the removed one and will thus get
-    // /// a new index. We use the latter solution for performance reasons.
+    // /// a new index. We use the latter solution for performance reasons.\
+    // Find the last index.
+    // let last_index = self.hyperedges.len() - 1;
+    // // Insert the new entry.
+    // self.hyperedges.insert_full(HyperedgeKey {
+    //     vertices: vertices.to_owned(),
+    //     weight,
+    // });
+    // // Swap and remove by index.
+    // self.hyperedges.swap_remove_index(internal_index);
+    // // If the index to remove was the last one, no other operations
+    // // are needed at this point.
+    // if internal_index == last_index {
+    //     return Ok(());
+    // }
     // pub fn remove_hyperedge(
     //     &mut self,
     //     stable_hyperedge_weighted_index: StableHyperedgeWeightedIndex,
@@ -326,12 +340,16 @@ where
         let HyperedgeKey {
             vertices,
             weight: previous_weight,
-        } = self.hyperedges.get_index(internal_index).ok_or(
-            HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
-        )?;
+        } = self
+            .hyperedges
+            .get_index(internal_index)
+            .map(|hyperedge_key| hyperedge_key.to_owned())
+            .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(
+                internal_index,
+            ))?;
 
         // Return an error if the new weight is the same as the previous one.
-        if weight == *previous_weight {
+        if weight == previous_weight {
             return Err(HypergraphError::HyperedgeWeightUnchanged(
                 hyperedge_index,
                 weight,
@@ -350,30 +368,56 @@ where
         ) {
             return Err(HypergraphError::HyperedgeWeightAlreadyAssigned(weight));
         }
-        // TODO!
 
-        // match self.hyperedges.get_index_mut(*hyperedge_index) {
-        //             Some((_, weights)) => {
-        //                 // We can't directly replace the value in the set.
-        //                 // First, we need to insert the new weight, it will end up
-        //                 // being at the last position.
-        //                 if !weights.insert(weight) {
-        //                     return false;
-        //                 };
+        // IndexMap doesn't allow holes by design, see:
+        // https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
+        //
+        // As a consequence, we have two options. Either we use shift_remove
+        // and it will result in an expensive regeneration of all the indexes
+        // in the map/set or we use swap_remove methods and deal with the fact
+        // that the last element will be swapped in place of the removed one
+        // and will thus get a new index.
+        //
+        // In our case, since we are inserting an entry upfront, it circumvents
+        // the aforementioned issue.
+        //
+        // First case: index alteration is avoided.
+        //
+        // Index to remove
+        //  |              1.Insert new entry
+        //  |                     |
+        //  v                     v
+        // [a, b, c] -> [a, b, c, d] -> [d, b, c, x]
+        //                               ^        ^
+        //                               |        |
+        //                               +--------+
+        //                         2.Swap and remove
+        //
+        // -----------------------------------------
+        //
+        // Second case: no index alteration.
+        //
+        // Index to remove
+        //        |        1.Insert new entry
+        //        |               |
+        //        v               v
+        // [a, b, c] -> [a, b, c, d] -> [a, b, d, x]
+        //                                     ^  ^
+        //                                     |  |
+        //                                     +--+
+        //                         2.Swap and remove
 
-        //                 // Then get the value by index of the original weight.
-        //                 match weights.clone().get_index(*weight_index) {
-        //                     Some(weight) => {
-        //                         // Last, use swap and remove. It will remove the old weight
-        //                         // and insert the new one at the index position of the former.
-        //                         weights.swap_remove(weight)
-        //                     }
-        //                     None => false,
-        //                 }
-        //             }
-        //             None => false,
-        //         }
+        // Insert the new entry.
+        // Since we have already checked that the new weight is not in the
+        // map, we can safely perform the operation without checking its output.
+        self.hyperedges.insert(HyperedgeKey { vertices, weight });
 
+        // Swap and remove by index.
+        // Since we know that the internal index is correct, we can safely
+        // perform the operation without checking its output.
+        self.hyperedges.swap_remove_index(internal_index);
+
+        // Return a unit.
         Ok(())
     }
 

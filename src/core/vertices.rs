@@ -85,6 +85,11 @@ where
     /// Adds a vertex with a custom weight to the hypergraph.
     /// Returns the index of the vertex.
     pub fn add_vertex(&mut self, weight: V) -> Result<VertexIndex, HypergraphError<V, HE>> {
+        // Return an error if the weight is already assigned to another vertex.
+        if self.vertices.contains_key(&weight) {
+            return Err(HypergraphError::VertexWeightAlreadyAssigned(weight));
+        }
+
         self.vertices
             .entry(weight)
             .or_insert(IndexSet::with_capacity(0));
@@ -376,9 +381,10 @@ where
         // Then we use swap and remove. This will remove the previous weight
         // and insert the new one at the index position of the former.
         // This doesn't alter the indexing.
-        // Since we have already checked that the previous weight is in the
-        // map, we can safely perform the operation without checking its output.
-        self.vertices.swap_remove(&previous_weight);
+        // See the update_hyperedge_weight method for more detailed explanation.
+        // Since we know that the internal index is correct, we can safely
+        // perform the operation without checking its output.
+        self.vertices.swap_remove_index(internal_index);
 
         // Return a unit.
         Ok(())

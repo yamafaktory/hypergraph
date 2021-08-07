@@ -21,11 +21,23 @@ where
     #[error("Hyperedge weight {0} was not found")]
     HyperedgeWeightNotFound(HE),
 
-    /// Error when a hyperedge weight is updated with the same value.
-    #[error("HyperedgeIndex {0} weight unchanged (no-op)")]
+    /// Error when a hyperedge is updated with the same weight.
+    #[error("HyperedgeIndex {0} weight is unchanged (no-op)")]
     HyperedgeWeightUnchanged(HyperedgeIndex, HE),
 
-    /// Error when a hyperedge weight is updated with the weight of another one.
+    /// Error when a hyperedge is updated with the same vertices.
+    #[error("HyperedgeIndex {0} vertices are unchanged (no-op)")]
+    HyperedgeVerticesUnchanged(HyperedgeIndex),
+
+    /// Error when a hyperedge is updated with no vertices.
+    #[error("HyperedgeIndex {0} vertices are missing")]
+    HyperedgeCreationNoVertices(HE),
+
+    /// Error when a hyperedge is updated with no vertices.
+    #[error("HyperedgeIndex {0} vertices are missing")]
+    HyperedgeUpdateNoVertices(HyperedgeIndex),
+
+    /// Error when a hyperedge is updated with the weight of another one.
     #[error("Hyperedge weight {0} was already assigned")]
     HyperedgeWeightAlreadyAssigned(HE),
 

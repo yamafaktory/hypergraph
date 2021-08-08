@@ -665,48 +665,66 @@ fn integration() {
     assert_eq!(graph.count_vertices(), 5);
     assert_eq!(graph.count_hyperedges(), 3);
 
-    // Remove a vertex with no index alteration since it's the last one.
-    // assert_eq!(graph.remove_vertex(VertexIndex(4)), Ok(()));
+    // Remove a vertex.
+    // Start with the last one. No remapping is occurring internally.
+    assert_eq!(graph.remove_vertex(VertexIndex(4)), Ok(()));
+    assert_eq!(
+        graph.get_vertex_weight(VertexIndex(4)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(4))),
+        "should be out-of-bound and return an explicit error - removed"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(1)),
+        Ok(vec![
+            VertexIndex(0),
+            VertexIndex(1),
+            VertexIndex(1),
+            VertexIndex(3)
+        ]),
+        "should get the same vertices for the second hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(2)),
+        Ok(vec![VertexIndex(0), VertexIndex(3), VertexIndex(2)]),
+        "should get different vertices for the third hyperedge - removed"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(3)),
+        Ok(vec![VertexIndex(3)]),
+        "should get the same vertices for the fourth hyperedge"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(0)),
+        Ok(vec![HyperedgeIndex(2), HyperedgeIndex(1)]),
+        "should get the hyperedges of the first vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(1)),
+        Ok(vec![HyperedgeIndex(1)]),
+        "should get the hyperedges of the second vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(2)),
+        Ok(vec![HyperedgeIndex(2)]),
+        "should get the hyperedges of the third vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(3)),
+        Ok(vec![
+            HyperedgeIndex(3),
+            HyperedgeIndex(1),
+            HyperedgeIndex(2)
+        ]),
+        "should get the hyperedges of the fourth vertex"
+    );
 
-    // assert_eq!(
-    //     graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
-    //     Some(vec![StableVertexIndex(0)]) // was {0, 4} before.
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(2)),
-    //     Some(vec![
-    //         StableVertexIndex(0),
-    //         StableVertexIndex(3),
-    //         StableVertexIndex(2)
-    //     ]) // was {4, 0, 3, 2} before.
-    // );
-    // assert_eq!(graph.get_vertex_weight(StableVertexIndex(4)), None);
-    // assert_eq!(graph.count_vertices(), 4);
-    // assert_eq!(
-    //     graph.get_vertex_hyperedges_full(StableVertexIndex(2)),
-    //     Some(vec![vec![
-    //         StableVertexIndex(0),
-    //         StableVertexIndex(3),
-    //         StableVertexIndex(2)
-    //     ]])
-    // );
+    // Remove another vertex.
+    // Now remove the first one. A remapping is occurring internally.
+    assert_eq!(graph.remove_vertex(VertexIndex(0)), Ok(()));
 
-    // Remove a vertex with index alteration.
-    // In this case, index swapping is occurring, i.e. vertex of unstable index 3 will become 0.
-    // assert!(graph.remove_vertex(StableVertexIndex(0)));
-    // assert_eq!(
-    //     graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(0)),
-    //     Some(vec![]) // was {0} before.
-    // );
-    // assert_eq!(
-    //     graph.get_hyperedge_vertices(StableHyperedgeWeightedIndex(2)),
-    //     Some(vec![StableVertexIndex(3), StableVertexIndex(2)]) // was {0, 3, 2} before.
-    // );
-    // assert_eq!(graph.get_vertex_weight(StableVertexIndex(0)), None); // should be gone.
-    // assert_eq!(
-    //     graph.get_vertex_weight(StableVertexIndex(3)),
-    //     Some(vertex_d) // index swapping 3 -> 0.
-    // );
+    // Check that the hypergraph is still valid.
+    assert_eq!(graph.count_vertices(), 4);
+    assert_eq!(graph.count_hyperedges(), 3);
 
     // // Render to graphviz dot format.
     // // graph.render_to_graphviz_dot();

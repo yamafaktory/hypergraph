@@ -351,7 +351,7 @@ where
                     internal_index,
                 ))?;
 
-            // Update the vertices accordingly.
+            // Update the impacted vertices accordingly.
             for vertex in swapped_vertices.into_iter() {
                 match self.vertices.get_index_mut(vertex) {
                     Some((_, index_set)) => {
@@ -423,11 +423,11 @@ where
         //
         // First case: index alteration is avoided.
         //
-        // Index to remove
+        // Entry to remove
         //  |              1.Insert new entry
         //  |                     |
         //  v                     v
-        // [a, b, c] -> [a, b, c, d] -> [d, b, c, x]
+        // [a, b, c] -> [a, b, c, d] -> [d, b, c, _]
         //                               ^        ^
         //                               |        |
         //                               +--------+
@@ -437,11 +437,11 @@ where
         //
         // Second case: no index alteration.
         //
-        // Index to remove
+        // Entry to remove
         //        |        1.Insert new entry
         //        |               |
         //        v               v
-        // [a, b, c] -> [a, b, c, d] -> [a, b, d, x]
+        // [a, b, c] -> [a, b, c, d] -> [a, b, d, _]
         //                                     ^  ^
         //                                     |  |
         //                                     +--+

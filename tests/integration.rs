@@ -386,22 +386,22 @@ fn integration() {
         "should be out-of-bound and return an explicit error"
     );
 
-    // Get the adjacent vertices to a vertex.
+    // Get the adjacent vertices from a vertex.
     assert_eq!(
-        graph.get_adjacent_vertices_to(VertexIndex(0)),
+        graph.get_adjacent_vertices_from(VertexIndex(0)),
         Ok(vec![VertexIndex(1), VertexIndex(3)])
     );
     assert_eq!(
-        graph.get_adjacent_vertices_to(VertexIndex(1)),
+        graph.get_adjacent_vertices_from(VertexIndex(1)),
         Ok(vec![VertexIndex(1), VertexIndex(3)])
     );
-    assert_eq!(graph.get_adjacent_vertices_to(VertexIndex(2)), Ok(vec![]));
+    assert_eq!(graph.get_adjacent_vertices_from(VertexIndex(2)), Ok(vec![]));
     assert_eq!(
-        graph.get_adjacent_vertices_to(VertexIndex(3)),
+        graph.get_adjacent_vertices_from(VertexIndex(3)),
         Ok(vec![VertexIndex(2)])
     );
     assert_eq!(
-        graph.get_adjacent_vertices_to(VertexIndex(5)),
+        graph.get_adjacent_vertices_from(VertexIndex(5)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
         "should be out-of-bound and return an explicit error"
     );
@@ -560,7 +560,7 @@ fn integration() {
         "should return an explicit error since the vertices have not changed"
     );
 
-    // Check that the hypergraph is still valid.
+    // Check the hypergraph integrity.
     assert_eq!(graph.count_vertices(), 5);
     assert_eq!(graph.count_hyperedges(), 5);
 
@@ -610,7 +610,7 @@ fn integration() {
         "should get the same hyperedges for the fifth vertex"
     );
 
-    // Check that the hypergraph is still valid.
+    // Check the hypergraph integrity.
     assert_eq!(graph.count_vertices(), 5);
     assert_eq!(graph.count_hyperedges(), 4);
 
@@ -661,7 +661,7 @@ fn integration() {
         "should be out-of-bound and return an explicit error"
     );
 
-    // Check that the hypergraph is still valid.
+    // Check the hypergraph integrity.
     assert_eq!(graph.count_vertices(), 5);
     assert_eq!(graph.count_hyperedges(), 3);
 
@@ -718,12 +718,55 @@ fn integration() {
         "should get the hyperedges of the fourth vertex"
     );
 
+    // Check the hypergraph integrity.
+    assert_eq!(graph.count_vertices(), 4);
+    assert_eq!(graph.count_hyperedges(), 3);
+
     // Remove another vertex.
     // Now remove the first one. A remapping is occurring internally.
     assert_eq!(graph.remove_vertex(VertexIndex(0)), Ok(()));
+    assert_eq!(
+        graph.get_vertex_weight(VertexIndex(0)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(0))),
+        "should be out-of-bound and return an explicit error - removed"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(1)),
+        Ok(vec![VertexIndex(1), VertexIndex(1), VertexIndex(3)]),
+        "should get the different vertices for the second hyperedge - removed"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(2)),
+        Ok(vec![VertexIndex(3), VertexIndex(2)]),
+        "should get different vertices for the third hyperedge - removed"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(3)),
+        Ok(vec![VertexIndex(3)]),
+        "should get the same vertices for the fourth hyperedge"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(1)),
+        Ok(vec![HyperedgeIndex(1)]),
+        "should get the hyperedges of the second vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(2)),
+        Ok(vec![HyperedgeIndex(2)]),
+        "should get the hyperedges of the third vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(3)),
+        Ok(vec![
+            HyperedgeIndex(3),
+            HyperedgeIndex(1),
+            HyperedgeIndex(2)
+        ]),
+        "should get the hyperedges of the fourth vertex"
+    );
 
-    // Check that the hypergraph is still valid.
-    assert_eq!(graph.count_vertices(), 4);
+    // Check the hypergraph integrity.
+    assert_eq!(graph.count_vertices(), 3);
     assert_eq!(graph.count_hyperedges(), 3);
 
     // // Render to graphviz dot format.

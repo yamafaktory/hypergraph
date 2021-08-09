@@ -1,10 +1,10 @@
-use crate::{HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex};
+use crate::{
+    error::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
+};
 
 use indexmap::IndexSet;
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
-
-use super::error::HypergraphError;
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -183,7 +183,7 @@ where
             }
 
             let mapped_index = self.get_vertex(index)?;
-            let indexes = self.get_adjacent_vertices_to(mapped_index)?;
+            let indexes = self.get_adjacent_vertices_from(mapped_index)?;
             let internal_indexes = self.get_internal_vertices(indexes)?;
 
             // For every connected vertex, try to find the lowest distance.
@@ -213,8 +213,8 @@ where
         Ok(vec![])
     }
 
-    /// Gets the list of all vertices connected to a given vertex.
-    pub fn get_adjacent_vertices_to(
+    /// Gets the list of all vertices connected from a given vertex.
+    pub fn get_adjacent_vertices_from(
         &self,
         from: VertexIndex,
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
@@ -269,7 +269,7 @@ where
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))
     }
 
-    /// Removes a vertex based on its index.
+    /// Removes a vertex by index.
     pub fn remove_vertex(
         &mut self,
         vertex_index: VertexIndex,
@@ -339,7 +339,7 @@ where
 
             // Update the impacted hyperedges accordingly.
             for hyperedge in stale_hyperedges.into_iter() {
-                let HyperedgeKey { vertices, .. } = self
+                let HyperedgeKey { vertices, weight } = self
                     .hyperedges
                     .get_index(hyperedge)
                     .map(|hyperedge_key| hyperedge_key.to_owned())
@@ -348,6 +348,7 @@ where
                 let updated_vertices = vertices
                     .into_iter()
                     .map(|vertex| {
+                        // Remap the vertex if this is the swapped one.
                         if vertex == last_index {
                             internal_index
                         } else {
@@ -356,10 +357,18 @@ where
                     })
                     .collect_vec();
 
-                self.update_hyperedge_vertices(
-                    self.get_hyperedge(hyperedge)?,
-                    self.get_vertices(updated_vertices)?,
-                )?;
+                // Insert the new entry with the updated vertices.
+                // Since we are not altering the weight, we can safely perform
+                // the operation without checking its output.
+                self.hyperedges.insert(HyperedgeKey {
+                    vertices: updated_vertices,
+                    weight,
+                });
+
+                // Swap and remove by index.
+                // Since we know that the hyperedge index is correct, we can
+                // safely perform the operation without checking its output.
+                self.hyperedges.swap_remove_index(hyperedge);
             }
         }
 
@@ -367,7 +376,7 @@ where
         Ok(())
     }
 
-    /// Updates the weight of a vertex based on its index.
+    /// Updates the weight of a vertex by index.
     pub fn update_vertex_weight(
         &mut self,
         vertex_index: VertexIndex,

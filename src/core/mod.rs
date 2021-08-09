@@ -1,3 +1,4 @@
+pub(crate) mod bi_hash_map;
 mod debug;
 mod dot;
 #[doc(hidden)]
@@ -10,20 +11,25 @@ mod utils;
 #[doc(hidden)]
 pub mod vertices;
 
+use bi_hash_map::BiHashMap;
 use debug::ExtendedDebug;
 // use dot::render_to_graphviz_dot;
 
 use indexmap::{IndexMap, IndexSet};
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display, Formatter, Result},
     hash::Hash,
-    ops::Index,
 };
+
+/// Shared Trait for hyperedges and vertices.
+/// Must be implemented to use the library.
+pub trait SharedTrait: Copy + Debug + Display + Eq + Hash {}
+
+impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash {}
 
 /// Vertex stable index representation as usize.
 /// Uses the newtype index pattern.
-/// https://matklad.github.io/2018/06/04/newtype-index-pattern.html
+/// <https://matklad.github.io/2018/06/04/newtype-index-pattern.html>
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VertexIndex(pub usize);
 
@@ -43,6 +49,11 @@ impl Display for HyperedgeIndex {
     }
 }
 
+/// A HyperedgeKey is a representation of both the vertices and the weight
+/// of a hyperedge, used as a key in the hyperedges set.
+/// In a non-simple hypergraph, since the same vertices can be shared by
+/// different hyperedges, the weight is also included in the key to keep
+/// it unique.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HyperedgeKey<HE> {
     vertices: Vec<usize>,
@@ -50,37 +61,9 @@ pub struct HyperedgeKey<HE> {
 }
 
 impl<HE> HyperedgeKey<HE> {
-    pub fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
+    /// Creates a new HyperedgeKey from the given vertices and weight.
+    pub(crate) fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
         Self { vertices, weight }
-    }
-}
-
-pub struct BiHashMap<Index>
-where
-    Index: SharedTrait,
-{
-    left: HashMap<usize, Index>,
-    right: HashMap<Index, usize>,
-}
-
-impl<Index> BiHashMap<Index>
-where
-    Index: SharedTrait,
-{
-    pub fn new() -> BiHashMap<Index> {
-        Self {
-            left: HashMap::<usize, Index>::with_capacity(0),
-            right: HashMap::<Index, usize>::with_capacity(0),
-        }
-    }
-}
-
-impl<Index> Default for BiHashMap<Index>
-where
-    Index: SharedTrait,
-{
-    fn default() -> Self {
-        BiHashMap::new()
     }
 }
 
@@ -96,11 +79,11 @@ pub struct Hypergraph<V, HE> {
     /// the exact same vertices (non-simple hypergraph).
     pub hyperedges: IndexSet<HyperedgeKey<HE>>,
 
-    // Mimic bi-directional maps for hyperedges and vertices.
+    // Bi-directional maps for hyperedges and vertices.
     hyperedges_mapping: BiHashMap<HyperedgeIndex>,
     vertices_mapping: BiHashMap<VertexIndex>,
 
-    // Keep stable index generation counters.
+    // Stable index generation counters.
     hyperedges_count: usize,
     vertices_count: usize,
 }
@@ -113,12 +96,6 @@ impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
             .finish()
     }
 }
-
-/// Shared Trait for hyperedges and vertices.
-/// This is a set of traits that must be implemented to use the library.
-pub trait SharedTrait: Copy + Debug + Display + Eq + Hash {}
-
-impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash {}
 
 impl<'a, V, HE> Default for Hypergraph<V, HE>
 where
@@ -160,17 +137,3 @@ where
         // println!("{}", render_to_graphviz_dot(self));
     }
 }
-
-// impl<V, HE> Index<V> for Hypergraph<V, HE>
-// where
-//     V: SharedTrait,
-//     HE: SharedTrait,
-// {
-//     type Output = usize;
-
-//     fn index(&self, vertex: V) -> &Self::Output {
-//         let (index, _, _) = self.vertices.get_full(&vertex).unwrap();
-//         dbg!(index);
-//         &0
-//     }
-// }

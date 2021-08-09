@@ -21,7 +21,3 @@ hypergraph = "0.2.0"
 ## Documentation
 
 Please read the [documentation](https://docs.rs/hypergraph).
-
-## Note
-
-This an early stage project. More functionalities will be added in the future.

@@ -1,17 +1,17 @@
 use crate::{
-    core::utils::are_arrays_equal, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait,
-    VertexIndex,
+    core::utils::are_slices_equal, error::HypergraphError, HyperedgeIndex, HyperedgeKey,
+    Hypergraph, SharedTrait, VertexIndex,
 };
 
 use itertools::Itertools;
-
-use super::error::HypergraphError;
 
 impl<V, HE> Hypergraph<V, HE>
 where
     V: SharedTrait,
     HE: SharedTrait,
 {
+    // This private method is infallible since adding the same hyperedge
+    // will return the existing index.
     fn add_hyperedge_index(&mut self, internal_index: usize) -> HyperedgeIndex {
         match self.hyperedges_mapping.left.get(&internal_index) {
             Some(hyperedge_index) => *hyperedge_index,
@@ -134,13 +134,6 @@ where
         self.hyperedges.len()
     }
 
-    // // Returns an iterator of all the hyperedges.
-    // pub fn get_hyperedges(
-    //     &self,
-    // ) -> impl Iterator<Item = (&Vec<UnstableVertexIndex>, &IndexSet<HE>)> {
-    //     self.hyperedges.iter()
-    // }
-
     /// Gets the hyperedges directly connecting a vertex to another.
     pub fn get_hyperedges_connecting(
         &self,
@@ -245,7 +238,7 @@ where
         }
     }
 
-    /// Removes a hyperedge based on its index.
+    /// Removes a hyperedge by index.
     pub fn remove_hyperedge(
         &mut self,
         hyperedge_index: HyperedgeIndex,
@@ -369,7 +362,7 @@ where
         Ok(())
     }
 
-    /// Updates the weight of a hyperedge based on its weighted index.
+    /// Updates the weight of a hyperedge by index.
     pub fn update_hyperedge_weight(
         &mut self,
         hyperedge_index: HyperedgeIndex,
@@ -461,7 +454,7 @@ where
         Ok(())
     }
 
-    /// Updates the vertices of a hyperedge based on its index.
+    /// Updates the vertices of a hyperedge by index.
     pub fn update_hyperedge_vertices(
         &mut self,
         hyperedge_index: HyperedgeIndex,
@@ -488,7 +481,7 @@ where
             ))?;
 
         // If the new vertices are the same as the old ones, skip the update.
-        if are_arrays_equal(&internal_vertices, &previous_vertices) {
+        if are_slices_equal(&internal_vertices, &previous_vertices) {
             return Err(HypergraphError::HyperedgeVerticesUnchanged(hyperedge_index));
         }
 

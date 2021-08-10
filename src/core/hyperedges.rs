@@ -1,5 +1,5 @@
 use crate::{
-    core::utils::are_slices_equal, error::HypergraphError, HyperedgeIndex, HyperedgeKey,
+    core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeKey,
     Hypergraph, SharedTrait, VertexIndex,
 };
 

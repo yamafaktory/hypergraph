@@ -1,4 +1,4 @@
-use crate::{error::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
+use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
 
 use itertools::Itertools;
 
@@ -8,6 +8,7 @@ where
     HE: SharedTrait,
 {
     /// Private helper function used internally.
+    #[allow(clippy::type_complexity)]
     pub(crate) fn get_connections(
         &self,
         from: VertexIndex,

@@ -1,8 +1,6 @@
 pub(crate) mod bi_hash_map;
-mod debug;
-mod dot;
 #[doc(hidden)]
-pub mod error;
+pub mod errors;
 #[doc(hidden)]
 pub mod hyperedges;
 mod shared;
@@ -12,9 +10,6 @@ mod utils;
 pub mod vertices;
 
 use bi_hash_map::BiHashMap;
-use debug::ExtendedDebug;
-// use dot::render_to_graphviz_dot;
-
 use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt::{Debug, Display, Formatter, Result},
@@ -97,10 +92,10 @@ impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
     }
 }
 
-impl<'a, V, HE> Default for Hypergraph<V, HE>
+impl<V, HE> Default for Hypergraph<V, HE>
 where
-    V: SharedTrait + ExtendedDebug<'a>,
-    HE: SharedTrait + ExtendedDebug<'a>,
+    V: SharedTrait,
+    HE: SharedTrait,
 {
     fn default() -> Self {
         Hypergraph::new()
@@ -128,12 +123,5 @@ where
             hyperedges_count: 0,
             vertices_count: 0,
         }
-    }
-
-    /// Renders the hypergraph to Graphviz dot format.
-    /// Due to Graphviz dot inability to render hypergraphs out of the box,
-    /// unaries are rendered as vertex peripheries which can't be labelled.
-    pub fn render_to_graphviz_dot(&self) {
-        // println!("{}", render_to_graphviz_dot(self));
     }
 }

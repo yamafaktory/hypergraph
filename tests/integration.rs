@@ -3,7 +3,7 @@
 
 use std::fmt::{Display, Formatter, Result};
 
-use hypergraph::{error::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
+use hypergraph::{errors::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
 
 #[test]
 fn integration() {
@@ -768,7 +768,4 @@ fn integration() {
     // Check the hypergraph integrity.
     assert_eq!(graph.count_vertices(), 3);
     assert_eq!(graph.count_hyperedges(), 3);
-
-    // // Render to graphviz dot format.
-    // // graph.render_to_graphviz_dot();
 }

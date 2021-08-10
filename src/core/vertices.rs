@@ -1,5 +1,5 @@
 use crate::{
-    error::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
+    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
 };
 
 use indexmap::IndexSet;

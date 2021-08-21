@@ -3,7 +3,7 @@ use crate::{HyperedgeIndex, SharedTrait, VertexIndex};
 use thiserror::Error;
 
 /// Enumeration of all the possible errors.
-#[derive(Debug, Error, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Error, Debug, Eq, PartialEq)]
 pub enum HypergraphError<V, HE>
 where
     V: SharedTrait,

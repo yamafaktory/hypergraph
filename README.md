@@ -4,7 +4,7 @@
 
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/yamafaktory/hypergraph/ci?style=for-the-badge) ![Crates.io](https://img.shields.io/crates/v/hypergraph?style=for-the-badge) ![docs.rs](https://img.shields.io/docsrs/hypergraph?style=for-the-badge)
 
-Hypergraph is data structure library to generate **directed** [hypergraphs](https://en.wikipedia.org/wiki/Hypergraph).
+Hypergraph is a data structure library to generate **directed** [hypergraphs](https://en.wikipedia.org/wiki/Hypergraph).
 
 A hypergraph is a generalization of a graph in which a hyperedge can join any number of vertices.
 

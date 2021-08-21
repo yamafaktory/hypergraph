@@ -1,6 +1,9 @@
-use crate::{HyperedgeVertices, Hypergraph, SharedTrait, VertexIndex};
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
+};
 
 use indexmap::IndexSet;
+use itertools::Itertools;
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
 
 impl<V, HE> Hypergraph<V, HE>
@@ -8,15 +11,97 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
-    /// Adds a vertex as a custom weight in the hypergraph.
+    // This private method is infallible since adding the same vertex
+    // will return the existing index.
+    fn add_vertex_index(&mut self, internal_index: usize) -> VertexIndex {
+        match self.vertices_mapping.left.get(&internal_index) {
+            Some(vertex_index) => *vertex_index,
+            None => {
+                let vertex_index = VertexIndex(self.vertices_count);
+
+                if self
+                    .vertices_mapping
+                    .left
+                    .insert(internal_index, vertex_index)
+                    .is_none()
+                {
+                    // Update the counter only for the first insertion.
+                    self.vertices_count += 1;
+                }
+
+                self.vertices_mapping
+                    .right
+                    .insert(vertex_index, internal_index);
+
+                vertex_index
+            }
+        }
+    }
+
+    // Private method to get the VertexIndex matching an internal index.
+    pub(crate) fn get_vertex(
+        &self,
+        vertex_index: usize,
+    ) -> Result<VertexIndex, HypergraphError<V, HE>> {
+        match self.vertices_mapping.left.get(&vertex_index) {
+            Some(index) => Ok(*index),
+            None => Err(HypergraphError::InternalVertexIndexNotFound(vertex_index)),
+        }
+    }
+
+    // Private method to get a vector of VertexIndex from a vector of internal indexes.
+    pub(crate) fn get_vertices(
+        &self,
+        vertices: Vec<usize>,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        vertices
+            .iter()
+            .map(|vertex_index| self.get_vertex(*vertex_index))
+            .collect()
+    }
+
+    // Private method to get the internal vertex matching a VertexIndex.
+    pub(crate) fn get_internal_vertex(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<usize, HypergraphError<V, HE>> {
+        match self.vertices_mapping.right.get(&vertex_index) {
+            Some(index) => Ok(*index),
+            None => Err(HypergraphError::VertexIndexNotFound(vertex_index)),
+        }
+    }
+
+    // Private method to get the internal vertices from a vector of VertexIndex.
+    pub(crate) fn get_internal_vertices(
+        &self,
+        vertices: Vec<VertexIndex>,
+    ) -> Result<Vec<usize>, HypergraphError<V, HE>> {
+        vertices
+            .iter()
+            .map(|vertex_index| self.get_internal_vertex(*vertex_index))
+            .collect()
+    }
+
+    /// Adds a vertex with a custom weight to the hypergraph.
     /// Returns the index of the vertex.
-    pub fn add_vertex(&mut self, weight: V) -> VertexIndex {
+    pub fn add_vertex(&mut self, weight: V) -> Result<VertexIndex, HypergraphError<V, HE>> {
+        // Return an error if the weight is already assigned to another vertex.
+        if self.vertices.contains_key(&weight) {
+            return Err(HypergraphError::VertexWeightAlreadyAssigned(weight));
+        }
+
         self.vertices
             .entry(weight)
             .or_insert(IndexSet::with_capacity(0));
 
-        // Assume that unwrapping the index can't be none due to previous insertion.
-        self.vertices.get_index_of(&weight).unwrap()
+        let internal_index = self
+            .vertices
+            .get_index_of(&weight)
+            // This safe-check should always pass since the weight has been
+            // inserted upfront.
+            .ok_or(HypergraphError::VertexWeightNotFound(weight))?;
+
+        Ok(self.add_vertex_index(internal_index))
     }
 
     /// Returns the number of vertices in the hypergraph.
@@ -31,7 +116,7 @@ where
         &self,
         from: VertexIndex,
         to: VertexIndex,
-    ) -> Option<Vec<VertexIndex>> {
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         struct Cursor {
             distance: usize,
@@ -54,6 +139,10 @@ where
             }
         }
 
+        // Get the internal indexes of the vertices.
+        let internal_from = self.get_internal_vertex(from)?;
+        let internal_to = self.get_internal_vertex(to)?;
+
         // We need to initialize a vector of length equal to the number of vertices.
         // The default value, as per Dijkstra, must be set to infinity.
         // A value of usize::MAX is used.
@@ -65,12 +154,12 @@ where
         let mut heap = BinaryHeap::new();
 
         // Initialize the first vertex to zero.
-        distances[from] = 0;
+        distances[internal_from] = 0;
 
         // Push the first cursor to the heap.
         heap.push(Cursor {
             distance: 0,
-            index: from,
+            index: internal_from,
         });
 
         // Keep track of the traversal path.
@@ -78,14 +167,14 @@ where
 
         while let Some(Cursor { distance, index }) = heap.pop() {
             // End of the traversal.
-            if index == to {
+            if index == internal_to {
                 // We need to inject the index of the target vertex.
-                path.push(to);
+                path.push(internal_to);
 
                 // Remove duplicates generated during the iteration of the algorithm.
                 path.dedup();
 
-                return Some(path);
+                return self.get_vertices(path);
             }
 
             // Skip if a better path has already been found.
@@ -93,10 +182,15 @@ where
                 continue;
             }
 
+            let mapped_index = self.get_vertex(index)?;
+            let indexes = self.get_adjacent_vertices_from(mapped_index)?;
+            let internal_indexes = self.get_internal_vertices(indexes)?;
+
             // For every connected vertex, try to find the lowest distance.
-            for vertex_index in self.get_vertex_connections(index) {
+            for vertex_index in internal_indexes {
                 let next = Cursor {
-                    // We assume a distance of one by default.
+                    // We assume a distance of one by default since vertices
+                    // have custom weights.
                     distance: distance + 1,
                     index: vertex_index,
                 };
@@ -115,121 +209,214 @@ where
             }
         }
 
-        None
+        // If we reach this point, return an empty vector.
+        Ok(vec![])
     }
 
-    /// Gets the list of all vertices connected to a given vertex.
-    pub fn get_vertex_connections(&self, from: VertexIndex) -> Vec<VertexIndex> {
-        self.get_connections(from, None)
+    /// Gets the list of all vertices connected from a given vertex.
+    pub fn get_adjacent_vertices_from(
+        &self,
+        from: VertexIndex,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        let results = self.get_connections(from, None)?;
+
+        Ok(results
+            .into_iter()
+            .filter_map(|(_, vertex_index)| vertex_index)
+            .sorted()
+            .dedup()
+            .collect_vec())
     }
 
-    /// Gets the hyperedges as vectors of vertices of a vertex from its index.
-    pub fn get_vertex_hyperedges(&self, index: VertexIndex) -> Option<Vec<HyperedgeVertices>> {
-        self.vertices
-            .get_index(index)
-            .map(|(_, hyperedges)| hyperedges)
-            .map(|index_set| index_set.iter().cloned().collect())
+    /// Gets the hyperedges of a vertex as a vector of HyperedgeIndex.
+    pub fn get_vertex_hyperedges(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_vertex(vertex_index)?;
+
+        let (_, hyperedges_index_set) = self
+            .vertices
+            .get_index(internal_index)
+            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
+
+        self.get_hyperedges(hyperedges_index_set.clone().into_iter().collect_vec())
+    }
+
+    /// Gets the hyperedges of a vertex as a vector of vectors of VertexIndex.
+    pub fn get_full_vertex_hyperedges(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
+        self.get_vertex_hyperedges(vertex_index).map(|hyperedges| {
+            hyperedges
+                .into_iter()
+                .flat_map(|hyperedge_index| self.get_hyperedge_vertices(hyperedge_index))
+                .collect()
+        })
     }
 
     /// Gets the weight of a vertex from its index.
-    pub fn get_vertex_weight(&self, index: VertexIndex) -> Option<&V> {
-        self.vertices.get_index(index).map(|(weight, _)| weight)
+    pub fn get_vertex_weight(
+        &self,
+        vertex_index: VertexIndex,
+    ) -> Result<V, HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_vertex(vertex_index)?;
+
+        self.vertices
+            .get_index(internal_index)
+            .map(|(weight, _)| *weight)
+            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))
     }
 
-    /// Removes a vertex based on its index.
-    /// IndexMap doesn't allow holes by design, see:
-    /// https://github.com/bluss/indexmap/issues/90#issuecomment-455381877
-    /// As a consequence, we have two options. Either we use shift_remove
-    /// and it will result in an expensive regeneration of all the indexes
-    /// in the map or we use swap_remove and deal with the fact that the last
-    /// element will be swapped in place of the removed one and will thus get
-    /// a new index. We use the latter solution for performance reasons.
-    pub fn remove_vertex(&mut self, index: VertexIndex) -> bool {
-        match self.vertices.clone().get_index(index) {
-            Some((key, hyperedges)) => {
-                // First, we need to get all the hyperedges' indexes of the
-                // vertex in order to update them accordingly.
-                // We preemptively store the eventual index of the swapped
-                // vertex to avoid extra loops.
-                let last_index = self.count_vertices() - 1;
-                let maybe_swapped_index = if last_index == index {
-                    None
-                } else {
-                    Some(last_index)
-                };
+    /// Removes a vertex by index.
+    pub fn remove_vertex(
+        &mut self,
+        vertex_index: VertexIndex,
+    ) -> Result<(), HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_vertex(vertex_index)?;
 
-                for hyperedge in hyperedges.iter() {
-                    if let Some(hyperedge_index) = self.hyperedges.get_index_of(hyperedge) {
-                        self.update_hyperedge_vertices(
-                            hyperedge_index,
-                            &hyperedge
-                                .iter()
-                                .filter_map(|current_index| {
-                                    if current_index != &index {
-                                        // Inject the current index or the swapped one.
-                                        match maybe_swapped_index {
-                                            Some(swapped_index) => {
-                                                Some(if swapped_index == *current_index {
-                                                    index
-                                                } else {
-                                                    *current_index
-                                                })
-                                            }
-                                            None => Some(*current_index),
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect::<Vec<usize>>(),
-                        );
-                    }
-                }
+        // Get the hyperedges of the vertex.
+        let hyperedges = self.get_internal_hyperedges(self.get_vertex_hyperedges(vertex_index)?)?;
 
-                // We also need to update the other hyperedges which are impacted by this change.
-                if let Some(swapped_index) = maybe_swapped_index {
-                    if let Some(hyperedge_weights) = self.get_vertex_hyperedges(swapped_index) {
-                        for weight in hyperedge_weights.iter() {
-                            if let Some(hyperedge_index) = self.hyperedges.get_index_of(weight) {
-                                self.update_hyperedge_vertices(
-                                    hyperedge_index,
-                                    &weight
-                                        .iter()
-                                        .map(|current_index| {
-                                            if *current_index == swapped_index {
-                                                index
-                                            } else {
-                                                *current_index
-                                            }
-                                        })
-                                        .collect::<Vec<usize>>(),
-                                );
-                            }
+        // Remove the vertex from the hyperedges which contain it.
+        for hyperedge in hyperedges.into_iter() {
+            let HyperedgeKey { vertices, .. } = self
+                .hyperedges
+                .get_index(hyperedge)
+                .map(|hyperedge_key| hyperedge_key.to_owned())
+                .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(hyperedge))?;
+
+            let hyperedge_index = self.get_hyperedge(hyperedge)?;
+
+            // Get the unique vertices, i.e. check for self-loops.
+            let unique_vertices = vertices.iter().sorted().dedup().collect_vec();
+
+            // Remove the hyperedge if the vertex is the only one present.
+            if unique_vertices.len() == 1 {
+                self.remove_hyperedge(hyperedge_index)?;
+            } else {
+                // Otherwise update the hyperedge with the updated vertices.
+                let updated_vertices = self.get_vertices(
+                    vertices
+                        .into_iter()
+                        .filter(|vertex| *vertex != internal_index)
+                        .collect_vec(),
+                )?;
+
+                self.update_hyperedge_vertices(hyperedge_index, updated_vertices)?;
+            }
+        }
+
+        // Find the last index.
+        let last_index = self.vertices.len() - 1;
+
+        // Swap and remove by index.
+        self.vertices.swap_remove_index(internal_index);
+
+        // Update the mapping for the removed vertex.
+        self.vertices_mapping.left.remove(&internal_index);
+        self.vertices_mapping.right.remove(&vertex_index);
+
+        // If the index to remove wasn't the last one, the last vertex has
+        // been swapped in place of the removed one. See the remove_hyperedge
+        // method for more details about the internals.
+        if internal_index != last_index {
+            // Get the index of the swapped vertex.
+            let swapped_vertex_index = self.get_vertex(last_index)?;
+
+            // Proceed with the aforementioned operations.
+            self.vertices_mapping
+                .right
+                .insert(swapped_vertex_index, internal_index);
+            self.vertices_mapping.left.remove(&last_index);
+            self.vertices_mapping
+                .left
+                .insert(internal_index, swapped_vertex_index);
+
+            let stale_hyperedges =
+                self.get_internal_hyperedges(self.get_vertex_hyperedges(swapped_vertex_index)?)?;
+
+            // Update the impacted hyperedges accordingly.
+            for hyperedge in stale_hyperedges.into_iter() {
+                let HyperedgeKey { vertices, weight } = self
+                    .hyperedges
+                    .get_index(hyperedge)
+                    .map(|hyperedge_key| hyperedge_key.to_owned())
+                    .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(hyperedge))?;
+
+                let updated_vertices = vertices
+                    .into_iter()
+                    .map(|vertex| {
+                        // Remap the vertex if this is the swapped one.
+                        if vertex == last_index {
+                            internal_index
+                        } else {
+                            vertex
                         }
-                    }
-                }
+                    })
+                    .collect_vec();
 
-                // Now we can safely remove the vertex.
-                self.vertices.swap_remove(key).is_some()
+                // Insert the new entry with the updated vertices.
+                // Since we are not altering the weight, we can safely perform
+                // the operation without checking its output.
+                self.hyperedges.insert(HyperedgeKey {
+                    vertices: updated_vertices,
+                    weight,
+                });
+
+                // Swap and remove by index.
+                // Since we know that the hyperedge index is correct, we can
+                // safely perform the operation without checking its output.
+                self.hyperedges.swap_remove_index(hyperedge);
             }
-            None => false,
         }
+
+        // Return a unit.
+        Ok(())
     }
 
-    /// Updates the weight of a vertex based on its index.
-    pub fn update_vertex_weight(&mut self, index: VertexIndex, weight: V) -> bool {
-        match self.vertices.clone().get_index(index) {
-            Some((key, value)) => {
-                // We can't directly replace the value in the map.
-                // First, we need to insert the new weight, it will end up
-                // being at the last position.
-                self.vertices.insert(weight, value.to_owned());
+    /// Updates the weight of a vertex by index.
+    pub fn update_vertex_weight(
+        &mut self,
+        vertex_index: VertexIndex,
+        weight: V,
+    ) -> Result<(), HypergraphError<V, HE>> {
+        let internal_index = self.get_internal_vertex(vertex_index)?;
 
-                // Then we use swap and remove. It will remove the old weight
-                // and insert the new one at the index position of the former.
-                self.vertices.swap_remove(key).is_some()
-            }
-            None => false,
+        let (previous_weight, index_set) = self
+            .vertices
+            .get_index(internal_index)
+            .map(|(previous_weight, index_set)| (previous_weight.to_owned(), index_set.to_owned()))
+            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
+
+        // Return an error if the new weight is the same as the previous one.
+        if weight == previous_weight {
+            return Err(HypergraphError::VertexWeightUnchanged(vertex_index, weight));
         }
+
+        // Return an error if the new weight is already assigned to another
+        // vertex.
+        if self.vertices.contains_key(&weight) {
+            return Err(HypergraphError::VertexWeightAlreadyAssigned(weight));
+        }
+
+        // We can't directly replace the value in the map.
+        // First, we need to insert the new weight, it will end up
+        // being at the last position.
+        // Since we have already checked that the new weight is not in the
+        // map, we can safely perform the operation without checking its output.
+        self.vertices.insert(weight, index_set);
+
+        // Then we use swap and remove. This will remove the previous weight
+        // and insert the new one at the index position of the former.
+        // This doesn't alter the indexing.
+        // See the update_hyperedge_weight method for more detailed explanation.
+        // Since we know that the internal index is correct, we can safely
+        // perform the operation without checking its output.
+        self.vertices.swap_remove_index(internal_index);
+
+        // Return a unit.
+        Ok(())
     }
 }

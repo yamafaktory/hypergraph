@@ -3,7 +3,7 @@ authors = ["Davy Duperron <yamafaktory@gmail.com>"]
 categories = ["data-structures", "graphics", "mathematics"]
 description = "Hypergraph is data structure library to create a directed hypergraph in which an hyperedge can join any number of vertices."
 edition = "2018"
-exclude = [".github", "rustfmt.toml"]
+exclude = [".github", "hypergraph.svg", "rustfmt.toml"]
 keywords = ["data-structure", "graph", "hypergraph"]
 license = "MIT"
 name = "hypergraph"
@@ -12,6 +12,6 @@ repository = "https://github.com/yamafaktory/hypergraph"
 version = "0.2.2-alpha.0"
 
 [dependencies]
-indexmap = "1.6.1"
-itertools = "0.10.0"
-random_color = "0.5.0"
+indexmap = "1.7.0"
+itertools = "0.10.1"
+thiserror = "1.0.26"

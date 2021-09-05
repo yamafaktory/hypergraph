@@ -14,4 +14,4 @@ version = "1.0.2-alpha.0"
 [dependencies]
 indexmap = "1.7.0"
 itertools = "0.10.1"
-thiserror = "1.0.26"
+thiserror = "1.0.29"

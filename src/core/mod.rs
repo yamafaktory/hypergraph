@@ -5,7 +5,6 @@ pub mod errors;
 pub mod hyperedges;
 mod shared;
 mod utils;
-/// Vertices implementation.
 #[doc(hidden)]
 pub mod vertices;
 

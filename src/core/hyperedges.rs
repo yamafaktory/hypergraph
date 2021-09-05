@@ -1,6 +1,7 @@
 use crate::{
-    core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeKey,
-    Hypergraph, SharedTrait, VertexIndex,
+    core::{shared::Connection, utils::are_slices_equal},
+    errors::HypergraphError,
+    HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
 };
 
 use itertools::Itertools;
@@ -140,7 +141,7 @@ where
         from: VertexIndex,
         to: VertexIndex,
     ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
-        let results = self.get_connections(from, Some(to))?;
+        let results = self.get_connections(Connection::InAndOut(from, to))?;
 
         Ok(results
             .into_iter()
@@ -360,6 +361,18 @@ where
 
         // Return a unit.
         Ok(())
+    }
+
+    // Reverses a hyperedge.
+    pub fn reverse_hyperedge(
+        &mut self,
+        hyperedge_index: HyperedgeIndex,
+    ) -> Result<(), HypergraphError<V, HE>> {
+        // Get the vertices of the hyperedge.
+        let vertices = self.get_hyperedge_vertices(hyperedge_index)?;
+
+        // Update the hyperedge with the reversed vertices.
+        self.update_hyperedge_vertices(hyperedge_index, vertices.into_iter().rev().collect_vec())
     }
 
     /// Updates the weight of a hyperedge by index.

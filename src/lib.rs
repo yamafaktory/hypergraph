@@ -101,6 +101,9 @@
 //!     // Get the adjacent vertices from a vertex.
 //!     assert_eq!(graph.get_adjacent_vertices_from(VertexIndex(0)), Ok(vec![bianca, ghanda]));
 //!
+//!     // Get the adjacent vertices to a vertex.
+//!     assert_eq!(graph.get_adjacent_vertices_to(VertexIndex(0)), Ok(vec![ewan, faarooq]));
+//!
 //!     // Find the shortest paths between some vertices.
 //!     assert_eq!(graph.get_dijkstra_connections(faarooq, bianca), Ok(vec![faarooq, ava, bianca]));
 //!
@@ -118,6 +121,15 @@
 //!
 //!     // Remove a vertex.
 //!     graph.remove_vertex(ewan)?;
+//!
+//!     // Reverse a hyperedge.
+//!     graph.reverse_hyperedge(fifth_hyperedge)?;
+//!
+//!     // Get the in-degree of a vertex.
+//!     assert_eq!(graph.get_vertex_degree_in(ava), Ok(1));
+//!
+//!     // Get the out-degree of a vertex.
+//!     assert_eq!(graph.get_vertex_degree_out(ghanda), Ok(0));
 //!     
 //!     Ok(())
 //! }

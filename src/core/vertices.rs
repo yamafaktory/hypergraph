@@ -1,5 +1,6 @@
 use crate::{
-    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
+    core::shared::Connection, errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph,
+    SharedTrait, VertexIndex,
 };
 
 use indexmap::IndexSet;
@@ -218,7 +219,7 @@ where
         &self,
         from: VertexIndex,
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        let results = self.get_connections(from, None)?;
+        let results = self.get_connections(Connection::In(from))?;
 
         Ok(results
             .into_iter()
@@ -226,6 +227,40 @@ where
             .sorted()
             .dedup()
             .collect_vec())
+    }
+
+    /// Gets the list of all vertices connected to a given vertex.
+    pub fn get_adjacent_vertices_to(
+        &self,
+        to: VertexIndex,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        let results = self.get_connections(Connection::Out(to))?;
+
+        Ok(results
+            .into_iter()
+            .filter_map(|(_, vertex_index)| vertex_index)
+            .sorted()
+            .dedup()
+            .collect_vec())
+    }
+
+    /// Gets the in-degree of a vertex.
+    /// <https://en.wikipedia.org/wiki/Directed_graph#Indegree_and_outdegree>
+    pub fn get_vertex_degree_in(&self, to: VertexIndex) -> Result<usize, HypergraphError<V, HE>> {
+        let results = self.get_connections(Connection::Out(to))?;
+
+        Ok(results.len())
+    }
+
+    /// Gets the out-degree of a vertex.
+    /// <https://en.wikipedia.org/wiki/Directed_graph#Indegree_and_outdegree>
+    pub fn get_vertex_degree_out(
+        &self,
+        from: VertexIndex,
+    ) -> Result<usize, HypergraphError<V, HE>> {
+        let results = self.get_connections(Connection::In(from))?;
+
+        Ok(results.len())
     }
 
     /// Gets the hyperedges of a vertex as a vector of HyperedgeIndex.

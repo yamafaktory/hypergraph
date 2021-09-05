@@ -406,6 +406,29 @@ fn integration() {
         "should be out-of-bound and return an explicit error"
     );
 
+    // Get the adjacent vertices to a vertex.
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(0)),
+        Ok(vec![VertexIndex(4)])
+    );
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(1)),
+        Ok(vec![VertexIndex(0), VertexIndex(1)])
+    );
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(2)),
+        Ok(vec![VertexIndex(3)])
+    );
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(3)),
+        Ok(vec![VertexIndex(0), VertexIndex(1)])
+    );
+    assert_eq!(
+        graph.get_adjacent_vertices_to(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and return an explicit error"
+    );
+
     // Get some paths via Dijkstra.
     assert_eq!(
         graph.get_dijkstra_connections(VertexIndex(4), VertexIndex(1)),
@@ -768,4 +791,37 @@ fn integration() {
     // Check the hypergraph integrity.
     assert_eq!(graph.count_vertices(), 3);
     assert_eq!(graph.count_hyperedges(), 3);
+
+    // Reverse a hyperedge.
+    assert_eq!(
+        graph.reverse_hyperedge(HyperedgeIndex(1)),
+        Ok(()),
+        "should reverse the vertices of the second hyperedge"
+    );
+    assert_eq!(
+        graph.get_hyperedge_vertices(HyperedgeIndex(1)),
+        Ok(vec![VertexIndex(3), VertexIndex(1), VertexIndex(1)])
+    );
+
+    // Get the in-degree and the out-degree of some vertices.
+    assert_eq!(
+        graph.get_vertex_degree_in(VertexIndex(2)),
+        Ok(1),
+        "should get the in-degree of the third vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_degree_out(VertexIndex(2)),
+        Ok(0),
+        "should get the out-degree of the third vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_degree_in(VertexIndex(3)),
+        Ok(0),
+        "should get the in-degree of the fourth vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_degree_out(VertexIndex(3)),
+        Ok(2),
+        "should get the out-degree of the fourth vertex"
+    );
 }

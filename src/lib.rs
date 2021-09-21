@@ -131,6 +131,12 @@
 //!     // Get the out-degree of a vertex.
 //!     assert_eq!(graph.get_vertex_degree_out(ghanda), Ok(0));
 //!     
+//!     // Clear the hyperedges.
+//!     graph.clear_hyperedges()?;
+//!
+//!     // Clear the whole hypergraph.
+//!     graph.clear();
+//!
 //!     Ok(())
 //! }
 //! ```

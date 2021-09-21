@@ -107,6 +107,21 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
+    /// Clears the hypergraph.
+    pub fn clear(&mut self) {
+        // Clear the hyperedges and vertices sets while keeping their capacities.
+        self.hyperedges.clear();
+        self.vertices.clear();
+
+        // Reset the mappings.
+        self.hyperedges_mapping = BiHashMap::default();
+        self.vertices_mapping = BiHashMap::default();
+
+        // Reset the counters.
+        self.hyperedges_count = 0;
+        self.vertices_count = 0;
+    }
+
     /// Creates a new hypergraph with no allocation.
     pub fn new() -> Self {
         Hypergraph::with_capacity(0, 0)
@@ -115,12 +130,12 @@ where
     /// Creates a new hypergraph with the specified capacity.
     pub fn with_capacity(vertices: usize, hyperedges: usize) -> Self {
         Hypergraph {
-            vertices: IndexMap::with_capacity(vertices),
-            hyperedges: IndexSet::with_capacity(hyperedges),
-            hyperedges_mapping: BiHashMap::default(),
-            vertices_mapping: BiHashMap::default(),
             hyperedges_count: 0,
+            hyperedges_mapping: BiHashMap::default(),
+            hyperedges: IndexSet::with_capacity(hyperedges),
             vertices_count: 0,
+            vertices_mapping: BiHashMap::default(),
+            vertices: IndexMap::with_capacity(vertices),
         }
     }
 }

@@ -66,6 +66,9 @@ where
                                 }
                             }
                             Connection::Out(to) => {
+                                // Inject the index of the hyperedge and the
+                                // vertex index if the current window is a
+                                // match.
                                 if *window_to == to {
                                     return index_acc
                                         .into_iter()

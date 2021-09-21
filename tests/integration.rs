@@ -824,4 +824,38 @@ fn integration() {
         Ok(2),
         "should get the out-degree of the fourth vertex"
     );
+
+    // Clear the hyperedges.
+    assert_eq!(
+        graph.clear_hyperedges(),
+        Ok(()),
+        "should remove all the hyperedges"
+    );
+    assert_eq!(graph.count_hyperedges(), 0, "should have no hyperedges");
+    assert_eq!(
+        graph.count_vertices(),
+        3,
+        "should still have three vertices"
+    );
+    assert_eq!(graph.count_hyperedges(), 0, "should have no hyperedges");
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(1)),
+        Ok(vec![]),
+        "should get no hyperedges for the second vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(2)),
+        Ok(vec![]),
+        "should get no hyperedges for the third vertex"
+    );
+    assert_eq!(
+        graph.get_vertex_hyperedges(VertexIndex(3)),
+        Ok(vec![]),
+        "should get no hyperedges for the fourth vertex"
+    );
+
+    // Clear the whole hypergraph.
+    graph.clear();
+    assert_eq!(graph.count_vertices(), 0, "should have no vertices");
+    assert_eq!(graph.count_hyperedges(), 0, "should have no hyperedges");
 }

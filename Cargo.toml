@@ -9,7 +9,7 @@ license = "MIT"
 name = "hypergraph"
 readme = "README.md"
 repository = "https://github.com/yamafaktory/hypergraph"
-version = "1.0.3"
+version = "1.0.4-alpha.0"
 
 [dependencies]
 indexmap = "1.7.0"

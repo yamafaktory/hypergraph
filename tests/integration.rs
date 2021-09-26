@@ -509,10 +509,10 @@ fn integration() {
     // Check the eventual errors.
     assert_eq!(
         graph.update_hyperedge_weight(HyperedgeIndex(0), "pass the purple ball"),
-        Err(HypergraphError::HyperedgeWeightUnchanged(
-            HyperedgeIndex(0),
-            "pass the purple ball"
-        )),
+        Err(HypergraphError::HyperedgeWeightUnchanged {
+            index: HyperedgeIndex(0),
+            weight: "pass the purple ball"
+        }),
         "should return an explicit error since this weight has not changed"
     );
     assert_eq!(

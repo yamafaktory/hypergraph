@@ -3,7 +3,7 @@ use crate::{HyperedgeIndex, SharedTrait, VertexIndex};
 use thiserror::Error;
 
 /// Enumeration of all the possible errors.
-#[derive(Clone, Copy, Error, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum HypergraphError<V, HE>
 where
     V: SharedTrait,
@@ -22,8 +22,8 @@ where
     HyperedgeWeightNotFound(HE),
 
     /// Error when a hyperedge is updated with the same weight.
-    #[error("HyperedgeIndex {0} weight is unchanged (no-op)")]
-    HyperedgeWeightUnchanged(HyperedgeIndex, HE),
+    #[error("HyperedgeIndex {index:?} weight {weight:?} is unchanged (no-op)")]
+    HyperedgeWeightUnchanged { index: HyperedgeIndex, weight: HE },
 
     /// Error when a hyperedge is updated with the same vertices.
     #[error("HyperedgeIndex {0} vertices are unchanged (no-op)")]
@@ -36,6 +36,21 @@ where
     /// Error when a hyperedge is updated with no vertices.
     #[error("HyperedgeIndex {0} vertices are missing")]
     HyperedgeUpdateNoVertices(HyperedgeIndex),
+
+    /// Error when a hyperedge doesn't contain some vertices.
+    #[error("HyperedgeIndex {index:?} does not include vertices {vertices:?}")]
+    HyperedgeVerticesIndexesNotFound {
+        index: HyperedgeIndex,
+        vertices: Vec<VertexIndex>,
+    },
+
+    /// Error when a hyperedge contraction is invalid.
+    #[error("HyperedgeIndex {index:?} contraction of vertices {vertices:?} into vertex {target:?} is invalid" )]
+    HyperedgeInvalidContraction {
+        index: HyperedgeIndex,
+        target: VertexIndex,
+        vertices: Vec<VertexIndex>,
+    },
 
     /// Error when a hyperedge is updated with the weight of another one.
     #[error("Hyperedge weight {0} was already assigned")]
@@ -58,8 +73,8 @@ where
     VertexWeightNotFound(V),
 
     /// Error when a vertex weight is updated with the same value.
-    #[error("VertexIndex {0} weight unchanged (no-op)")]
-    VertexWeightUnchanged(VertexIndex, V),
+    #[error("VertexIndex {index:?} weight {weight:?} unchanged (no-op)")]
+    VertexWeightUnchanged { index: VertexIndex, weight: V },
 
     /// Error when a vertex weight is updated with the weight of another one.
     #[error("Vertex weight {0} was already assigned")]

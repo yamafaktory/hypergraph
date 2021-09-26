@@ -1,6 +1,6 @@
 [package]
 authors = ["Davy Duperron <yamafaktory@gmail.com>"]
-categories = ["data-structures", "graphics", "mathematics"]
+categories = ["data-structures", "mathematics", "science"]
 description = "Hypergraph is data structure library to create a directed hypergraph in which an hyperedge can join any number of vertices."
 edition = "2018"
 exclude = [".github", "hypergraph.svg", "rustfmt.toml"]

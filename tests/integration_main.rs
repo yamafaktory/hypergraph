@@ -1,30 +1,13 @@
 #![deny(unsafe_code, nonstandard_style)]
 #![forbid(rust_2018_idioms)]
 
-use std::fmt::{Display, Formatter, Result};
+mod common;
 
+use common::Vertex;
 use hypergraph::{errors::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
 
 #[test]
 fn integration() {
-    // Create a custom struct.
-    #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-    struct Vertex<'a> {
-        name: &'a str,
-    }
-
-    impl<'a> Vertex<'a> {
-        pub fn new(name: &'a str) -> Self {
-            Vertex { name }
-        }
-    }
-
-    impl<'a> Display for Vertex<'a> {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-            write!(f, "{}", self)
-        }
-    }
-
     // Create a new hypergraph.
     let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
 
@@ -509,10 +492,10 @@ fn integration() {
     // Check the eventual errors.
     assert_eq!(
         graph.update_hyperedge_weight(HyperedgeIndex(0), "pass the purple ball"),
-        Err(HypergraphError::HyperedgeWeightUnchanged(
-            HyperedgeIndex(0),
-            "pass the purple ball"
-        )),
+        Err(HypergraphError::HyperedgeWeightUnchanged {
+            index: HyperedgeIndex(0),
+            weight: "pass the purple ball"
+        }),
         "should return an explicit error since this weight has not changed"
     );
     assert_eq!(

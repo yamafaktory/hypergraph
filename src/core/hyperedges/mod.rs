@@ -6,7 +6,7 @@ pub(crate) mod get_internal_hyperedges;
 
 pub mod add_hyperedge;
 pub mod clear_hyperedges;
-pub mod contract_hyperedge;
+pub mod contract_hyperedge_vertices;
 pub mod count_hyperedges;
 pub mod get_hyperedge_vertices;
 pub mod get_hyperedge_weight;

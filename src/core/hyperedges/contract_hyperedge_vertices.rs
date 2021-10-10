@@ -10,7 +10,8 @@ where
     V: SharedTrait,
     HE: SharedTrait,
 {
-    /// Contracts the vertices of a hyperedge into one single vertex.
+    /// Contracts a set of the vertices of a hyperedge into one single vertex.
+    /// Returns the updated vertices.
     /// Based on <https://en.wikipedia.org/wiki/Edge_contraction>
     pub fn contract_hyperedge_vertices(
         &mut self,

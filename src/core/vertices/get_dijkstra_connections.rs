@@ -1,4 +1,4 @@
-use crate::{errors::HypergraphError, Hypergraph, SharedTrait, VertexIndex};
+use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
 
 use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
 
@@ -14,7 +14,7 @@ where
         &self,
         from: VertexIndex,
         to: VertexIndex,
-    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+    ) -> Result<Vec<(HyperedgeIndex, VertexIndex)>, HypergraphError<V, HE>> {
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         struct Cursor {
             distance: usize,
@@ -61,18 +61,18 @@ where
         });
 
         // Keep track of the traversal path.
-        let mut path = Vec::<usize>::new();
+        let mut path = Vec::<(usize, usize)>::new();
 
         while let Some(Cursor { distance, index }) = heap.pop() {
             // End of the traversal.
             if index == internal_to {
                 // We need to inject the index of the target vertex.
-                path.push(internal_to);
-
+                path.push((0, internal_to));
+                dbg!(path.clone());
                 // Remove duplicates generated during the iteration of the algorithm.
                 path.dedup();
-
-                return self.get_vertices(path);
+                return Ok(Vec::<(HyperedgeIndex, VertexIndex)>::new());
+                //          return self.get_vertices(path);
             }
 
             // Skip if a better path has already been found.
@@ -81,22 +81,24 @@ where
             }
 
             let mapped_index = self.get_vertex(index)?;
-            let indexes = self.get_adjacent_vertices_from(mapped_index)?;
-            let internal_indexes = self.get_internal_vertices(indexes)?;
+            let indexes = self.get_full_adjacent_vertices_from(mapped_index)?;
 
             // For every connected vertex, try to find the lowest distance.
-            for vertex_index in internal_indexes {
+            for (hyperedge_index, vertex_index) in indexes {
+                let vertex_index = self.get_internal_vertex(vertex_index)?;
+                let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
+                let cost = hyperedge_weight.into();
+
                 let next = Cursor {
-                    // We assume a distance of one by default since vertices
-                    // have custom weights.
-                    distance: distance + 1,
+                    // Use the cost derived from the hyperedge weight.
+                    distance: distance + cost,
                     index: vertex_index,
                 };
 
                 // If so, add it to the frontier and continue.
                 if next.distance < distances[next.index] {
                     // Update the traversal accordingly.
-                    path.push(index);
+                    path.push((self.get_internal_hyperedge(hyperedge_index)?, index));
 
                     // Push it to the heap.
                     heap.push(next);

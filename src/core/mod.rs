@@ -17,9 +17,9 @@ use std::{
 
 /// Shared Trait for hyperedges and vertices.
 /// Must be implemented to use the library.
-pub trait SharedTrait: Copy + Debug + Display + Eq + Hash {}
+pub trait SharedTrait: Copy + Debug + Display + Eq + Hash + Into<usize> {}
 
-impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash {}
+impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash + Into<usize> {}
 
 /// Vertex stable index representation as usize.
 /// Uses the newtype index pattern.
@@ -29,7 +29,19 @@ pub struct VertexIndex(pub usize);
 
 impl Display for VertexIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self)
+    }
+}
+
+impl From<usize> for VertexIndex {
+    fn from(index: usize) -> Self {
+        VertexIndex(index)
+    }
+}
+
+impl Into<usize> for VertexIndex {
+    fn into(self) -> usize {
+        self.0
     }
 }
 
@@ -43,6 +55,17 @@ impl Display for HyperedgeIndex {
     }
 }
 
+impl From<usize> for HyperedgeIndex {
+    fn from(index: usize) -> Self {
+        HyperedgeIndex(index)
+    }
+}
+
+impl Into<usize> for HyperedgeIndex {
+    fn into(self) -> usize {
+        self.0
+    }
+}
 /// A HyperedgeKey is a representation of both the vertices and the weight
 /// of a hyperedge, used as a key in the hyperedges set.
 /// In a non-simple hypergraph, since the same vertices can be shared by
@@ -82,7 +105,11 @@ pub struct Hypergraph<V, HE> {
     vertices_count: usize,
 }
 
-impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
+impl<V, HE> Debug for Hypergraph<V, HE>
+where
+    V: Eq + Hash + Debug,
+    HE: Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("Hypergraph")
             .field("vertices", &self.vertices)

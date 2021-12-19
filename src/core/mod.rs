@@ -9,6 +9,7 @@ mod utils;
 pub mod vertices;
 
 use bi_hash_map::BiHashMap;
+
 use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt::{Debug, Display, Formatter, Result},

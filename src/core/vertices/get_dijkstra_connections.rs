@@ -85,25 +85,39 @@ where
             }
 
             // Get the VertexIndex associated with the internal index.
-            // Proceed by finding the all the adjacent vertices as a vector of
-            // tuples (HyperedgeIndex, VertexIndex).
+            // Proceed by finding all the adjacent vertices as a hashmap whose
+            // keys are VertexIndex and values are a vector of HyperedgeIndex.
             let mapped_index = self.get_vertex(index)?;
             let indexes = self.get_full_adjacent_vertices_from(mapped_index)?;
 
             // For every connected vertex, try to find the lowest distance.
-            for (hyperedge_index, vertex_index) in indexes {
+            for (vertex_index, hyperedge_indexes) in indexes {
                 let vertex_index = self.get_internal_vertex(vertex_index)?;
-                let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
-                // Use the trait implementation to get the associated cost of
-                // the hyperedge.
-                let cost = hyperedge_weight.into();
 
-                let next = Cursor::new(distance + cost, vertex_index);
+                let mut min_cost = usize::MAX;
+                let mut best_hyperedge: Option<HyperedgeIndex> = None;
+
+                // Get the lower cost.
+                for hyperedge_index in hyperedge_indexes.into_iter() {
+                    let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
+
+                    // Use the trait implementation to get the associated cost
+                    // of the hyperedge.
+                    let cost = hyperedge_weight.into();
+
+                    if cost < min_cost {
+                        min_cost = cost;
+                        best_hyperedge = Some(hyperedge_index);
+                    }
+                }
+
+                let next = Cursor::new(distance + min_cost, vertex_index);
 
                 // If so, add it to the frontier and continue.
-                if next.distance < distances[next.index] {
+                if next.distance < distances[next.index] && best_hyperedge.is_some() {
+                    dbg!(self.get_vertex(index)?, best_hyperedge);
                     // Update the traversal accordingly.
-                    path.push((hyperedge_index, self.get_vertex(index)?));
+                    path.push((best_hyperedge.unwrap(), self.get_vertex(index)?));
 
                     // Push it to the heap.
                     heap.push(next);

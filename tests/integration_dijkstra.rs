@@ -4,7 +4,7 @@
 mod common;
 
 use common::{HyperEdge, Vertex};
-use hypergraph::{errors::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
+use hypergraph::Hypergraph;
 
 #[test]
 fn integration() {
@@ -31,21 +31,39 @@ fn integration() {
     let e = graph.add_vertex(vertex_five).unwrap();
 
     // Create some hyperedges.
+    // ---------------------------------
+    //                 alpha
+    //         ┌-----------------------┐
+    //  alpha  |  gamma      gamma     |
+    // ┌-----┐ | ┌-----┐ ┌-----------┐ |
+    // |     | | |     | |           | |
+    // |     v | |     v |           v v
+    // ┌-┐   ┌---┐     ┌-┐    ┌-┐    ┌-┐
+    // |a|   | b |     |c|    |d|    |e|
+    // └-┘   └---┘     └-┘    └-┘    └-┘
+    // |     ^ |                ^    | ^
+    // |     | |                |    | |
+    // |     | |                └----┘ |
+    // |     | |                 beta  |
+    // └-----┘ └-----------------------┘
+    //   beta            beta
+    // ---------------------------------
     let alpha = graph.add_hyperedge(vec![a, b, e], hyperedge_one).unwrap();
     let beta = graph
         .add_hyperedge(vec![a, b, e, d], hyperedge_two)
         .unwrap();
     let gamma = graph.add_hyperedge(vec![b, c, e], hyperedge_three).unwrap();
 
-    // Get some paths via Dijkstra.
+    // Get some paths via Dijkstra based on the hyperedges' costs.
     assert_eq!(
-        graph.get_dijkstra_connections(a, e),
+        graph.get_dijkstra_connections(a, d),
         Ok(vec![
             (alpha, a),
             (alpha, b),
             (gamma, b),
             (gamma, c),
-            (gamma, e)
+            (beta, e),
+            (beta, d)
         ]),
         "should get a path of three vertices"
     );

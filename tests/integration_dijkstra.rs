@@ -40,7 +40,13 @@ fn integration() {
     // Get some paths via Dijkstra.
     assert_eq!(
         graph.get_dijkstra_connections(a, e),
-        Ok(vec![(alpha, a)]),
+        Ok(vec![
+            (alpha, a),
+            (alpha, b),
+            (gamma, b),
+            (gamma, c),
+            (gamma, e)
+        ]),
         "should get a path of three vertices"
     );
 }

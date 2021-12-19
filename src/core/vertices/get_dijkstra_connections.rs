@@ -21,6 +21,12 @@ where
             index: usize,
         }
 
+        impl Cursor {
+            fn new(distance: usize, index: usize) -> Self {
+                Self { distance, index }
+            }
+        }
+
         // Use a custom implementation of Ord as we want a min-heap BinaryHeap.
         impl Ord for Cursor {
             fn cmp(&self, other: &Cursor) -> Ordering {
@@ -55,24 +61,22 @@ where
         distances[internal_from] = 0;
 
         // Push the first cursor to the heap.
-        heap.push(Cursor {
-            distance: 0,
-            index: internal_from,
-        });
+        heap.push(Cursor::new(0, internal_from));
 
         // Keep track of the traversal path.
-        let mut path = Vec::<(usize, usize)>::new();
+        let mut path = Vec::<(HyperedgeIndex, VertexIndex)>::new();
 
         while let Some(Cursor { distance, index }) = heap.pop() {
             // End of the traversal.
             if index == internal_to {
-                // We need to inject the index of the target vertex.
-                path.push((0, internal_to));
-                dbg!(path.clone());
-                // Remove duplicates generated during the iteration of the algorithm.
-                path.dedup();
-                return Ok(Vec::<(HyperedgeIndex, VertexIndex)>::new());
-                //          return self.get_vertices(path);
+                // We need to inject the last tuple for the target vertex.
+                // We get the connecting hyperedge from the last element of the
+                // path.
+                let last_connecting_hyperedge = path.last().unwrap().0;
+
+                path.push((last_connecting_hyperedge, self.get_vertex(internal_to)?));
+
+                return Ok(path);
             }
 
             // Skip if a better path has already been found.
@@ -80,6 +84,9 @@ where
                 continue;
             }
 
+            // Get the VertexIndex associated with the internal index.
+            // Proceed by finding the all the adjacent vertices as a vector of
+            // tuples (HyperedgeIndex, VertexIndex).
             let mapped_index = self.get_vertex(index)?;
             let indexes = self.get_full_adjacent_vertices_from(mapped_index)?;
 
@@ -87,18 +94,16 @@ where
             for (hyperedge_index, vertex_index) in indexes {
                 let vertex_index = self.get_internal_vertex(vertex_index)?;
                 let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
+                // Use the trait implementation to get the associated cost of
+                // the hyperedge.
                 let cost = hyperedge_weight.into();
 
-                let next = Cursor {
-                    // Use the cost derived from the hyperedge weight.
-                    distance: distance + cost,
-                    index: vertex_index,
-                };
+                let next = Cursor::new(distance + cost, vertex_index);
 
                 // If so, add it to the frontier and continue.
                 if next.distance < distances[next.index] {
                     // Update the traversal accordingly.
-                    path.push((self.get_internal_hyperedge(hyperedge_index)?, index));
+                    path.push((hyperedge_index, self.get_vertex(index)?));
 
                     // Push it to the heap.
                     heap.push(next);

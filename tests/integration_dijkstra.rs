@@ -22,6 +22,7 @@ fn integration() {
     let hyperedge_one = HyperEdge::new("one", 10);
     let hyperedge_two = HyperEdge::new("two", 20);
     let hyperedge_three = HyperEdge::new("three", 1);
+    let hyperedge_four = HyperEdge::new("four", 100);
 
     // Create some vertices.
     let a = graph.add_vertex(vertex_one).unwrap();
@@ -41,10 +42,10 @@ fn integration() {
     // ┌-┐   ┌---┐     ┌-┐    ┌-┐    ┌-┐
     // |a|   | b |     |c|    |d|    |e|
     // └-┘   └---┘     └-┘    └-┘    └-┘
-    // |     ^ |                ^    | ^
-    // |     | |                |    | |
-    // |     | |                └----┘ |
-    // |     | |                 beta  |
+    // |     ^ | |            ^ ^    | ^
+    // |     | | |            | |    | |
+    // |     | | |    delta   | └----┘ |
+    // |     | | └------------┘  beta  |
     // └-----┘ └-----------------------┘
     //   beta            beta
     // ---------------------------------
@@ -53,18 +54,18 @@ fn integration() {
         .add_hyperedge(vec![a, b, e, d], hyperedge_two)
         .unwrap();
     let gamma = graph.add_hyperedge(vec![b, c, e], hyperedge_three).unwrap();
+    let _delta = graph.add_hyperedge(vec![b, d], hyperedge_four).unwrap();
 
-    // Get some paths via Dijkstra based on the hyperedges' costs.
+    // Get the cheapest path via Dijkstra based on the hyperedges' costs.
     assert_eq!(
         graph.get_dijkstra_connections(a, d),
         Ok(vec![
-            (alpha, a),
-            (alpha, b),
-            (gamma, b),
-            (gamma, c),
-            (beta, e),
-            (beta, d)
+            (a, None),
+            (b, Some(alpha)),
+            (c, Some(gamma)),
+            (e, Some(gamma)),
+            (d, Some(beta))
         ]),
-        "should get a path of three vertices"
+        "should follow a, b, c, e, d with their matching traversed hyperedges"
     );
 }

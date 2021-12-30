@@ -1,86 +1,101 @@
+use itertools::Itertools;
+
 use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
 
-use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
+use std::{
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap},
+    fmt::Debug,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Visitor {
+    distance: usize,
+    index: usize,
+}
+
+impl Visitor {
+    fn new(distance: usize, index: usize) -> Self {
+        Self { distance, index }
+    }
+}
+
+// Use a custom implementation of Ord as we want a min-heap BinaryHeap.
+impl Ord for Visitor {
+    fn cmp(&self, other: &Visitor) -> Ordering {
+        other
+            .distance
+            .cmp(&self.distance)
+            .then_with(|| self.distance.cmp(&other.distance))
+    }
+}
+
+impl PartialOrd for Visitor {
+    fn partial_cmp(&self, other: &Visitor) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl<V, HE> Hypergraph<V, HE>
 where
     V: SharedTrait,
     HE: SharedTrait,
 {
-    /// Gets a list of the shortest path of vertices between two vertices.
-    /// The implementation of the algorithm is based on
+    /// Gets a list of the cheapest path of vertices between two vertices as a
+    /// vector of tuples of the form `(VertexIndex, Option<HyperedgeIndex>)`
+    /// where the second member is the hyperedge that has been traversed to
+    /// reach the vertex.
+    /// Please note that the initial tuple holds `None` as hyperedge since none
+    /// has been traversed yet.
+    /// The implementation of the algorithm is partially based on:
     /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
     pub fn get_dijkstra_connections(
         &self,
         from: VertexIndex,
         to: VertexIndex,
-    ) -> Result<Vec<(HyperedgeIndex, VertexIndex)>, HypergraphError<V, HE>> {
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-        struct Cursor {
-            distance: usize,
-            index: usize,
-        }
-
-        impl Cursor {
-            fn new(distance: usize, index: usize) -> Self {
-                Self { distance, index }
-            }
-        }
-
-        // Use a custom implementation of Ord as we want a min-heap BinaryHeap.
-        impl Ord for Cursor {
-            fn cmp(&self, other: &Cursor) -> Ordering {
-                other
-                    .distance
-                    .cmp(&self.distance)
-                    .then_with(|| self.distance.cmp(&other.distance))
-            }
-        }
-
-        impl PartialOrd for Cursor {
-            fn partial_cmp(&self, other: &Cursor) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
+    ) -> Result<Vec<(VertexIndex, Option<HyperedgeIndex>)>, HypergraphError<V, HE>> {
         // Get the internal indexes of the vertices.
         let internal_from = self.get_internal_vertex(from)?;
         let internal_to = self.get_internal_vertex(to)?;
 
-        // We need to initialize a vector of length equal to the number of vertices.
-        // The default value, as per Dijkstra, must be set to infinity.
-        // A value of usize::MAX is used.
-        let mut distances = (0..self.vertices.len())
-            .map(|_| usize::MAX)
-            .collect::<Vec<usize>>();
+        // Keep track of the distances.
+        let mut distances = HashMap::new();
+
+        let mut maybe_traversed_hyperedge_by_vertex = HashMap::new();
 
         // Create an empty binary heap.
-        let mut heap = BinaryHeap::new();
+        let mut to_traverse = BinaryHeap::new();
 
         // Initialize the first vertex to zero.
-        distances[internal_from] = 0;
+        distances.insert(internal_from, 0);
 
         // Push the first cursor to the heap.
-        heap.push(Cursor::new(0, internal_from));
+        to_traverse.push(Visitor::new(0, internal_from));
 
         // Keep track of the traversal path.
-        let mut path = Vec::<(HyperedgeIndex, VertexIndex)>::new();
+        let mut path = Vec::<VertexIndex>::new();
 
-        while let Some(Cursor { distance, index }) = heap.pop() {
+        while let Some(Visitor { distance, index }) = to_traverse.pop() {
             // End of the traversal.
             if index == internal_to {
-                // We need to inject the last tuple for the target vertex.
-                // We get the connecting hyperedge from the last element of the
-                // path.
-                let last_connecting_hyperedge = path.last().unwrap().0;
+                // Inject the target vertex.
+                path.push(self.get_vertex(internal_to)?);
 
-                path.push((last_connecting_hyperedge, self.get_vertex(internal_to)?));
-
-                return Ok(path);
+                return Ok(path
+                    .into_iter()
+                    .map(|vertex_index| {
+                        (
+                            vertex_index,
+                            maybe_traversed_hyperedge_by_vertex
+                                .get(&vertex_index)
+                                .map_or(None, |&current| current),
+                        )
+                    })
+                    .collect_vec());
             }
 
             // Skip if a better path has already been found.
-            if distance > distances[index] {
+            if distance > distances[&index] {
                 continue;
             }
 
@@ -92,12 +107,12 @@ where
 
             // For every connected vertex, try to find the lowest distance.
             for (vertex_index, hyperedge_indexes) in indexes {
-                let vertex_index = self.get_internal_vertex(vertex_index)?;
+                let internal_vertex_index = self.get_internal_vertex(vertex_index)?;
 
                 let mut min_cost = usize::MAX;
                 let mut best_hyperedge: Option<HyperedgeIndex> = None;
 
-                // Get the lower cost.
+                // Get the lower cost out of all the hyperedges.
                 for hyperedge_index in hyperedge_indexes.into_iter() {
                     let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
 
@@ -108,27 +123,43 @@ where
                     if cost < min_cost {
                         min_cost = cost;
                         best_hyperedge = Some(hyperedge_index);
+
+                        break;
                     }
                 }
 
-                let next = Cursor::new(distance + min_cost, vertex_index);
+                // Prepare the next visitor.
+                let next = Visitor::new(distance + min_cost, internal_vertex_index);
+
+                // Check if this is the shorter distance.
+                let is_shorter = distances
+                    .get(&next.index)
+                    .map_or(true, |&current| next.distance < current);
 
                 // If so, add it to the frontier and continue.
-                if next.distance < distances[next.index] && best_hyperedge.is_some() {
-                    dbg!(self.get_vertex(index)?, best_hyperedge);
-                    // Update the traversal accordingly.
-                    path.push((best_hyperedge.unwrap(), self.get_vertex(index)?));
+                if is_shorter {
+                    maybe_traversed_hyperedge_by_vertex.insert(vertex_index, best_hyperedge);
+
+                    // Update the path traversal accordingly.
+                    // Keep vertex indexes unique.
+                    if !path
+                        .iter()
+                        .any(|current_index| mapped_index == *current_index)
+                    {
+                        path.push(mapped_index);
+                    }
 
                     // Push it to the heap.
-                    heap.push(next);
+                    to_traverse.push(next);
 
                     // Relaxation, we have now found a better way
-                    distances[vertex_index] = next.distance;
+                    distances.insert(internal_vertex_index, next.distance);
                 }
             }
         }
 
-        // If we reach this point, return an empty vector.
+        // If we reach this point, this means that there's no solution.
+        // Return an empty vector.
         Ok(vec![])
     }
 }

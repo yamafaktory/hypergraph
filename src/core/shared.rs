@@ -1,4 +1,6 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+};
 
 use itertools::Itertools;
 
@@ -12,8 +14,8 @@ pub(crate) enum Connection<Index = VertexIndex> {
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Private helper function used internally.
     /// Takes a connection as an enum and returns a vector of tuples of the

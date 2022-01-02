@@ -1,14 +1,14 @@
-use crate::{errors::HypergraphError, Hypergraph, SharedTrait, VertexIndex};
+use crate::{errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     // Private method to get the internal vertices from a vector of VertexIndex.
-    pub(crate) fn get_internal_vertices<E: AsRef<Vec<VertexIndex>>>(
+    pub(crate) fn get_internal_vertices<R: AsRef<Vec<VertexIndex>>>(
         &self,
-        vertices: E,
+        vertices: R,
     ) -> Result<Vec<usize>, HypergraphError<V, HE>> {
         vertices
             .as_ref()

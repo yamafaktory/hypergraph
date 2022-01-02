@@ -1,14 +1,14 @@
 use crate::{
-    core::shared::Connection, errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait,
-    VertexIndex,
+    core::shared::Connection, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph,
+    VertexIndex, VertexTrait,
 };
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets the hyperedges directly connecting a vertex to another.
     pub fn get_hyperedges_connecting(

@@ -1,29 +1,38 @@
 use crate::{
-    core::shared::Connection, errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait,
-    VertexIndex,
+    core::shared::Connection, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph,
+    VertexIndex, VertexTrait,
 };
 
-use itertools::Itertools;
+use indexmap::IndexMap;
+use itertools::{fold, Itertools};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets the list of all vertices connected to a given vertex as tuples of
-    /// the form (hyperedge index, vertex index).
+    /// the form (VertexIndex, Vec<HyperedgeIndex>).
     pub fn get_full_adjacent_vertices_to(
         &self,
         to: VertexIndex,
-    ) -> Result<Vec<(HyperedgeIndex, VertexIndex)>, HypergraphError<V, HE>> {
+    ) -> Result<Vec<(VertexIndex, Vec<HyperedgeIndex>)>, HypergraphError<V, HE>> {
         let results = self.get_connections(Connection::Out(to))?;
 
-        Ok(results
-            .into_iter()
-            .filter(|(_, vertex_index)| vertex_index.is_some())
-            .map(|(hyperedge_index, vertex_index)| (hyperedge_index, vertex_index.unwrap()))
-            .sorted()
-            .dedup()
-            .collect_vec())
+        Ok(fold(
+            results,
+            IndexMap::<VertexIndex, Vec<HyperedgeIndex>>::new(),
+            |mut acc, (hyperedge_index, vertex_index)| {
+                if vertex_index.is_some() {
+                    let hyperedges = acc.entry(vertex_index.unwrap()).or_insert(vec![]);
+
+                    hyperedges.push(hyperedge_index);
+                }
+
+                acc
+            },
+        )
+        .into_iter()
+        .collect_vec())
     }
 }

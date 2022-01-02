@@ -16,11 +16,17 @@ use std::{
     hash::Hash,
 };
 
-/// Shared Trait for hyperedges and vertices.
+/// Shared Trait for the vertices.
 /// Must be implemented to use the library.
-pub trait SharedTrait: Copy + Debug + Display + Eq + Hash + Into<usize> {}
+pub trait VertexTrait: Copy + Debug + Display + Eq + Hash {}
 
-impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash + Into<usize> {}
+impl<T> VertexTrait for T where T: Copy + Debug + Display + Eq + Hash {}
+
+/// Shared Trait for the hyperedges.
+/// Must be implemented to use the library.
+pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
+
+impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 
 /// Vertex stable index representation as usize.
 /// Uses the newtype index pattern.
@@ -121,8 +127,8 @@ where
 
 impl<V, HE> Default for Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     fn default() -> Self {
         Hypergraph::new()
@@ -132,8 +138,8 @@ where
 /// Hypergraph implementations.
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Clears the hypergraph.
     pub fn clear(&mut self) {

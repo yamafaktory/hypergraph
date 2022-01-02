@@ -1,9 +1,11 @@
-use crate::{bi_hash_map::BiHashMap, errors::HypergraphError, Hypergraph, SharedTrait};
+use crate::{
+    bi_hash_map::BiHashMap, errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexTrait,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Clears all the hyperedges from the hypergraph.
     pub fn clear_hyperedges(&mut self) -> Result<(), HypergraphError<V, HE>> {

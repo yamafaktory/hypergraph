@@ -1,9 +1,9 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait};
+use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets the weight of a hyperedge from its index.
     pub fn get_hyperedge_weight(

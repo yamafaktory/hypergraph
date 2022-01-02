@@ -1,11 +1,13 @@
-use crate::{errors::HypergraphError, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex};
+use crate::{
+    errors::HypergraphError, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+};
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Removes a vertex by index.
     pub fn remove_vertex(

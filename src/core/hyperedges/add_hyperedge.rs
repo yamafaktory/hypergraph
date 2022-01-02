@@ -1,11 +1,12 @@
 use crate::{
-    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
+    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex,
+    VertexTrait,
 };
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Adds a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
     /// Returns the weighted index of the hyperedge.

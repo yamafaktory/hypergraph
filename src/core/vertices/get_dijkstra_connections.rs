@@ -1,6 +1,8 @@
 use itertools::Itertools;
 
-use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+};
 
 use std::{
     cmp::Ordering,
@@ -38,8 +40,8 @@ impl PartialOrd for Visitor {
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets a list of the cheapest path of vertices between two vertices as a
     /// vector of tuples of the form `(VertexIndex, Option<HyperedgeIndex>)`

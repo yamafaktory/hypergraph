@@ -3,26 +3,26 @@
 
 mod common;
 
-use common::{HyperEdge, Vertex};
+use common::{Hyperedge, Vertex};
 use hypergraph::Hypergraph;
 
 #[test]
 fn integration() {
     // Create a new hypergraph.
-    let mut graph = Hypergraph::<Vertex, HyperEdge>::new();
+    let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
 
     // Create some vertice weights.
-    let vertex_one = Vertex::new("one", 1);
-    let vertex_two = Vertex::new("two", 1);
-    let vertex_three = Vertex::new("three", 1);
-    let vertex_four = Vertex::new("four", 1);
-    let vertex_five = Vertex::new("five", 1);
+    let vertex_one = Vertex::new("one");
+    let vertex_two = Vertex::new("two");
+    let vertex_three = Vertex::new("three");
+    let vertex_four = Vertex::new("four");
+    let vertex_five = Vertex::new("five");
 
     // Create some hyperedge weights.
-    let hyperedge_one = HyperEdge::new("one", 10);
-    let hyperedge_two = HyperEdge::new("two", 20);
-    let hyperedge_three = HyperEdge::new("three", 1);
-    let hyperedge_four = HyperEdge::new("four", 100);
+    let hyperedge_one = Hyperedge::new("one", 10);
+    let hyperedge_two = Hyperedge::new("two", 20);
+    let hyperedge_three = Hyperedge::new("three", 1);
+    let hyperedge_four = Hyperedge::new("four", 100);
 
     // Create some vertices.
     let a = graph.add_vertex(vertex_one).unwrap();

@@ -1,11 +1,11 @@
-use crate::{errors::HypergraphError, Hypergraph, SharedTrait, VertexIndex};
+use crate::{errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait};
 
 use indexmap::IndexSet;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Adds a vertex with a custom weight to the hypergraph.
     /// Returns the index of the vertex.

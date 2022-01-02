@@ -1,13 +1,14 @@
 use crate::{
-    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait, VertexIndex,
+    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex,
+    VertexTrait,
 };
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets the intersections of a set of hyperedges as a vector of vertices.
     pub fn get_hyperedges_intersections(

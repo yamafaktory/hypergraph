@@ -3,36 +3,36 @@
 
 mod common;
 
-use common::{HyperEdge, Vertex};
+use common::{Hyperedge, Vertex};
 use hypergraph::{errors::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
 
 #[test]
 fn integration_contration() {
     // Create a new hypergraph.
-    let mut graph = Hypergraph::<Vertex, HyperEdge>::new();
+    let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
 
     // Create some vertices.
-    let a = graph.add_vertex(Vertex::new("a", 1)).unwrap();
-    let b = graph.add_vertex(Vertex::new("b", 1)).unwrap();
-    let c = graph.add_vertex(Vertex::new("c", 1)).unwrap();
-    let d = graph.add_vertex(Vertex::new("d", 1)).unwrap();
-    let e = graph.add_vertex(Vertex::new("e", 1)).unwrap();
+    let a = graph.add_vertex(Vertex::new("a")).unwrap();
+    let b = graph.add_vertex(Vertex::new("b")).unwrap();
+    let c = graph.add_vertex(Vertex::new("c")).unwrap();
+    let d = graph.add_vertex(Vertex::new("d")).unwrap();
+    let e = graph.add_vertex(Vertex::new("e")).unwrap();
 
     // Create some hyperedges.
     let alpha = graph
-        .add_hyperedge(vec![a, b, c, d, e], HyperEdge::new("α", 1))
+        .add_hyperedge(vec![a, b, c, d, e], Hyperedge::new("α", 1))
         .unwrap();
     let beta = graph
-        .add_hyperedge(vec![a, c, d, e, c], HyperEdge::new("β", 1))
+        .add_hyperedge(vec![a, c, d, e, c], Hyperedge::new("β", 1))
         .unwrap();
     let gamma = graph
-        .add_hyperedge(vec![a, e, b], HyperEdge::new("γ", 1))
+        .add_hyperedge(vec![a, e, b], Hyperedge::new("γ", 1))
         .unwrap();
     let delta = graph
-        .add_hyperedge(vec![b, c, b, d, c], HyperEdge::new("δ", 1))
+        .add_hyperedge(vec![b, c, b, d, c], Hyperedge::new("δ", 1))
         .unwrap();
     let epsilon = graph
-        .add_hyperedge(vec![c, c, c], HyperEdge::new("ε", 1))
+        .add_hyperedge(vec![c, c, c], Hyperedge::new("ε", 1))
         .unwrap();
 
     // In the alpha hyperedge, contract the vertices b and c into one single vertex b.

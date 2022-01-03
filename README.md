@@ -8,17 +8,22 @@ Hypergraph is a data structure library to generate **directed** [hypergraphs](ht
 
 A hypergraph is a generalization of a graph in which a hyperedge can join any number of vertices.
 
+## 📣 Goal
+
+This library aims at providing the necessary methods for modeling complex, multiway (non-pairwise) relational data found in complex networks.
+One of the main advantages of using a hypergraph model over a graph one is to provide a more flexible and natural framework to represent entities and their relationships (e.g. Alice uses some social network, shares some data to Bob, who shares it to Carol, etc).
+
 ## 🎁 Features
 
-This library enables you to:
+This library enables you to represent:
 
-- represent **non-simple** hypergraphs with two or more hyperedges - with different weights - containing the exact same set of vertices
-- represent **self-loops** - i.e., hyperedges containing vertices directed to themselves one or more times
-- represent **unaries** - i.e., hyperedges containing a unique vertex
+- **non-simple** hypergraphs with two or more hyperedges - with different weights - containing the exact same set of vertices
+- **self-loops** - i.e., hyperedges containing vertices directed to themselves one or more times
+- **unaries** - i.e., hyperedges containing a unique vertex
 
-Additional features:
+## ⚗️ Implementation
 
-- Safe Rust implementation
+- 100% safe Rust
 - Proper error handling
 - Stable indexes assigned for each hyperedge and each vertex
 

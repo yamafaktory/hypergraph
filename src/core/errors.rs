@@ -1,4 +1,4 @@
-use crate::{HyperedgeIndex, SharedTrait, VertexIndex};
+use crate::{HyperedgeIndex, VertexIndex};
 
 use thiserror::Error;
 
@@ -6,8 +6,8 @@ use thiserror::Error;
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum HypergraphError<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: Copy + Eq,
+    HE: Copy + Eq,
 {
     /// Error when a HyperedgeIndex was not found.
     #[error("HyperedgeIndex {0} was not found")]

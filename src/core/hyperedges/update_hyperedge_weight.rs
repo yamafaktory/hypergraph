@@ -1,9 +1,11 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeKey, Hypergraph, SharedTrait};
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexTrait,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Updates the weight of a hyperedge by index.
     pub fn update_hyperedge_weight(

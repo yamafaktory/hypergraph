@@ -1,11 +1,13 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait, VertexIndex};
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+};
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets the hyperedges of a vertex as a vector of HyperedgeIndex.
     pub fn get_vertex_hyperedges(

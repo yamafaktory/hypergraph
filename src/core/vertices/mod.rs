@@ -9,6 +9,8 @@ pub mod count_vertices;
 pub mod get_adjacent_vertices_from;
 pub mod get_adjacent_vertices_to;
 pub mod get_dijkstra_connections;
+pub mod get_full_adjacent_vertices_from;
+pub mod get_full_adjacent_vertices_to;
 pub mod get_full_vertex_hyperedges;
 pub mod get_vertex_degree_in;
 pub mod get_vertex_degree_out;

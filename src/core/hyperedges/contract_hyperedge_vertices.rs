@@ -1,14 +1,14 @@
 use crate::{
-    core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, Hypergraph,
-    SharedTrait, VertexIndex,
+    core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait,
+    Hypergraph, VertexIndex, VertexTrait,
 };
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Contracts a set of the vertices of a hyperedge into one single vertex.
     /// Returns the updated vertices.

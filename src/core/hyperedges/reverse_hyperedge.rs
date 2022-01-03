@@ -1,11 +1,11 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait};
+use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     // Reverses a hyperedge.
     pub fn reverse_hyperedge(

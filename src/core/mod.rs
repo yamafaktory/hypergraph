@@ -9,17 +9,24 @@ mod utils;
 pub mod vertices;
 
 use bi_hash_map::BiHashMap;
+
 use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt::{Debug, Display, Formatter, Result},
     hash::Hash,
 };
 
-/// Shared Trait for hyperedges and vertices.
+/// Shared Trait for the vertices.
 /// Must be implemented to use the library.
-pub trait SharedTrait: Copy + Debug + Display + Eq + Hash {}
+pub trait VertexTrait: Copy + Debug + Display + Eq + Hash {}
 
-impl<T> SharedTrait for T where T: Copy + Debug + Display + Eq + Hash {}
+impl<T> VertexTrait for T where T: Copy + Debug + Display + Eq + Hash {}
+
+/// Shared Trait for the hyperedges.
+/// Must be implemented to use the library.
+pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
+
+impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 
 /// Vertex stable index representation as usize.
 /// Uses the newtype index pattern.
@@ -29,7 +36,13 @@ pub struct VertexIndex(pub usize);
 
 impl Display for VertexIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self)
+    }
+}
+
+impl From<usize> for VertexIndex {
+    fn from(index: usize) -> Self {
+        VertexIndex(index)
     }
 }
 
@@ -40,6 +53,12 @@ pub struct HyperedgeIndex(pub usize);
 impl Display for HyperedgeIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<usize> for HyperedgeIndex {
+    fn from(index: usize) -> Self {
+        HyperedgeIndex(index)
     }
 }
 
@@ -82,7 +101,11 @@ pub struct Hypergraph<V, HE> {
     vertices_count: usize,
 }
 
-impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
+impl<V, HE> Debug for Hypergraph<V, HE>
+where
+    V: Eq + Hash + Debug,
+    HE: Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("Hypergraph")
             .field("vertices", &self.vertices)
@@ -93,8 +116,8 @@ impl<V: Eq + Hash + Debug, HE: Debug> Debug for Hypergraph<V, HE> {
 
 impl<V, HE> Default for Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     fn default() -> Self {
         Hypergraph::new()
@@ -104,8 +127,8 @@ where
 /// Hypergraph implementations.
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Clears the hypergraph.
     pub fn clear(&mut self) {

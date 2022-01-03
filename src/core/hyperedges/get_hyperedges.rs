@@ -1,9 +1,9 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, Hypergraph, SharedTrait};
+use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     // Private method to get a vector of HyperedgeIndex from a vector of internal indexes.
     pub(crate) fn get_hyperedges(

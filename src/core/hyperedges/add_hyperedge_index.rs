@@ -1,9 +1,9 @@
-use crate::{HyperedgeIndex, Hypergraph, SharedTrait};
+use crate::{HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     // This private method is infallible since adding the same hyperedge
     // will return the existing index.

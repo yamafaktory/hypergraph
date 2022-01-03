@@ -1,14 +1,14 @@
 use crate::{
     core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeKey,
-    Hypergraph, SharedTrait, VertexIndex,
+    HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
 };
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Updates the vertices of a hyperedge by index.
     pub fn update_hyperedge_vertices(

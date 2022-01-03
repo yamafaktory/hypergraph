@@ -1,15 +1,15 @@
 #![deny(unsafe_code, nonstandard_style)]
-#![forbid(rust_2018_idioms)]
+#![forbid(rust_2021_compatibility)]
 
 mod common;
 
-use common::Vertex;
+use common::{Hyperedge, Vertex};
 use hypergraph::{errors::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
 
 #[test]
 fn integration() {
     // Create a new hypergraph.
-    let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
+    let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
 
     // Create some vertices.
     let andrea = Vertex::new("Andrea");
@@ -62,7 +62,7 @@ fn integration() {
                 VertexIndex(1),
                 VertexIndex(3)
             ],
-            "pass the pink ball"
+            Hyperedge::new("pass the pink ball", 1)
         ),
         Ok(HyperedgeIndex(0)),
         "should add a first hyperedge which contains a self-loop on the VertexIndex 1"
@@ -75,7 +75,7 @@ fn integration() {
                 VertexIndex(1),
                 VertexIndex(3)
             ],
-            "pass the yellow ball",
+            Hyperedge::new("pass the yellow ball", 1),
         ),
         Ok(HyperedgeIndex(1)),
         "should add a second hyperedge which contains the same vertices as the first one"
@@ -88,36 +88,44 @@ fn integration() {
                 VertexIndex(3),
                 VertexIndex(2)
             ],
-            "share the \"The Disordered Cosmos: A Journey into Dark Matter, Spacetime, and Dreams Deferred\" book"
+            Hyperedge::new("share the \"The Disordered Cosmos: A Journey into Dark Matter, Spacetime, and Dreams Deferred\" book", 2)
         ),
         Ok(HyperedgeIndex(2)),
         "should add a third hyperedge which is unique"
     );
     assert_eq!(
-        graph.add_hyperedge(vec![VertexIndex(3)], "meditate like a Jedi"),
+        graph.add_hyperedge(
+            vec![VertexIndex(3)],
+            Hyperedge::new("meditate like a Jedi", 10)
+        ),
         Ok(HyperedgeIndex(3)),
         "should add a fourth hyperedge which contains a unary"
     );
     assert_eq!(
-        graph.add_hyperedge(vec![VertexIndex(3)], "meditate like a Jedi"),
+        graph.add_hyperedge(
+            vec![VertexIndex(3)],
+            Hyperedge::new("meditate like a Jedi", 10)
+        ),
         Err(HypergraphError::HyperedgeWeightAlreadyAssigned(
-            "meditate like a Jedi"
+            Hyperedge::new("meditate like a Jedi", 10)
         )),
         "should return an explicit error since this weight is already in use"
     );
     assert_eq!(
-        graph.add_hyperedge(vec![VertexIndex(3)], "work out"), 
+        graph.add_hyperedge(vec![VertexIndex(3)], Hyperedge::new("work out", 20)), 
         Ok(HyperedgeIndex(4)),
         "should add a fifth hyperedge which contains the same unary as the fourth one but with a different weight"
     );
     assert_eq!(
-        graph.add_hyperedge(vec![VertexIndex(9)], "nope"),
+        graph.add_hyperedge(vec![VertexIndex(9)], Hyperedge::new("nope", 0)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(9))),
         "should be out-of-bound and return an explicit error"
     );
     assert_eq!(
-        graph.add_hyperedge(vec![], "nope"),
-        Err(HypergraphError::HyperedgeCreationNoVertices("nope")),
+        graph.add_hyperedge(vec![], Hyperedge::new("nope", 0)),
+        Err(HypergraphError::HyperedgeCreationNoVertices(
+            Hyperedge::new("nope", 0)
+        )),
         "should return an explicit error since the vertices are missing"
     );
 
@@ -144,12 +152,12 @@ fn integration() {
     // Get the weights of some hyperedges.
     assert_eq!(
         graph.get_hyperedge_weight(HyperedgeIndex(0)),
-        Ok("pass the pink ball"),
+        Ok(Hyperedge::new("pass the pink ball", 1)),
         "should get the weight of the first hyperedge"
     );
     assert_eq!(
         graph.get_hyperedge_weight(HyperedgeIndex(4)),
-        Ok("work out"),
+        Ok(Hyperedge::new("work out", 20)),
         "should get the weight of the fifth hyperedge"
     );
     assert_eq!(
@@ -375,16 +383,43 @@ fn integration() {
         Ok(vec![VertexIndex(1), VertexIndex(3)])
     );
     assert_eq!(
+        graph.get_full_adjacent_vertices_from(VertexIndex(0)),
+        Ok(vec![
+            (VertexIndex(1), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+            (VertexIndex(3), vec![HyperedgeIndex(2)]),
+        ])
+    );
+    assert_eq!(
         graph.get_adjacent_vertices_from(VertexIndex(1)),
         Ok(vec![VertexIndex(1), VertexIndex(3)])
     );
+    assert_eq!(
+        graph.get_full_adjacent_vertices_from(VertexIndex(1)),
+        Ok(vec![
+            (VertexIndex(1), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+            (VertexIndex(3), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+        ])
+    );
     assert_eq!(graph.get_adjacent_vertices_from(VertexIndex(2)), Ok(vec![]));
+    assert_eq!(
+        graph.get_full_adjacent_vertices_from(VertexIndex(2)),
+        Ok(vec![])
+    );
     assert_eq!(
         graph.get_adjacent_vertices_from(VertexIndex(3)),
         Ok(vec![VertexIndex(2)])
     );
     assert_eq!(
+        graph.get_full_adjacent_vertices_from(VertexIndex(3)),
+        Ok(vec![(VertexIndex(2), vec![HyperedgeIndex(2)])])
+    );
+    assert_eq!(
         graph.get_adjacent_vertices_from(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and return an explicit error"
+    );
+    assert_eq!(
+        graph.get_full_adjacent_vertices_from(VertexIndex(5)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
         "should be out-of-bound and return an explicit error"
     );
@@ -395,19 +430,49 @@ fn integration() {
         Ok(vec![VertexIndex(4)])
     );
     assert_eq!(
+        graph.get_full_adjacent_vertices_to(VertexIndex(3)),
+        Ok(vec![
+            (VertexIndex(1), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+            (VertexIndex(0), vec![HyperedgeIndex(2)]),
+        ])
+    );
+    assert_eq!(
         graph.get_adjacent_vertices_to(VertexIndex(1)),
         Ok(vec![VertexIndex(0), VertexIndex(1)])
+    );
+    assert_eq!(
+        graph.get_full_adjacent_vertices_to(VertexIndex(1)),
+        Ok(vec![
+            (VertexIndex(0), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+            (VertexIndex(1), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+        ])
     );
     assert_eq!(
         graph.get_adjacent_vertices_to(VertexIndex(2)),
         Ok(vec![VertexIndex(3)])
     );
     assert_eq!(
+        graph.get_full_adjacent_vertices_to(VertexIndex(2)),
+        Ok(vec![(VertexIndex(3), vec![HyperedgeIndex(2)])])
+    );
+    assert_eq!(
         graph.get_adjacent_vertices_to(VertexIndex(3)),
         Ok(vec![VertexIndex(0), VertexIndex(1)])
     );
     assert_eq!(
+        graph.get_full_adjacent_vertices_to(VertexIndex(3)),
+        Ok(vec![
+            (VertexIndex(1), vec![HyperedgeIndex(0), HyperedgeIndex(1)]),
+            (VertexIndex(0), vec![HyperedgeIndex(2)])
+        ])
+    );
+    assert_eq!(
         graph.get_adjacent_vertices_to(VertexIndex(5)),
+        Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
+        "should be out-of-bound and return an explicit error"
+    );
+    assert_eq!(
+        graph.get_full_adjacent_vertices_to(VertexIndex(5)),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(5))),
         "should be out-of-bound and return an explicit error"
     );
@@ -415,12 +480,19 @@ fn integration() {
     // Get some paths via Dijkstra.
     assert_eq!(
         graph.get_dijkstra_connections(VertexIndex(4), VertexIndex(1)),
-        Ok(vec![VertexIndex(4), VertexIndex(0), VertexIndex(1),]),
+        Ok(vec![
+            (VertexIndex(4), None),
+            (VertexIndex(0), Some(HyperedgeIndex(2))),
+            (VertexIndex(1), Some(HyperedgeIndex(0)))
+        ]),
         "should get a path of three vertices"
     );
     assert_eq!(
         graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(3)),
-        Ok(vec![VertexIndex(0), VertexIndex(3)]),
+        Ok(vec![
+            (VertexIndex(0), None),
+            (VertexIndex(3), Some(HyperedgeIndex(2)))
+        ]),
         "should get a path of two vertices"
     );
     assert_eq!(
@@ -430,12 +502,12 @@ fn integration() {
     );
     assert_eq!(
         graph.get_dijkstra_connections(VertexIndex(1), VertexIndex(1)),
-        Ok(vec![VertexIndex(1)]),
+        Ok(vec![(VertexIndex(1), None)]),
         "should get a path of one vertex"
     );
     assert_eq!(
         graph.get_dijkstra_connections(VertexIndex(3), VertexIndex(3)),
-        Ok(vec![VertexIndex(3)]),
+        Ok(vec![(VertexIndex(3), None)]),
         "should get a path of one vertex"
     );
     assert_eq!(
@@ -458,13 +530,13 @@ fn integration() {
     // First case: the index is the last one, no internal index alteration
     // occurs.
     assert_eq!(
-        graph.update_hyperedge_weight(HyperedgeIndex(4), "sleep"),
+        graph.update_hyperedge_weight(HyperedgeIndex(4), Hyperedge::new("sleep", 0)),
         Ok(()),
         "should update the weight of the fifth hyperedge"
     );
     assert_eq!(
         graph.get_hyperedge_weight(HyperedgeIndex(4)),
-        Ok("sleep"),
+        Ok(Hyperedge::new("sleep", 0)),
         "should get the new weight of the fifth hyperedge"
     );
     assert_eq!(
@@ -475,13 +547,13 @@ fn integration() {
     // Second case: the index is not the last one, an internal index alteration
     // occurs but is anyway fixed by the insertion.
     assert_eq!(
-        graph.update_hyperedge_weight(HyperedgeIndex(0), "pass the purple ball"),
+        graph.update_hyperedge_weight(HyperedgeIndex(0), Hyperedge::new("pass the purple ball", 3)),
         Ok(()),
         "should update the weight of the first hyperedge"
     );
     assert_eq!(
         graph.get_hyperedge_weight(HyperedgeIndex(0)),
-        Ok("pass the purple ball"),
+        Ok(Hyperedge::new("pass the purple ball", 3)),
         "should get the new weight of the first hyperedge"
     );
     assert_eq!(
@@ -491,17 +563,20 @@ fn integration() {
     );
     // Check the eventual errors.
     assert_eq!(
-        graph.update_hyperedge_weight(HyperedgeIndex(0), "pass the purple ball"),
+        graph.update_hyperedge_weight(HyperedgeIndex(0), Hyperedge::new("pass the purple ball", 3)),
         Err(HypergraphError::HyperedgeWeightUnchanged {
             index: HyperedgeIndex(0),
-            weight: "pass the purple ball"
+            weight: Hyperedge::new("pass the purple ball", 3)
         }),
         "should return an explicit error since this weight has not changed"
     );
     assert_eq!(
-        graph.update_hyperedge_weight(HyperedgeIndex(0), "meditate like a Jedi"),
+        graph.update_hyperedge_weight(
+            HyperedgeIndex(0),
+            Hyperedge::new("meditate like a Jedi", 10)
+        ),
         Err(HypergraphError::HyperedgeWeightAlreadyAssigned(
-            "meditate like a Jedi"
+            Hyperedge::new("meditate like a Jedi", 10)
         )),
         "should return an explicit error since this weight is already assigned"
     );

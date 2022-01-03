@@ -1,5 +1,5 @@
 #![deny(unsafe_code, nonstandard_style)]
-#![forbid(rust_2018_idioms)]
+#![forbid(rust_2021_compatibility)]
 #![warn(missing_debug_implementations, missing_docs, unreachable_pub)]
 
 //! Hypergraph is data structure library to generate directed [hypergraphs](https://en.wikipedia.org/wiki/Hypergraph).
@@ -22,7 +22,8 @@
 //!
 //! ## Example
 //!
-//! Please notice that the hyperedges and the vertices must implement the [SharedTrait](crate::SharedTrait).
+//! Please notice that the hyperedges and the vertices must implement the
+//! [HyperedgeTrait](crate::HyperedgeTrait) and the [VertexTrait](crate::VertexTrait) respectively.
 //!
 //! ```
 //! use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
@@ -30,7 +31,7 @@
 //!
 //! // Create a new struct to represent a vertex.
 //! #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-//! struct Vertex<'a> {
+//! pub struct Vertex<'a> {
 //!     name: &'a str,
 //! }
 //!
@@ -43,11 +44,36 @@
 //! impl<'a> Display for Vertex<'a> {
 //!     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 //!         write!(f, "{}", self)
-//!   }
+//!     }
+//! }
+//!
+//! // Create a new struct to represent a hyperedge.
+//! #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+//! pub struct Hyperedge<'a> {
+//!     cost: usize,
+//!     name: &'a str,
+//! }
+//!
+//! impl<'a> Hyperedge<'a> {
+//!     pub fn new(name: &'a str, cost: usize) -> Self {
+//!         Hyperedge { cost, name }
+//!     }
+//! }
+//!
+//! impl<'a> Display for Hyperedge<'a> {
+//!     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+//!         write!(f, "{}", self)
+//!     }
+//! }
+//!
+//! impl<'a> Into<usize> for Hyperedge<'a> {
+//!     fn into(self) -> usize {
+//!         self.cost
+//!     }
 //! }
 //!
 //! fn main() -> std::result::Result<(),  Box<dyn std::error::Error>> {
-//!     let mut graph = Hypergraph::<Vertex<'_>, &str>::new();
+//!     let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
 //!
 //!     // Add some vertices to the graph.
 //!     let ava = graph.add_vertex(Vertex::new("Ava"))?;
@@ -69,18 +95,18 @@
 //!     assert_eq!(graph.count_vertices(), 7);
 //!
 //!     // Add some hyperedges to the graph.
-//!     let first_hyperedge = graph.add_hyperedge(vec![faarooq, ava, ghanda], "share a viral video with a cat")?;
-//!     let second_hyperedge = graph.add_hyperedge(vec![faarooq, ava, ghanda], "share a viral video with a dog")?;
-//!     let third_hyperedge = graph.add_hyperedge(vec![ewan, ava, bianca], "share a viral video with a beaver")?;
-//!     let fourth_hyperedge = graph.add_hyperedge(vec![daena], "play online")?;
-//!     let fifth_hyperedge = graph.add_hyperedge(vec![ewan, charles, bianca, bianca, ewan], "pass the ball")?;
+//!     let first_hyperedge = graph.add_hyperedge(vec![faarooq, ava, ghanda], Hyperedge::new("share a viral video with a cat", 1))?;
+//!     let second_hyperedge = graph.add_hyperedge(vec![faarooq, ava, ghanda], Hyperedge::new("share a viral video with a dog", 1))?;
+//!     let third_hyperedge = graph.add_hyperedge(vec![ewan, ava, bianca], Hyperedge::new("share a viral video with a beaver", 1))?;
+//!     let fourth_hyperedge = graph.add_hyperedge(vec![daena], Hyperedge::new("play online", 1))?;
+//!     let fifth_hyperedge = graph.add_hyperedge(vec![ewan, charles, bianca, bianca, ewan], Hyperedge::new("pass the ball", 1))?;
 //!
 //!     // Each hyperedge gets a unique index by insertion order.
 //!     assert_eq!(first_hyperedge, HyperedgeIndex(0));
 //!     assert_eq!(fifth_hyperedge, HyperedgeIndex(4));
 //!
 //!     // Get the weight of a hyperedge.
-//!     assert_eq!(graph.get_hyperedge_weight(HyperedgeIndex(0)), Ok("share a viral video with a cat"));
+//!     assert_eq!(graph.get_hyperedge_weight(HyperedgeIndex(0)), Ok(Hyperedge::new("share a viral video with a cat", 1)));
 //!
 //!     // Get the vertices of a hyperedge.
 //!     assert_eq!(graph.get_hyperedge_vertices(HyperedgeIndex(0)), Ok(vec![faarooq, ava, ghanda]));
@@ -105,13 +131,13 @@
 //!     assert_eq!(graph.get_adjacent_vertices_to(VertexIndex(0)), Ok(vec![ewan, faarooq]));
 //!
 //!     // Find the shortest paths between some vertices.
-//!     assert_eq!(graph.get_dijkstra_connections(faarooq, bianca), Ok(vec![faarooq, ava, bianca]));
+//!     assert_eq!(graph.get_dijkstra_connections(faarooq, bianca), Ok(vec![(faarooq, None), (ava, Some(first_hyperedge)), (bianca, Some(third_hyperedge))]));
 //!
 //!     // Update the weight of a vertex.
 //!     graph.update_vertex_weight(ava, Vertex::new("Avā"))?;
 //!     
 //!     // Update the weight of a hyperedge.
-//!     graph.update_hyperedge_weight(third_hyperedge, "share a viral video with a capybara")?;
+//!     graph.update_hyperedge_weight(third_hyperedge, Hyperedge::new("share a viral video with a capybara", 1))?;
 //!
 //!     // Update the vertices of a hyperedge.
 //!     graph.update_hyperedge_vertices(third_hyperedge, vec![ewan, ava, daena])?;

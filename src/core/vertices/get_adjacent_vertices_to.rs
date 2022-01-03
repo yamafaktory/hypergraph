@@ -1,13 +1,14 @@
 use crate::{
-    core::shared::Connection, errors::HypergraphError, Hypergraph, SharedTrait, VertexIndex,
+    core::shared::Connection, errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex,
+    VertexTrait,
 };
 
 use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: SharedTrait,
-    HE: SharedTrait,
+    V: VertexTrait,
+    HE: HyperedgeTrait,
 {
     /// Gets the list of all vertices connected to a given vertex.
     pub fn get_adjacent_vertices_to(

@@ -6,6 +6,7 @@ use crate::{
 use indexmap::IndexMap;
 use itertools::{fold, Itertools};
 
+#[allow(clippy::type_complexity)]
 impl<V, HE> Hypergraph<V, HE>
 where
     V: VertexTrait,
@@ -23,8 +24,8 @@ where
             results,
             IndexMap::<VertexIndex, Vec<HyperedgeIndex>>::new(),
             |mut acc, (hyperedge_index, vertex_index)| {
-                if vertex_index.is_some() {
-                    let hyperedges = acc.entry(vertex_index.unwrap()).or_insert(vec![]);
+                if let Some(index) = vertex_index {
+                    let hyperedges = acc.entry(index).or_insert(vec![]);
 
                     hyperedges.push(hyperedge_index);
                 }

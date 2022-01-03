@@ -46,12 +46,6 @@ impl From<usize> for VertexIndex {
     }
 }
 
-impl Into<usize> for VertexIndex {
-    fn into(self) -> usize {
-        self.0
-    }
-}
-
 /// Hyperedge stable index representation as usize.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HyperedgeIndex(pub usize);
@@ -68,11 +62,6 @@ impl From<usize> for HyperedgeIndex {
     }
 }
 
-impl Into<usize> for HyperedgeIndex {
-    fn into(self) -> usize {
-        self.0
-    }
-}
 /// A HyperedgeKey is a representation of both the vertices and the weight
 /// of a hyperedge, used as a key in the hyperedges set.
 /// In a non-simple hypergraph, since the same vertices can be shared by

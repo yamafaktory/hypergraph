@@ -38,6 +38,7 @@ impl PartialOrd for Visitor {
     }
 }
 
+#[allow(clippy::type_complexity)]
 impl<V, HE> Hypergraph<V, HE>
 where
     V: VertexTrait,
@@ -90,7 +91,7 @@ where
                             vertex_index,
                             maybe_traversed_hyperedge_by_vertex
                                 .get(&vertex_index)
-                                .map_or(None, |&current| current),
+                                .and_then(|&current| current),
                         )
                     })
                     .collect_vec());

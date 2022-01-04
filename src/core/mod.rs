@@ -85,12 +85,12 @@ pub struct Hypergraph<V, HE> {
     /// Vertices are stored as a map whose unique keys are the weights
     /// and the values are a set of the hyperedges indexes which include
     // the current vertex.
-    pub vertices: IndexMap<V, IndexSet<usize>>,
+    vertices: IndexMap<V, IndexSet<usize>>,
 
     /// Hyperedges are stored as a set whose unique keys are a combination of
     /// vertices indexes and a weight. Two or more hyperedges can contain
     /// the exact same vertices (non-simple hypergraph).
-    pub hyperedges: IndexSet<HyperedgeKey<HE>>,
+    hyperedges: IndexSet<HyperedgeKey<HE>>,
 
     // Bi-directional maps for hyperedges and vertices.
     hyperedges_mapping: BiHashMap<HyperedgeIndex>,

@@ -7,7 +7,7 @@ use common::{Hyperedge, Vertex};
 use hypergraph::Hypergraph;
 
 #[test]
-fn integration() {
+fn integration_dijkstra() {
     // Create a new hypergraph.
     let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
 

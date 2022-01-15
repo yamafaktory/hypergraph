@@ -3,17 +3,23 @@ pub(crate) mod bi_hash_map;
 pub mod errors;
 #[doc(hidden)]
 pub mod hyperedges;
+mod indexes;
+#[doc(hidden)]
+pub mod iterator;
 mod shared;
 mod utils;
 #[doc(hidden)]
 pub mod vertices;
 
 use bi_hash_map::BiHashMap;
+// Reexport indexes at this level.
+pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
 
 use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt::{Debug, Display, Formatter, Result},
     hash::Hash,
+    ops::Deref,
 };
 
 /// Shared Trait for the vertices.
@@ -28,47 +34,13 @@ pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
 
 impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 
-/// Vertex stable index representation as usize.
-/// Uses the newtype index pattern.
-/// <https://matklad.github.io/2018/06/04/newtype-index-pattern.html>
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct VertexIndex(pub usize);
-
-impl Display for VertexIndex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self)
-    }
-}
-
-impl From<usize> for VertexIndex {
-    fn from(index: usize) -> Self {
-        VertexIndex(index)
-    }
-}
-
-/// Hyperedge stable index representation as usize.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct HyperedgeIndex(pub usize);
-
-impl Display for HyperedgeIndex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<usize> for HyperedgeIndex {
-    fn from(index: usize) -> Self {
-        HyperedgeIndex(index)
-    }
-}
-
 /// A HyperedgeKey is a representation of both the vertices and the weight
 /// of a hyperedge, used as a key in the hyperedges set.
 /// In a non-simple hypergraph, since the same vertices can be shared by
 /// different hyperedges, the weight is also included in the key to keep
 /// it unique.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct HyperedgeKey<HE> {
+pub(crate) struct HyperedgeKey<HE> {
     vertices: Vec<usize>,
     weight: HE,
 }
@@ -77,6 +49,14 @@ impl<HE> HyperedgeKey<HE> {
     /// Creates a new HyperedgeKey from the given vertices and weight.
     pub(crate) fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
         Self { vertices, weight }
+    }
+}
+
+impl<HE> Deref for HyperedgeKey<HE> {
+    type Target = HE;
+
+    fn deref(&self) -> &HE {
+        &self.weight
     }
 }
 

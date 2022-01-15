@@ -121,7 +121,7 @@ where
 
                     // Use the trait implementation to get the associated cost
                     // of the hyperedge.
-                    let cost = hyperedge_weight.into();
+                    let cost = hyperedge_weight.to_owned().into();
 
                     if cost < min_cost {
                         min_cost = cost;

@@ -9,12 +9,12 @@ where
     pub fn get_vertex_weight(
         &self,
         vertex_index: VertexIndex,
-    ) -> Result<V, HypergraphError<V, HE>> {
+    ) -> Result<&V, HypergraphError<V, HE>> {
         let internal_index = self.get_internal_vertex(vertex_index)?;
 
         self.vertices
             .get_index(internal_index)
-            .map(|(weight, _)| *weight)
+            .map(|(weight, _)| weight)
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))
     }
 }

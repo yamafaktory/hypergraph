@@ -200,7 +200,7 @@ dependencies = [
 
 [[package]]
 name = "hypergraph"
-version = "1.1.1-alpha.0"
+version = "1.1.1"
 dependencies = [
  "criterion",
  "indexmap",

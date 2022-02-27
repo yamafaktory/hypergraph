@@ -37,8 +37,8 @@ impl<'a> Display for Hyperedge<'a> {
     }
 }
 
-impl<'a> Into<usize> for Hyperedge<'a> {
-    fn into(self) -> usize {
-        self.cost
+impl<'a> From<Hyperedge<'a>> for usize {
+    fn from(Hyperedge { cost, .. }: Hyperedge<'a>) -> Self {
+        cost
     }
 }

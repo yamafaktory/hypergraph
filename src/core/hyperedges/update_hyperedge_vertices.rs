@@ -1,9 +1,9 @@
+use rayon::prelude::*;
+
 use crate::{
     core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeKey,
     HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
 };
-
-use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -42,11 +42,11 @@ where
         }
 
         // Find the vertices which have been added.
-        let added = internal_vertices
-            .iter()
-            .fold(vec![], |mut acc: Vec<usize>, index| {
+        let mut added = internal_vertices
+            .par_iter()
+            .fold_with(vec![], |mut acc: Vec<usize>, index| {
                 if !previous_vertices
-                    .iter()
+                    .par_iter()
                     .any(|current_index| current_index == index)
                 {
                     acc.push(*index)
@@ -54,27 +54,29 @@ where
 
                 acc
             })
-            .into_iter()
-            .sorted()
-            .dedup()
-            .collect_vec();
+            .flatten()
+            .collect::<Vec<usize>>();
+
+        added.par_sort_unstable();
+        added.dedup();
 
         // Find the vertices which have been removed.
-        let removed = previous_vertices
-            .iter()
+        let mut removed = previous_vertices
+            .into_par_iter()
             .filter_map(|index| {
                 if !internal_vertices
-                    .iter()
-                    .any(|current_index| index == current_index)
+                    .par_iter()
+                    .any(|current_index| index == *current_index)
                 {
-                    Some(*index)
+                    Some(index)
                 } else {
                     None
                 }
             })
-            .sorted()
-            .dedup()
-            .collect_vec();
+            .collect::<Vec<usize>>();
+
+        removed.par_sort_unstable();
+        removed.dedup();
 
         // Update the added vertices.
         for index in added.into_iter() {

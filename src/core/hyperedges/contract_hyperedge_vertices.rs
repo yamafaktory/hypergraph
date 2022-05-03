@@ -1,9 +1,10 @@
+use itertools::Itertools;
+use rayon::prelude::*;
+
 use crate::{
     core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait,
     Hypergraph, VertexIndex, VertexTrait,
 };
-
-use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -23,34 +24,41 @@ where
         let hyperedge_vertices = self.get_hyperedge_vertices(hyperedge_index)?;
 
         // Get the deduped vertices.
-        let deduped_vertices = vertices.iter().sorted().dedup().collect_vec();
+        // We use `par_sort_unstable` here which means that the order of equal
+        // elements is not preserved but this is fine since we dedupe them
+        // afterwards.
+        let mut deduped_vertices = vertices;
+
+        deduped_vertices.par_sort_unstable();
+        deduped_vertices.dedup();
 
         // Check that the target is included in the deduped vertices.
         if !deduped_vertices
-            .iter()
-            .any(|&current_index| current_index == &target)
+            .par_iter()
+            .any(|&current_index| current_index == target)
         {
             return Err(HypergraphError::HyperedgeInvalidContraction {
                 index: hyperedge_index,
                 target,
-                vertices: deduped_vertices.into_iter().cloned().collect(),
+                vertices: deduped_vertices,
             });
         }
 
         // Get the vertices not found in the hyperedge.
-        let vertices_not_found =
-            deduped_vertices
-                .iter()
-                .fold(vec![], |mut acc: Vec<VertexIndex>, &index| {
-                    if !hyperedge_vertices
-                        .iter()
-                        .any(|&current_index| current_index == *index)
-                    {
-                        acc.push(index.to_owned())
-                    }
+        let vertices_not_found = deduped_vertices
+            .par_iter()
+            .fold_with(vec![], |mut acc: Vec<VertexIndex>, &index| {
+                if !hyperedge_vertices
+                    .par_iter()
+                    .any(|&current_index| current_index == index)
+                {
+                    acc.push(index.to_owned())
+                }
 
-                    acc
-                });
+                acc
+            })
+            .flatten()
+            .collect::<Vec<VertexIndex>>();
 
         // Check that all the vertices - target included - are a subset of
         // the current hyperedge's vertices.
@@ -67,7 +75,7 @@ where
         // Iterate over all the deduped vertices.
         for &vertex in deduped_vertices.iter() {
             // Safely get the hyperedges of the current vertex.
-            let mut vertex_hyperedges = self.get_vertex_hyperedges(*vertex)?;
+            let mut vertex_hyperedges = self.get_vertex_hyperedges(vertex)?;
 
             // Concatenate them to the global ones.
             all_hyperedges.append(&mut vertex_hyperedges);
@@ -83,8 +91,8 @@ where
                 // First remap each vertex to itself or to the target.
                 .map(|vertex| {
                     if deduped_vertices
-                        .iter()
-                        .any(|&current_index| current_index == vertex)
+                        .par_iter()
+                        .any(|&current_index| current_index == *vertex)
                     {
                         target
                     } else {

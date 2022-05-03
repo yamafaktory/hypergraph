@@ -1,6 +1,6 @@
-use crate::{HyperedgeIndex, VertexIndex};
-
 use thiserror::Error;
+
+use crate::{HyperedgeIndex, VertexIndex};
 
 /// Enumeration of all the possible errors.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -45,7 +45,9 @@ where
     },
 
     /// Error when a hyperedge contraction is invalid.
-    #[error("HyperedgeIndex {index:?} contraction of vertices {vertices:?} into vertex {target:?} is invalid" )]
+    #[error(
+        "HyperedgeIndex {index:?} contraction of vertices {vertices:?} into vertex {target:?} is invalid"
+    )]
     HyperedgeInvalidContraction {
         index: HyperedgeIndex,
         target: VertexIndex,

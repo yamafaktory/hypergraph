@@ -1,6 +1,6 @@
-use crate::{errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait};
-
 use indexmap::IndexSet;
+
+use crate::{errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where

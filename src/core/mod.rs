@@ -11,22 +11,23 @@ mod utils;
 #[doc(hidden)]
 pub mod vertices;
 
-use bi_hash_map::BiHashMap;
-// Reexport indexes at this level.
-pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
-
-use indexmap::{IndexMap, IndexSet};
 use std::{
     fmt::{Debug, Display, Formatter, Result},
     hash::Hash,
     ops::Deref,
 };
 
+use bi_hash_map::BiHashMap;
+use indexmap::{IndexMap, IndexSet};
+
+// Reexport indexes at this level.
+pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
+
 /// Shared Trait for the vertices.
 /// Must be implemented to use the library.
-pub trait VertexTrait: Copy + Debug + Display + Eq + Hash {}
+pub trait VertexTrait: Copy + Debug + Display + Eq + Hash + Send + Sync {}
 
-impl<T> VertexTrait for T where T: Copy + Debug + Display + Eq + Hash {}
+impl<T> VertexTrait for T where T: Copy + Debug + Display + Eq + Hash + Send + Sync {}
 
 /// Shared Trait for the hyperedges.
 /// Must be implemented to use the library.

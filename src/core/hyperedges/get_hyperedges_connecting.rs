@@ -1,9 +1,9 @@
+use rayon::prelude::*;
+
 use crate::{
     core::shared::Connection, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph,
     VertexIndex, VertexTrait,
 };
-
-use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -19,8 +19,8 @@ where
         let results = self.get_connections(Connection::InAndOut(from, to))?;
 
         Ok(results
-            .into_iter()
+            .into_par_iter()
             .map(|(hyperedged_index, _)| hyperedged_index)
-            .collect_vec())
+            .collect())
     }
 }

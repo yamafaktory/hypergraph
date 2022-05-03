@@ -56,7 +56,10 @@ fn integration_main() {
     // Create some hyperedges.
     let first_hyperedge = Hyperedge::new("pass the pink ball", 1);
     let second_hyperedge = Hyperedge::new("pass the yellow ball", 1);
-    let third_hyperedge = Hyperedge::new("share the \"The Disordered Cosmos: A Journey into Dark Matter, Spacetime, and Dreams Deferred\" book", 2);
+    let third_hyperedge = Hyperedge::new(
+        "share the \"The Disordered Cosmos: A Journey into Dark Matter, Spacetime, and Dreams Deferred\" book",
+        2,
+    );
     let fourth_hyperedge = Hyperedge::new("meditate like a Jedi", 10);
     let fifth_hyperedge = Hyperedge::new("work out", 20);
     let sixth_hyperedge = Hyperedge::new("nope", 0);
@@ -114,10 +117,10 @@ fn integration_main() {
         "should return an explicit error since this weight is already in use"
     );
     assert_eq!(
-            graph.add_hyperedge(vec![VertexIndex(3)], fifth_hyperedge),
-            Ok(HyperedgeIndex(4)),
-            "should add a fifth hyperedge which contains the same unary as the fourth one but with a different weight"
-        );
+        graph.add_hyperedge(vec![VertexIndex(3)], fifth_hyperedge),
+        Ok(HyperedgeIndex(4)),
+        "should add a fifth hyperedge which contains the same unary as the fourth one but with a different weight"
+    );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(9)], sixth_hyperedge),
         Err(HypergraphError::VertexIndexNotFound(VertexIndex(9))),

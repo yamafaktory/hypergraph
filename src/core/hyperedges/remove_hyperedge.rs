@@ -117,8 +117,8 @@ where
             for vertex in swapped_vertices.into_iter() {
                 match self.vertices.get_index_mut(vertex) {
                     Some((_, index_set)) => {
-                        // Update the by performing an insertion of the current
-                        //  hyperedge and a removal of the swapped one.
+                        // Perform an insertion of the current hyperedge and a
+                        // removal of the swapped one.
                         index_set.insert(internal_index);
                         index_set.remove(&last_index);
                     }

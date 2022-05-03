@@ -1,3 +1,5 @@
+use rayon::prelude::*;
+
 use crate::{
     bi_hash_map::BiHashMap, errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexTrait,
 };
@@ -20,7 +22,7 @@ where
 
         // Update the vertices accordingly.
         self.vertices
-            .iter_mut()
+            .par_iter_mut()
             // Clear the sets while keeping their capacities.
             .for_each(|(_, hyperedges)| hyperedges.clear());
 

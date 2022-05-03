@@ -26,6 +26,7 @@ This library enables you to represent:
 - 100% safe Rust
 - Proper error handling
 - Stable indexes assigned for each hyperedge and each vertex
+- Parallelism (with Rayon)
 
 ## 🛠️ Installation
 

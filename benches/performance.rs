@@ -1,10 +1,10 @@
 #![deny(unsafe_code, nonstandard_style)]
 
-use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
+use std::fmt::{Display, Formatter, Result};
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
 use itertools::Itertools;
-use std::fmt::{Display, Formatter, Result};
 
 static HYPEREDGES: usize = 10_000;
 static VERTICES: usize = 10_000;

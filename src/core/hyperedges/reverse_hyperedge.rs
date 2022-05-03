@@ -1,6 +1,6 @@
-use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
+use rayon::prelude::*;
 
-use itertools::Itertools;
+use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -16,6 +16,6 @@ where
         let vertices = self.get_hyperedge_vertices(hyperedge_index)?;
 
         // Update the hyperedge with the reversed vertices.
-        self.update_hyperedge_vertices(hyperedge_index, vertices.into_iter().rev().collect_vec())
+        self.update_hyperedge_vertices(hyperedge_index, vertices.into_par_iter().rev().collect())
     }
 }

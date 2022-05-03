@@ -1,8 +1,8 @@
+use itertools::Itertools;
+
 use crate::{
     errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
 };
-
-use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where

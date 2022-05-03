@@ -1,9 +1,9 @@
+use rayon::prelude::*;
+
 use crate::{
     core::shared::Connection, errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex,
     VertexTrait,
 };
-
-use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -15,13 +15,18 @@ where
         &self,
         from: VertexIndex,
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        let results = self.get_connections(Connection::In(from))?;
-
-        Ok(results
-            .into_iter()
+        let mut results = self
+            .get_connections(Connection::In(from))?
+            .into_par_iter()
             .filter_map(|(_, vertex_index)| vertex_index)
-            .sorted()
-            .dedup()
-            .collect_vec())
+            .collect::<Vec<VertexIndex>>();
+
+        // We use `par_sort_unstable` here which means that the order of equal
+        // elements is not preserved but this is fine since we dedupe them
+        // afterwards.
+        results.par_sort_unstable();
+        results.dedup();
+
+        Ok(results)
     }
 }

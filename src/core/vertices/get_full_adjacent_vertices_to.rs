@@ -1,10 +1,10 @@
+use indexmap::IndexMap;
+use itertools::{fold, Itertools};
+
 use crate::{
     core::shared::Connection, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph,
     VertexIndex, VertexTrait,
 };
-
-use indexmap::IndexMap;
-use itertools::{fold, Itertools};
 
 #[allow(clippy::type_complexity)]
 impl<V, HE> Hypergraph<V, HE>

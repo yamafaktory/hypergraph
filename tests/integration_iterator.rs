@@ -44,8 +44,14 @@ fn integration_iterator() {
         vec![
             (hyperedge_one, vec![vertex_one, vertex_two, vertex_three]),
             (hyperedge_two, vec![vertex_four, vertex_five]),
-            (hyperedge_three, vec![vertex_three, vertex_three, vertex_three]),
-            (hyperedge_four, vec![vertex_five, vertex_four, vertex_three, vertex_one])
+            (
+                hyperedge_three,
+                vec![vertex_three, vertex_three, vertex_three]
+            ),
+            (
+                hyperedge_four,
+                vec![vertex_five, vertex_four, vertex_three, vertex_one]
+            )
         ],
         "should provide `into_iter()` yelding a vector of tuples of the form (hyperedge, vector of vertices)"
     );

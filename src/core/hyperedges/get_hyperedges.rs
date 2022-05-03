@@ -1,3 +1,5 @@
+use rayon::prelude::*;
+
 use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
@@ -11,7 +13,7 @@ where
         hyperedges: Vec<usize>,
     ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
         hyperedges
-            .iter()
+            .par_iter()
             .map(|hyperedge_index| self.get_hyperedge(*hyperedge_index))
             .collect()
     }

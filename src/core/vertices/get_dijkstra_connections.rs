@@ -1,13 +1,13 @@
-use itertools::Itertools;
-
-use crate::{
-    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
-};
-
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     fmt::Debug,
+};
+
+use rayon::prelude::*;
+
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -85,7 +85,7 @@ where
                 path.push(self.get_vertex(internal_to)?);
 
                 return Ok(path
-                    .into_iter()
+                    .into_par_iter()
                     .map(|vertex_index| {
                         (
                             vertex_index,
@@ -94,7 +94,7 @@ where
                                 .and_then(|&current| current),
                         )
                     })
-                    .collect_vec());
+                    .collect());
             }
 
             // Skip if a better path has already been found.
@@ -146,7 +146,7 @@ where
                     // Update the path traversal accordingly.
                     // Keep vertex indexes unique.
                     if !path
-                        .iter()
+                        .par_iter()
                         .any(|current_index| mapped_index == *current_index)
                     {
                         path.push(mapped_index);

@@ -13,9 +13,10 @@ rust-version = "1.56"
 version = "1.1.1"
 
 [dependencies]
-indexmap = "1.8.0"
+indexmap = { version = "1.8.1", features = ["rayon"] }
 itertools = "0.10.3"
-thiserror = "1.0.30"
+rayon = "1.5.2"
+thiserror = "1.0.31"
 
 [dev-dependencies]
 criterion = "0.3.5"

@@ -1,8 +1,8 @@
+use rayon::prelude::*;
+
 use crate::{
     errors::HypergraphError, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
 };
-
-use itertools::Itertools;
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -30,7 +30,13 @@ where
             let hyperedge_index = self.get_hyperedge(hyperedge)?;
 
             // Get the unique vertices, i.e. check for self-loops.
-            let unique_vertices = vertices.iter().sorted().dedup().collect_vec();
+            let mut unique_vertices = vertices.clone();
+
+            // We use `par_sort_unstable` here which means that the order of
+            // equal elements is not preserved but this is fine since we dedupe
+            // them afterwards.
+            unique_vertices.par_sort_unstable();
+            unique_vertices.dedup();
 
             // Remove the hyperedge if the vertex is the only one present.
             if unique_vertices.len() == 1 {
@@ -39,9 +45,9 @@ where
                 // Otherwise update the hyperedge with the updated vertices.
                 let updated_vertices = self.get_vertices(
                     vertices
-                        .into_iter()
+                        .into_par_iter()
                         .filter(|vertex| *vertex != internal_index)
-                        .collect_vec(),
+                        .collect(),
                 )?;
 
                 self.update_hyperedge_vertices(hyperedge_index, updated_vertices)?;
@@ -86,7 +92,7 @@ where
                     .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(hyperedge))?;
 
                 let updated_vertices = vertices
-                    .into_iter()
+                    .into_par_iter()
                     .map(|vertex| {
                         // Remap the vertex if this is the swapped one.
                         if vertex == last_index {
@@ -95,7 +101,7 @@ where
                             vertex
                         }
                     })
-                    .collect_vec();
+                    .collect();
 
                 // Insert the new entry with the updated vertices.
                 // Since we are not altering the weight, we can safely perform

@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use rayon::prelude::*;
 
 use crate::{errors::HypergraphError, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexTrait};
 
@@ -47,23 +47,22 @@ where
                 // Result within this iterator, remap to None on error.
                 match self.hypergraph.get_vertices(vertices.to_owned()) {
                     Ok(indexes) => {
-                        match indexes
-                            .iter()
+                        indexes
+                            .par_iter()
                             .map(|index| self.hypergraph.get_vertex_weight(*index))
                             .collect::<Result<Vec<&V>, HypergraphError<V, HE>>>()
-                        {
-                            Ok(vertices_weights) => {
+                            .ok()
+                            .map(|vertices_weights| {
                                 // Now we can increment the inner index.
                                 self.index += 1;
 
-                                Some((*weight, vertices_weights.into_iter().cloned().collect_vec()))
-                            }
-                            Err(_) => None,
-                        }
+                                (*weight, vertices_weights.into_par_iter().cloned().collect())
+                            })
                     }
                     Err(_) => None,
                 }
             }
+
             None => None,
         }
     }

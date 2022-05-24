@@ -12,6 +12,7 @@ pub mod get_hyperedge_vertices;
 pub mod get_hyperedge_weight;
 pub mod get_hyperedges_connecting;
 pub mod get_hyperedges_intersections;
+pub mod join_hyperedges;
 pub mod remove_hyperedge;
 pub mod reverse_hyperedge;
 pub mod update_hyperedge_vertices;

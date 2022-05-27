@@ -79,4 +79,11 @@ fn integration_contration() {
         Ok(vec![b, c, b, d, c, a, c, d, e, c, c, c, c]),
         "should have updated delta"
     );
+
+    // Joining less then two hyperedges should not work.
+    assert_eq!(
+        graph.join_hyperedges(vec![delta]),
+        Err(HypergraphError::HyperedgesInvalidJoin),
+        "should return an explicit error"
+    );
 }

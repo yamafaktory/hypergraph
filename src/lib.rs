@@ -176,6 +176,9 @@
 //!     // Contract a hyperedge's vertices.
 //!     graph.contract_hyperedge_vertices(fifth_relation, vec![bianca, charles], bianca)?;
 //!
+//!     // Join some hyperedges.
+//!     graph.join_hyperedges(vec![fifth_relation, third_relation]);
+//!
 //!     // Clear the hyperedges.
 //!     graph.clear_hyperedges()?;
 //!

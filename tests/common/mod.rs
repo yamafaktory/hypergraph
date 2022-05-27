@@ -14,8 +14,8 @@ impl<'a> Vertex<'a> {
 }
 
 impl<'a> Display for Vertex<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+        write!(formatter, "{}", self)
     }
 }
 
@@ -32,8 +32,8 @@ impl<'a> Hyperedge<'a> {
 }
 
 impl<'a> Display for Hyperedge<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+        write!(formatter, "{}", self)
     }
 }
 

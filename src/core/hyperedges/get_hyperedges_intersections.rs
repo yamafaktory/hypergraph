@@ -21,7 +21,7 @@ where
 
         // Early exit if less than two hyperedges are provided.
         if number_of_hyperedges < 2 {
-            return Err(HypergraphError::HyperedgesIntersections);
+            return Err(HypergraphError::HyperedgesInvalidIntersections);
         }
 
         // Get the internal vertices of the hyperedges and keep the eventual error.

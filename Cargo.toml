@@ -15,7 +15,7 @@ version = "1.2.0"
 [dependencies]
 indexmap = { version = "1.8.1", features = ["rayon"] }
 itertools = "0.10.3"
-rayon = "1.5.2"
+rayon = "1.5.3"
 thiserror = "1.0.31"
 
 [dev-dependencies]

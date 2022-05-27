@@ -60,7 +60,11 @@ where
 
     /// Error when trying to get the intersections of less than two hyperedges.
     #[error("At least two hyperedges must be provided to find their intersections")]
-    HyperedgesIntersections,
+    HyperedgesInvalidIntersections,
+
+    /// Error when trying to join less than two hyperedges.
+    #[error("At least two hyperedges must be provided to be joined")]
+    HyperedgesInvalidJoin,
 
     /// Error when a VertexIndex was not found.
     #[error("VertexIndex {0} was not found")]

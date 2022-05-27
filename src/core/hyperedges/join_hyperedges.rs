@@ -1,6 +1,8 @@
 use rayon::prelude::*;
 
-use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
+use crate::{
+    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -8,23 +10,41 @@ where
     HE: HyperedgeTrait,
 {
     /// Joins two or more hyperedges from the hypergraph into one single entity.
+    /// All the vertices are moved to the first hyperedge in the provided order.
     pub fn join_hyperedges(
         &mut self,
         hyperedges: Vec<HyperedgeIndex>,
     ) -> Result<(), HypergraphError<V, HE>> {
-        // If the provided hyperedges are empty, skip the operation.
+        // If the provided hyperedges are less than two, skip the operation.
         if hyperedges.len() < 2 {
-            // return Err(HypergraphError::HyperedgeCreationNoVertices(weight));
+            return Err(HypergraphError::HyperedgesInvalidJoin);
         }
 
-        let joined_vertices = hyperedges
+        // Try to collect all the vertices from the provided hyperedges.
+        match hyperedges
             .par_iter()
-            .flat_map_iter(|hyperedge_index| self.get_hyperedge_vertices(*hyperedge_index));
+            .map(|hyperedge_index| self.get_hyperedge_vertices(*hyperedge_index))
+            .collect::<Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>>>()
+        {
+            Err(err) => Err(err),
+            Ok(joined_vertices) => {
+                // The goal is to move all the vertices from the provided
+                // hyperedges to the first one.
+                self.update_hyperedge_vertices(
+                    hyperedges[0],
+                    joined_vertices.into_par_iter().flatten().collect(),
+                )?;
 
-        // The goal is to move all the vertices from the provided hyperedges to
-        // the first hyperedge.
-        self.update_hyperedge_vertices(hyperedges[0]);
+                // Get the tail.
+                let tail = &hyperedges[1..];
 
-        Ok(())
+                // Removes the other hyperedges.
+                for hyperedge_index in tail.iter() {
+                    self.remove_hyperedge(*hyperedge_index)?;
+                }
+
+                Ok(())
+            }
+        }
     }
 }

@@ -346,12 +346,12 @@ fn integration_main() {
     );
     assert_eq!(
         graph.get_hyperedges_intersections(vec![]),
-        Err(HypergraphError::HyperedgesIntersections),
+        Err(HypergraphError::HyperedgesInvalidIntersections),
         "should fail since computing the intersections of less than two hyperedges is not possible"
     );
     assert_eq!(
         graph.get_hyperedges_intersections(vec![HyperedgeIndex(0)]),
-        Err(HypergraphError::HyperedgesIntersections),
+        Err(HypergraphError::HyperedgesInvalidIntersections),
         "should fail since computing the intersections of less than two hyperedges is not possible"
     );
     assert_eq!(

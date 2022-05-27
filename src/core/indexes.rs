@@ -7,8 +7,8 @@ use std::fmt::{Display, Formatter, Result};
 pub struct VertexIndex(pub usize);
 
 impl Display for VertexIndex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+        write!(formatter, "{}", self.0)
     }
 }
 

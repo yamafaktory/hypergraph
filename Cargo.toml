@@ -13,7 +13,7 @@ rust-version = "1.56"
 version = "1.3.0"
 
 [dependencies]
-indexmap = { version = "1.8.1", features = ["rayon"] }
+indexmap = { version = "1.8.2", features = ["rayon"] }
 itertools = "0.10.3"
 rayon = "1.5.3"
 thiserror = "1.0.31"

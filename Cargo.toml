@@ -16,10 +16,10 @@ version = "1.3.2"
 indexmap = { version = "1.9.1", features = ["rayon"] }
 itertools = "0.10.3"
 rayon = "1.5.3"
-thiserror = "1.0.31"
+thiserror = "1.0.32"
 
 [dev-dependencies]
-criterion = "0.3.5"
+criterion = "0.3.6"
 
 [[bench]]
 name = "performance"

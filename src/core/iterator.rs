@@ -45,21 +45,20 @@ where
                 // Convert the internal vertices to a vector of VertexIndex.
                 // Since this is a fallible operation and we can't deal with a
                 // Result within this iterator, remap to None on error.
-                match self.hypergraph.get_vertices(vertices.to_owned()) {
-                    Ok(indexes) => {
-                        indexes
-                            .par_iter()
-                            .map(|index| self.hypergraph.get_vertex_weight(*index))
-                            .collect::<Result<Vec<&V>, HypergraphError<V, HE>>>()
-                            .ok()
-                            .map(|vertices_weights| {
-                                // Now we can increment the inner index.
-                                self.index += 1;
+                if let Ok(indexes) = self.hypergraph.get_vertices(vertices.to_owned()) {
+                    indexes
+                        .par_iter()
+                        .map(|index| self.hypergraph.get_vertex_weight(*index))
+                        .collect::<Result<Vec<&V>, HypergraphError<V, HE>>>()
+                        .ok()
+                        .map(|vertices_weights| {
+                            // Now we can increment the inner index.
+                            self.index += 1;
 
-                                (*weight, vertices_weights.into_par_iter().cloned().collect())
-                            })
-                    }
-                    Err(_) => None,
+                            (*weight, vertices_weights.into_par_iter().cloned().collect())
+                        })
+                } else {
+                    None
                 }
             }
 

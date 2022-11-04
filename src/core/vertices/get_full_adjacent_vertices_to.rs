@@ -25,7 +25,7 @@ where
             IndexMap::<VertexIndex, Vec<HyperedgeIndex>>::new(),
             |mut acc, (hyperedge_index, vertex_index)| {
                 if let Some(index) = vertex_index {
-                    let hyperedges = acc.entry(index).or_insert(vec![]);
+                    let hyperedges = acc.entry(index).or_default();
 
                     hyperedges.push(hyperedge_index);
                 }

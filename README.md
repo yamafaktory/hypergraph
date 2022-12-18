@@ -2,7 +2,7 @@
 
 ---
 
-[<img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/yamafaktory/hypergraph/ci.yml?branch=main&logo=github&style=flat-square">](https://github.com/yamafaktory/hypergraph/actions/workflows/ci.yml) [<img alt="Crates.io" src="https://img.shields.io/crates/v/hypergraph?style=for-the-badge">](https://crates.io/crates/hypergraph/versions?sort=semver) [<img alt="docs.rs" src="https://img.shields.io/docsrs/hypergraph?style=for-the-badge">](https://docs.rs/hypergraph)
+[<img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/yamafaktory/hypergraph/ci.yml?branch=main&logo=github&style=flat-square">](https://github.com/yamafaktory/hypergraph/actions/workflows/ci.yml) [<img alt="Crates.io" src="https://img.shields.io/crates/v/hypergraph?style=flat-square">](https://crates.io/crates/hypergraph/versions?sort=semver) [<img alt="docs.rs" src="https://img.shields.io/docsrs/hypergraph?style=flat-square">](https://docs.rs/hypergraph)
 
 Hypergraph is a data structure library to generate **directed** [hypergraphs](https://en.wikipedia.org/wiki/Hypergraph).
 

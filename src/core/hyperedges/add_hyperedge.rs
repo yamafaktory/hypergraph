@@ -42,7 +42,7 @@ where
             .insert_full(HyperedgeKey::new(internal_vertices.clone(), weight));
 
         // Update the vertices so that we keep directly track of the hyperedge.
-        for vertex in internal_vertices.into_iter() {
+        for vertex in internal_vertices {
             let (_, index_set) = self
                 .vertices
                 .get_index_mut(vertex)

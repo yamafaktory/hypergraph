@@ -13,7 +13,7 @@ where
     /// All the vertices are moved to the first hyperedge in the provided order.
     pub fn join_hyperedges(
         &mut self,
-        hyperedges: Vec<HyperedgeIndex>,
+        hyperedges: &[HyperedgeIndex],
     ) -> Result<(), HypergraphError<V, HE>> {
         // If the provided hyperedges are less than two, skip the operation.
         if hyperedges.len() < 2 {

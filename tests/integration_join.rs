@@ -37,7 +37,7 @@ fn integration_contration() {
 
     // Join some hyperedges.
     assert_eq!(
-        graph.join_hyperedges(vec![delta, beta, epsilon]),
+        graph.join_hyperedges(&[delta, beta, epsilon]),
         Ok(()),
         "should join the delta and beta hyperedges"
     );
@@ -82,7 +82,7 @@ fn integration_contration() {
 
     // Joining less then two hyperedges should not work.
     assert_eq!(
-        graph.join_hyperedges(vec![delta]),
+        graph.join_hyperedges(&[delta]),
         Err(HypergraphError::HyperedgesInvalidJoin),
         "should return an explicit error"
     );

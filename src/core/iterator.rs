@@ -45,7 +45,7 @@ where
                 // Convert the internal vertices to a vector of VertexIndex.
                 // Since this is a fallible operation and we can't deal with a
                 // Result within this iterator, remap to None on error.
-                if let Ok(indexes) = self.hypergraph.get_vertices(vertices.to_owned()) {
+                if let Ok(indexes) = self.hypergraph.get_vertices(&vertices.clone()) {
                     indexes
                         .par_iter()
                         .map(|index| self.hypergraph.get_vertex_weight(*index))

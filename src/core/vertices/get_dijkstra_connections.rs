@@ -116,7 +116,7 @@ where
                 let mut best_hyperedge: Option<HyperedgeIndex> = None;
 
                 // Get the lower cost out of all the hyperedges.
-                for hyperedge_index in hyperedge_indexes.into_iter() {
+                for hyperedge_index in hyperedge_indexes {
                     let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
 
                     // Use the trait implementation to get the associated cost

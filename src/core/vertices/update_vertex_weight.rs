@@ -16,7 +16,7 @@ where
         let (previous_weight, index_set) = self
             .vertices
             .get_index(internal_index)
-            .map(|(previous_weight, index_set)| (previous_weight.to_owned(), index_set.to_owned()))
+            .map(|(previous_weight, index_set)| (previous_weight.to_owned(), index_set.clone()))
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
         // Return an error if the new weight is the same as the previous one.

@@ -16,7 +16,7 @@ where
         from: VertexIndex,
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
         let mut results = self
-            .get_connections(Connection::In(from))?
+            .get_connections(&Connection::In(from))?
             .into_par_iter()
             .filter_map(|(_, vertex_index)| vertex_index)
             .collect::<Vec<VertexIndex>>();

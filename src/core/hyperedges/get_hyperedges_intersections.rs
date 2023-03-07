@@ -36,7 +36,7 @@ where
                                 internal_index,
                             ))
                             .map(|HyperedgeKey { vertices, .. }| {
-                                vertices.iter().unique().cloned().collect_vec()
+                                vertices.iter().unique().copied().collect_vec()
                             })
                     })
             })
@@ -44,7 +44,7 @@ where
 
         vertices.and_then(|vertices| {
             self.get_vertices(
-                vertices
+                &vertices
                     .into_iter()
                     // Flatten and sort the vertices.
                     .flatten()

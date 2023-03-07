@@ -14,13 +14,10 @@ where
     ) -> Result<(), HypergraphError<V, HE>> {
         let internal_index = self.get_internal_hyperedge(hyperedge_index)?;
 
-        let HyperedgeKey { vertices, .. } = self
-            .hyperedges
-            .get_index(internal_index)
-            .map(|hyperedge_key| hyperedge_key.to_owned())
-            .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(
-                internal_index,
-            ))?;
+        let HyperedgeKey { vertices, .. } =
+            self.hyperedges.get_index(internal_index).cloned().ok_or(
+                HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+            )?;
 
         // Find the last index.
         let last_index = self.hyperedges.len() - 1;
@@ -33,7 +30,7 @@ where
         self.hyperedges_mapping.right.remove(&hyperedge_index);
 
         // Remove the hyperedge from the vertices.
-        for vertex in vertices.into_iter() {
+        for vertex in vertices {
             match self.vertices.get_index_mut(vertex) {
                 Some((_, index_set)) => {
                     index_set.remove(&internal_index);
@@ -105,16 +102,12 @@ where
             let HyperedgeKey {
                 vertices: swapped_vertices,
                 ..
-            } = self
-                .hyperedges
-                .get_index(internal_index)
-                .map(|hyperedge_key| hyperedge_key.to_owned())
-                .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(
-                    internal_index,
-                ))?;
+            } = self.hyperedges.get_index(internal_index).cloned().ok_or(
+                HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+            )?;
 
             // Update the impacted vertices accordingly.
-            for vertex in swapped_vertices.into_iter() {
+            for vertex in swapped_vertices {
                 match self.vertices.get_index_mut(vertex) {
                     Some((_, index_set)) => {
                         // Perform an insertion of the current hyperedge and a

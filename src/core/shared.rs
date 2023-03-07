@@ -23,15 +23,16 @@ where
     /// Private helper function used internally.
     /// Takes a connection as an enum and returns a vector of tuples of the
     /// form (hyperedge index, connected vertex index) where connected vertex
-    /// index is an optional value - None for InAndOut connections.
+    /// index is an optional value - None for `InAndOut` connections.
     #[allow(clippy::type_complexity)]
     pub(crate) fn get_connections(
         &self,
-        connections: Connection,
+        connections: &Connection,
     ) -> Result<Connections, HypergraphError<V, HE>> {
         let internal_index = self.get_internal_vertex(match connections {
-            Connection::In(vertex_index) | Connection::Out(vertex_index) => vertex_index,
-            Connection::InAndOut(vertex_index, _) => vertex_index,
+            Connection::InAndOut(vertex_index, _)
+            | Connection::In(vertex_index)
+            | Connection::Out(vertex_index) => *vertex_index,
         })?;
 
         let (_, hyperedges_index_set) = self
@@ -40,7 +41,7 @@ where
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
         let hyperedges =
-            self.get_hyperedges(hyperedges_index_set.clone().into_iter().collect_vec())?;
+            self.get_hyperedges(&hyperedges_index_set.clone().into_iter().collect_vec())?;
 
         let hyperedges_with_vertices = hyperedges
             .into_par_iter()
@@ -65,7 +66,7 @@ where
                                     // Inject the index of the hyperedge and the
                                     // vertex index if the current window is a
                                     // match.
-                                    if *window_from == from {
+                                    if *window_from == *from {
                                         return index_acc
                                             .into_iter()
                                             .chain(vec![(hyperedge_index, Some(*window_to))])
@@ -76,7 +77,7 @@ where
                                     // Inject the index of the hyperedge and the
                                     // vertex index if the current window is a
                                     // match.
-                                    if *window_to == to {
+                                    if *window_to == *to {
                                         return index_acc
                                             .into_iter()
                                             .chain(vec![(hyperedge_index, Some(*window_from))])
@@ -86,7 +87,7 @@ where
                                 Connection::InAndOut(from, to) => {
                                     // Inject only the index of the hyperedge
                                     // if the current window is a match.
-                                    if *window_from == from && *window_to == to {
+                                    if *window_from == *from && *window_to == *to {
                                         return index_acc
                                             .into_iter()
                                             .chain(vec![(hyperedge_index, None)])

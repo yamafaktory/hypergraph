@@ -7,7 +7,7 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the hyperedges of a vertex as a vector of vectors of VertexIndex.
+    /// Gets the hyperedges of a vertex as a vector of vectors of `VertexIndex`.
     pub fn get_full_vertex_hyperedges(
         &self,
         vertex_index: VertexIndex,

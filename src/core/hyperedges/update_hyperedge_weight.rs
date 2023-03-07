@@ -18,16 +18,12 @@ where
         let HyperedgeKey {
             vertices,
             weight: previous_weight,
-        } = self
-            .hyperedges
-            .get_index(internal_index)
-            .map(|hyperedge_key| hyperedge_key.to_owned())
-            .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(
-                internal_index,
-            ))?;
+        } = self.hyperedges.get_index(internal_index).ok_or(
+            HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+        )?;
 
         // Return an error if the new weight is the same as the previous one.
-        if weight == previous_weight {
+        if weight == *previous_weight {
             return Err(HypergraphError::HyperedgeWeightUnchanged {
                 index: hyperedge_index,
                 weight,
@@ -88,7 +84,8 @@ where
         // Insert the new entry.
         // Since we have already checked that the new weight is not in the
         // map, we can safely perform the operation without checking its output.
-        self.hyperedges.insert(HyperedgeKey { vertices, weight });
+        self.hyperedges
+            .insert(HyperedgeKey::new(vertices.clone(), weight));
 
         // Swap and remove by index.
         // Since we know that the internal index is correct, we can safely

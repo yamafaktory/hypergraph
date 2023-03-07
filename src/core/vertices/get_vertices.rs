@@ -10,7 +10,7 @@ where
     // Private method to get a vector of VertexIndex from a vector of internal indexes.
     pub(crate) fn get_vertices(
         &self,
-        vertices: Vec<usize>,
+        vertices: &[usize],
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
         vertices
             .par_iter()

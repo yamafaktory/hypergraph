@@ -16,7 +16,7 @@ where
         from: VertexIndex,
         to: VertexIndex,
     ) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
-        let results = self.get_connections(Connection::InAndOut(from, to))?;
+        let results = self.get_connections(&Connection::InAndOut(from, to))?;
 
         Ok(results
             .into_par_iter()

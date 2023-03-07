@@ -8,7 +8,7 @@ where
     // Private method to get the internal hyperedges from a vector of HyperedgeIndex.
     pub(crate) fn get_internal_hyperedges(
         &self,
-        hyperedges: Vec<HyperedgeIndex>,
+        hyperedges: &[HyperedgeIndex],
     ) -> Result<Vec<usize>, HypergraphError<V, HE>> {
         hyperedges
             .iter()

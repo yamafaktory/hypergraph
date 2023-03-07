@@ -52,7 +52,7 @@ where
                     .par_iter()
                     .any(|&current_index| current_index == index)
                 {
-                    acc.push(index.to_owned())
+                    acc.push(index);
                 }
 
                 acc
@@ -73,7 +73,7 @@ where
         let mut all_hyperedges: Vec<HyperedgeIndex> = vec![];
 
         // Iterate over all the deduped vertices.
-        for &vertex in deduped_vertices.iter() {
+        for &vertex in &deduped_vertices {
             // Safely get the hyperedges of the current vertex.
             let mut vertex_hyperedges = self.get_vertex_hyperedges(vertex)?;
 

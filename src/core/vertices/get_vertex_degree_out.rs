@@ -14,7 +14,7 @@ where
         &self,
         from: VertexIndex,
     ) -> Result<usize, HypergraphError<V, HE>> {
-        let results = self.get_connections(Connection::In(from))?;
+        let results = self.get_connections(&Connection::In(from))?;
 
         Ok(results.len())
     }

@@ -19,6 +19,6 @@ where
             HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
         )?;
 
-        self.get_vertices(vertices.to_owned())
+        self.get_vertices(vertices)
     }
 }

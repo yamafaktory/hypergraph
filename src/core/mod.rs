@@ -35,7 +35,7 @@ pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
 
 impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 
-/// A HyperedgeKey is a representation of both the vertices and the weight
+/// A `HyperedgeKey` is a representation of both the vertices and the weight
 /// of a hyperedge, used as a key in the hyperedges set.
 /// In a non-simple hypergraph, since the same vertices can be shared by
 /// different hyperedges, the weight is also included in the key to keep
@@ -47,7 +47,7 @@ pub(crate) struct HyperedgeKey<HE> {
 }
 
 impl<HE> HyperedgeKey<HE> {
-    /// Creates a new HyperedgeKey from the given vertices and weight.
+    /// Creates a new `HyperedgeKey` from the given vertices and weight.
     pub(crate) fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
         Self { vertices, weight }
     }

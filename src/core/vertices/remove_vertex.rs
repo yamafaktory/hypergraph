@@ -17,14 +17,15 @@ where
         let internal_index = self.get_internal_vertex(vertex_index)?;
 
         // Get the hyperedges of the vertex.
-        let hyperedges = self.get_internal_hyperedges(self.get_vertex_hyperedges(vertex_index)?)?;
+        let hyperedges =
+            self.get_internal_hyperedges(&self.get_vertex_hyperedges(vertex_index)?)?;
 
         // Remove the vertex from the hyperedges which contain it.
-        for hyperedge in hyperedges.into_iter() {
+        for hyperedge in hyperedges {
             let HyperedgeKey { vertices, .. } = self
                 .hyperedges
                 .get_index(hyperedge)
-                .map(|hyperedge_key| hyperedge_key.to_owned())
+                .cloned()
                 .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(hyperedge))?;
 
             let hyperedge_index = self.get_hyperedge(hyperedge)?;
@@ -44,10 +45,10 @@ where
             } else {
                 // Otherwise update the hyperedge with the updated vertices.
                 let updated_vertices = self.get_vertices(
-                    vertices
+                    &vertices
                         .into_par_iter()
                         .filter(|vertex| *vertex != internal_index)
-                        .collect(),
+                        .collect::<Vec<usize>>(),
                 )?;
 
                 self.update_hyperedge_vertices(hyperedge_index, updated_vertices)?;
@@ -81,24 +82,23 @@ where
                 .insert(internal_index, swapped_vertex_index);
 
             let stale_hyperedges =
-                self.get_internal_hyperedges(self.get_vertex_hyperedges(swapped_vertex_index)?)?;
+                self.get_internal_hyperedges(&self.get_vertex_hyperedges(swapped_vertex_index)?)?;
 
             // Update the impacted hyperedges accordingly.
-            for hyperedge in stale_hyperedges.into_iter() {
+            for hyperedge in stale_hyperedges {
                 let HyperedgeKey { vertices, weight } = self
                     .hyperedges
                     .get_index(hyperedge)
-                    .map(|hyperedge_key| hyperedge_key.to_owned())
                     .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(hyperedge))?;
 
                 let updated_vertices = vertices
                     .into_par_iter()
                     .map(|vertex| {
                         // Remap the vertex if this is the swapped one.
-                        if vertex == last_index {
+                        if vertex == &last_index {
                             internal_index
                         } else {
-                            vertex
+                            *vertex
                         }
                     })
                     .collect();
@@ -106,10 +106,8 @@ where
                 // Insert the new entry with the updated vertices.
                 // Since we are not altering the weight, we can safely perform
                 // the operation without checking its output.
-                self.hyperedges.insert(HyperedgeKey {
-                    vertices: updated_vertices,
-                    weight,
-                });
+                self.hyperedges
+                    .insert(HyperedgeKey::new(updated_vertices, *weight));
 
                 // Swap and remove by index.
                 // Since we know that the hyperedge index is correct, we can

@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
@@ -19,6 +17,6 @@ where
             .get_index(internal_index)
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
-        Ok(hyperedge_key.deref())
+        Ok(&**hyperedge_key)
     }
 }

@@ -28,13 +28,9 @@ where
         let HyperedgeKey {
             vertices: previous_vertices,
             weight,
-        } = self
-            .hyperedges
-            .get_index(internal_index)
-            .map(|hyperedge_key| hyperedge_key.to_owned())
-            .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(
-                internal_index,
-            ))?;
+        } = self.hyperedges.get_index(internal_index).cloned().ok_or(
+            HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
+        )?;
 
         // If the new vertices are the same as the old ones, skip the update.
         if are_slices_equal(&internal_vertices, &previous_vertices) {
@@ -49,7 +45,7 @@ where
                     .par_iter()
                     .any(|current_index| current_index == index)
                 {
-                    acc.push(*index)
+                    acc.push(*index);
                 }
 
                 acc
@@ -64,13 +60,13 @@ where
         let mut removed = previous_vertices
             .into_par_iter()
             .filter_map(|index| {
-                if !internal_vertices
+                if internal_vertices
                     .par_iter()
                     .any(|current_index| index == *current_index)
                 {
-                    Some(index)
-                } else {
                     None
+                } else {
+                    Some(index)
                 }
             })
             .collect::<Vec<usize>>();
@@ -79,7 +75,7 @@ where
         removed.dedup();
 
         // Update the added vertices.
-        for index in added.into_iter() {
+        for index in added {
             match self.vertices.get_index_mut(index) {
                 Some((_, index_set)) => {
                     index_set.insert(internal_index);
@@ -89,7 +85,7 @@ where
         }
 
         // Update the removed vertices.
-        for index in removed.into_iter() {
+        for index in removed {
             match self.vertices.get_index_mut(index) {
                 Some((_, index_set)) => {
                     // This has an impact on the internal indexing for the set.

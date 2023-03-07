@@ -1,3 +1,5 @@
+#![deny(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 #![deny(unsafe_code, nonstandard_style)]
 #![forbid(rust_2021_compatibility)]
 #![warn(missing_debug_implementations, missing_docs, unreachable_pub)]
@@ -23,7 +25,7 @@
 //! ## Example
 //!
 //! Please notice that the hyperedges and the vertices must implement the
-//! [HyperedgeTrait](crate::HyperedgeTrait) and the [VertexTrait](crate::VertexTrait) respectively.
+//! [`HyperedgeTrait`](crate::HyperedgeTrait) and the [`VertexTrait`](crate::VertexTrait) respectively.
 //!
 //! ```
 //! use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
@@ -177,7 +179,7 @@
 //!     graph.contract_hyperedge_vertices(fifth_relation, vec![bianca, charles], bianca)?;
 //!
 //!     // Join some hyperedges.
-//!     graph.join_hyperedges(vec![fifth_relation, third_relation]);
+//!     graph.join_hyperedges(&[fifth_relation, third_relation]);
 //!
 //!     // Clear the hyperedges.
 //!     graph.clear_hyperedges()?;

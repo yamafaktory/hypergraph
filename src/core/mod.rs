@@ -20,7 +20,7 @@ use std::{
 };
 
 use bi_hash_map::BiHashMap;
-use types::{AIndexMap, AIndexSet};
+use types::{AIndexMap, AIndexSet, ARandomState};
 
 // Reexport indexes at this level.
 pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
@@ -142,10 +142,10 @@ where
         Hypergraph {
             hyperedges_count: 0,
             hyperedges_mapping: BiHashMap::default(),
-            hyperedges: AIndexSet::with_capacity_and_hasher(hyperedges, Default::default()),
+            hyperedges: AIndexSet::with_capacity_and_hasher(hyperedges, ARandomState::default()),
             vertices_count: 0,
             vertices_mapping: BiHashMap::default(),
-            vertices: AIndexMap::with_capacity_and_hasher(vertices, Default::default()),
+            vertices: AIndexMap::with_capacity_and_hasher(vertices, ARandomState::default()),
         }
     }
 }

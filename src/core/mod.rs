@@ -7,6 +7,8 @@ mod indexes;
 #[doc(hidden)]
 pub mod iterator;
 mod shared;
+#[doc(hidden)]
+mod types;
 mod utils;
 #[doc(hidden)]
 pub mod vertices;
@@ -18,7 +20,7 @@ use std::{
 };
 
 use bi_hash_map::BiHashMap;
-use indexmap::{IndexMap, IndexSet};
+use types::{AIndexMap, AIndexSet};
 
 // Reexport indexes at this level.
 pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
@@ -65,20 +67,24 @@ impl<HE> Deref for HyperedgeKey<HE> {
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as a map whose unique keys are the weights
     /// and the values are a set of the hyperedges indexes which include
-    // the current vertex.
-    vertices: IndexMap<V, IndexSet<usize>>,
+    /// the current vertex.
+    vertices: AIndexMap<V, AIndexSet<usize>>,
 
     /// Hyperedges are stored as a set whose unique keys are a combination of
     /// vertices indexes and a weight. Two or more hyperedges can contain
     /// the exact same vertices (non-simple hypergraph).
-    hyperedges: IndexSet<HyperedgeKey<HE>>,
+    hyperedges: AIndexSet<HyperedgeKey<HE>>,
 
-    // Bi-directional maps for hyperedges and vertices.
+    /// Bi-directional map for hyperedges.
     hyperedges_mapping: BiHashMap<HyperedgeIndex>,
+
+    /// Bi-directional map for vertices.
     vertices_mapping: BiHashMap<VertexIndex>,
 
-    // Stable index generation counters.
+    /// Stable index generation counter for hyperedges.
     hyperedges_count: usize,
+
+    /// Stable index generation counter for vertices.
     vertices_count: usize,
 }
 
@@ -136,10 +142,10 @@ where
         Hypergraph {
             hyperedges_count: 0,
             hyperedges_mapping: BiHashMap::default(),
-            hyperedges: IndexSet::with_capacity(hyperedges),
+            hyperedges: AIndexSet::with_capacity_and_hasher(hyperedges, Default::default()),
             vertices_count: 0,
             vertices_mapping: BiHashMap::default(),
-            vertices: IndexMap::with_capacity(vertices),
+            vertices: AIndexMap::with_capacity_and_hasher(vertices, Default::default()),
         }
     }
 }

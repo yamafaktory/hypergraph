@@ -13,6 +13,7 @@ rust-version = "1.56"
 version = "2.0.0"
 
 [dependencies]
+ahash = "0.8.3"
 indexmap = { version = "1.9.2", features = ["rayon"] }
 itertools = "0.10.5"
 rayon = "1.7.0"

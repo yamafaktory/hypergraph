@@ -1,6 +1,8 @@
-use indexmap::IndexSet;
-
-use crate::{errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait};
+use crate::{
+    core::types::{AIndexSet, ARandomState},
+    errors::HypergraphError,
+    HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -17,7 +19,10 @@ where
 
         self.vertices
             .entry(weight)
-            .or_insert(IndexSet::with_capacity(0));
+            .or_insert(AIndexSet::with_capacity_and_hasher(
+                0,
+                ARandomState::default(),
+            ));
 
         let internal_index = self
             .vertices

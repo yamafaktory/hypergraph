@@ -14,10 +14,10 @@ version = "2.1.0"
 
 [dependencies]
 ahash = "0.8.3"
-indexmap = { version = "1.9.2", features = ["rayon"] }
+indexmap = { version = "1.9.3", features = ["rayon"] }
 itertools = "0.10.5"
 rayon = "1.7.0"
-thiserror = "1.0.39"
+thiserror = "1.0.40"
 
 [dev-dependencies]
 criterion = "0.4.0"

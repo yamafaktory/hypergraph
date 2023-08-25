@@ -97,7 +97,7 @@ where
         f.debug_struct("Hypergraph")
             .field("vertices", &self.vertices)
             .field("hyperedges", &self.hyperedges)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

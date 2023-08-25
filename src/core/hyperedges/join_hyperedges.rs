@@ -39,7 +39,7 @@ where
                 let tail = &hyperedges[1..];
 
                 // Removes the other hyperedges.
-                for hyperedge_index in tail.iter() {
+                for hyperedge_index in tail {
                     self.remove_hyperedge(*hyperedge_index)?;
                 }
 

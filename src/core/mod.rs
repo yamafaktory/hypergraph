@@ -1,151 +1,206 @@
-pub(crate) mod bi_hash_map;
 #[doc(hidden)]
 pub mod errors;
-#[doc(hidden)]
-pub mod hyperedges;
-mod indexes;
-#[doc(hidden)]
-pub mod iterator;
-mod shared;
+// #[doc(hidden)]
+// pub mod hyperedges;
+// mod indexes;
+// #[doc(hidden)]
+// pub mod iterator;
+// mod shared;
 #[doc(hidden)]
 mod types;
-mod utils;
-#[doc(hidden)]
-pub mod vertices;
+// mod utils;
+// #[doc(hidden)]
+// pub mod vertices;
 
 use std::{
-    fmt::{Debug, Display, Formatter, Result},
+    fmt::{Debug, Display, Formatter},
     hash::Hash,
+    marker::PhantomData,
     ops::Deref,
+    sync::Arc,
 };
 
-use bi_hash_map::BiHashMap;
+use quick_cache::sync::Cache;
+use tokio::{
+    fs::{create_dir_all, read_dir, read_to_string},
+    sync::{mpsc, oneshot, Mutex},
+};
+use tracing::{debug, error, info, span, warn, Level};
+//
+// use bi_hash_map::BiHashMap;
 use types::{AIndexMap, AIndexSet, ARandomState};
+use uuid::Uuid;
+//
+// // Reexport indexes at this level.
+// pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
+//
 
-// Reexport indexes at this level.
-pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
+// /// Shared Trait for the vertices.
+// /// Must be implemented to use the library.
+// pub trait VertexTrait: Clone + Debug + Display {}
+//
+// impl<T> VertexTrait for T where T: Clone + Debug + Display {}
+//
+// /// Shared Trait for the hyperedges.
+// /// Must be implemented to use the library.
+// pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
+//
+// impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 
-/// Shared Trait for the vertices.
-/// Must be implemented to use the library.
-pub trait VertexTrait: Copy + Debug + Display + Eq + Hash + Send + Sync {}
+//
+// #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+// pub struct StorageContainer<A> {
+//     data: PhantomData<A>,
+//     index: Uuid,
+// }
+//
+// impl<A> StorageContainer<A> {
+//     pub fn new() -> Self {
+//         StorageContainer {
+//             data: PhantomData,
+//             index: Uuid::new_v7(),
+//         }
+//     }
+// }
 
-impl<T> VertexTrait for T where T: Copy + Debug + Display + Eq + Hash + Send + Sync {}
-
-/// Shared Trait for the hyperedges.
-/// Must be implemented to use the library.
-pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
-
-impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
-
-/// A `HyperedgeKey` is a representation of both the vertices and the weight
-/// of a hyperedge, used as a key in the hyperedges set.
-/// In a non-simple hypergraph, since the same vertices can be shared by
-/// different hyperedges, the weight is also included in the key to keep
-/// it unique.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) struct HyperedgeKey<HE> {
-    vertices: Vec<usize>,
-    weight: HE,
+enum Entity<V, HE>
+where
+    V: Copy + Clone + Debug + Send + Sync,
+    HE: Copy + Clone + Debug + Send + Sync,
+{
+    Hyperedge(HE),
+    Vertex(V),
 }
 
-impl<HE> HyperedgeKey<HE> {
-    /// Creates a new `HyperedgeKey` from the given vertices and weight.
-    pub(crate) fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
-        Self { vertices, weight }
+#[derive(Debug)]
+struct MemoryCache<V, HE>
+where
+    V: Copy + Clone + Debug + Send + Sync,
+    HE: Copy + Clone + Debug + Send + Sync,
+{
+    hyperedges: Arc<Cache<Uuid, HE>>,
+    vertices: Arc<Cache<Uuid, V>>,
+    writer: mpsc::Sender<(Entity<V, HE>, oneshot::Sender<String>)>,
+}
+
+impl<V, HE> MemoryCache<V, HE>
+where
+    V: Copy + Clone + Debug + Send + Sync + 'static,
+    HE: Copy + Clone + Debug + Send + Sync + 'static,
+{
+    async fn new() -> Result<Self, ()> {
+        info!("Creating IOManager");
+
+        let sender = Self::get_writer().await?;
+
+        Ok(Self {
+            hyperedges: Arc::new(Cache::new(10_000)),
+            vertices: Arc::new(Cache::new(10_000)),
+            writer: sender,
+        })
+    }
+
+    #[tracing::instrument]
+    async fn get_reader() -> Result<mpsc::Sender<(Entity<V, HE>, oneshot::Sender<String>)>, ()> {
+        let (sender, mut rx) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<String>)>(1);
+
+        tokio::spawn(async move {
+            while let Some((todo, response)) = rx.recv().await {
+                debug!("Reading from in-memory cache.");
+
+                response.send(String::from("hello")).unwrap();
+            }
+        });
+
+        Ok(sender)
+    }
+
+    #[tracing::instrument]
+    async fn get_writer() -> Result<mpsc::Sender<(Entity<V, HE>, oneshot::Sender<String>)>, ()> {
+        let (sender, mut rx) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<String>)>(1);
+
+        tokio::spawn(async move {
+            while let Some((todo, response)) = rx.recv().await {
+                debug!("Writing to in-memory cache.");
+
+                response.send(String::from("hello")).unwrap();
+            }
+        });
+
+        Ok(sender)
     }
 }
 
-impl<HE> Deref for HyperedgeKey<HE> {
-    type Target = HE;
+#[derive(Debug)]
+struct IOManager {
+    sender: mpsc::Sender<(String, oneshot::Sender<String>)>,
+}
 
-    fn deref(&self) -> &HE {
-        &self.weight
+impl IOManager {
+    #[tracing::instrument]
+    async fn new() -> Result<Self, ()> {
+        info!("Creating IOManager");
+
+        let sender = Self::get_writer().await?;
+
+        Ok(Self { sender })
+    }
+
+    #[tracing::instrument]
+    async fn get_writer() -> Result<mpsc::Sender<(String, oneshot::Sender<String>)>, ()> {
+        let (sender, mut rx) = mpsc::channel::<(String, oneshot::Sender<String>)>(1);
+
+        tokio::spawn(async move {
+            while let Some((todo, response)) = rx.recv().await {
+                debug!("Writing to disk.");
+                response.send(String::from("hello")).unwrap();
+            }
+        });
+
+        Ok(sender)
     }
 }
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
-pub struct Hypergraph<V, HE> {
-    /// Vertices are stored as a map whose unique keys are the weights
-    /// and the values are a set of the hyperedges indexes which include
-    /// the current vertex.
-    vertices: AIndexMap<V, AIndexSet<usize>>,
-
-    /// Hyperedges are stored as a set whose unique keys are a combination of
-    /// vertices indexes and a weight. Two or more hyperedges can contain
-    /// the exact same vertices (non-simple hypergraph).
-    hyperedges: AIndexSet<HyperedgeKey<HE>>,
-
-    /// Bi-directional map for hyperedges.
-    hyperedges_mapping: BiHashMap<HyperedgeIndex>,
-
-    /// Bi-directional map for vertices.
-    vertices_mapping: BiHashMap<VertexIndex>,
-
-    /// Stable index generation counter for hyperedges.
-    hyperedges_count: usize,
-
-    /// Stable index generation counter for vertices.
-    vertices_count: usize,
-}
-
-impl<V, HE> Debug for Hypergraph<V, HE>
+#[derive(Debug)]
+pub struct Hypergraph<V, HE>
 where
-    V: Eq + Hash + Debug,
-    HE: Debug,
+    V: Copy + Clone + Debug + Send + Sync,
+    HE: Copy + Clone + Debug + Send + Sync,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        f.debug_struct("Hypergraph")
-            .field("vertices", &self.vertices)
-            .field("hyperedges", &self.hyperedges)
-            .finish_non_exhaustive()
-    }
+    cache: MemoryCache<V, HE>,
+    writer: IOManager,
 }
 
-impl<V, HE> Default for Hypergraph<V, HE>
-where
-    V: VertexTrait,
-    HE: HyperedgeTrait,
-{
-    fn default() -> Self {
-        Hypergraph::new()
-    }
-}
-
-/// Hypergraph implementations.
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: VertexTrait,
-    HE: HyperedgeTrait,
+    V: Copy + Clone + Debug + Send + Sync + 'static,
+    HE: Copy + Clone + Debug + Send + Sync + 'static,
 {
-    /// Clears the hypergraph.
-    pub fn clear(&mut self) {
-        // Clear the hyperedges and vertices sets while keeping their capacities.
-        self.hyperedges.clear();
-        self.vertices.clear();
+    #[tracing::instrument]
+    pub async fn init() -> Result<Self, ()> {
+        info!("Init Hypergraph");
 
-        // Reset the mappings.
-        self.hyperedges_mapping = BiHashMap::default();
-        self.vertices_mapping = BiHashMap::default();
-
-        // Reset the counters.
-        self.hyperedges_count = 0;
-        self.vertices_count = 0;
+        Ok(Self {
+            cache: MemoryCache::new().await?,
+            writer: IOManager::new().await?,
+        })
     }
 
-    /// Creates a new hypergraph with no allocation.
-    pub fn new() -> Self {
-        Hypergraph::with_capacity(0, 0)
-    }
+    #[tracing::instrument]
+    pub async fn add_vertex(self, vertex: V) -> Result<(), ()> {
+        let (tx, rx) = oneshot::channel();
 
-    /// Creates a new hypergraph with the specified capacity.
-    pub fn with_capacity(vertices: usize, hyperedges: usize) -> Self {
-        Hypergraph {
-            hyperedges_count: 0,
-            hyperedges_mapping: BiHashMap::default(),
-            hyperedges: AIndexSet::with_capacity_and_hasher(hyperedges, ARandomState::default()),
-            vertices_count: 0,
-            vertices_mapping: BiHashMap::default(),
-            vertices: AIndexMap::with_capacity_and_hasher(vertices, ARandomState::default()),
-        }
+        self.cache
+            .writer
+            .send((Entity::Vertex(vertex), tx))
+            .await
+            .unwrap();
+
+        let response = rx.await.unwrap();
+
+        debug!(response);
+
+        Ok(())
     }
 }

@@ -1,9 +1,11 @@
-use crate::{HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait};
+use std::fmt::{Debug, Display};
+
+use crate::Hypergraph;
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: VertexTrait,
-    HE: HyperedgeTrait,
+    V: Clone + Debug + Display,
+    HE: Clone + Debug + Display,
 {
     // This private method is infallible since adding the same vertex
     // will return the existing index.

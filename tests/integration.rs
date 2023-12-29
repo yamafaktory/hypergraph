@@ -1,7 +1,7 @@
-use hypergraph::Hypergraph;
+use hypergraph::{errors::HypergraphError, Hypergraph};
 
 #[tokio::test]
-async fn integration_main() -> Result<(), ()> {
+async fn integration_main() -> Result<(), HypergraphError> {
     tracing_subscriber::fmt::fmt()
         .pretty()
         .with_max_level(tracing::Level::DEBUG)
@@ -16,7 +16,9 @@ async fn integration_main() -> Result<(), ()> {
 
     let graph = Hypergraph::<Vertex, Hyperedge>::init().await?;
 
-    let t = graph.add_vertex(Vertex {}).await;
+    graph.add_vertex(Vertex {}).await?;
+
+    graph.add_hyperedge(Hyperedge {}, &[]).await?;
 
     Ok(())
 }

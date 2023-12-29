@@ -1,15 +1,19 @@
 use thiserror::Error;
 
 /// Enumeration of all the possible errors.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
-pub enum HypergraphError<V, HE>
-where
-    V: Copy + Eq,
-    HE: Copy + Eq,
-{
-    /// Dummy
-    #[error("HyperedgeIndex {0} was not found")]
-    Dummy(HE, V),
+#[derive(Debug, Error)]
+pub enum HypergraphError {
+    /// Error when a vertex is inserted.
+    #[error("Vertex couldn't be inserted")]
+    VertexInsertion,
+    /// Error when an hyperedge is inserted.
+    #[error("Hyperedge couldn't be inserted")]
+    HyperedgeInsertion,
+    //
+    //
+    //
+    //
+    //
     // /// Error when a HyperedgeIndex was not found.
     // #[error("HyperedgeIndex {0} was not found")]
     // HyperedgeIndexNotFound(HyperedgeIndex),

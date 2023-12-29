@@ -1,72 +1,25 @@
 #[doc(hidden)]
 pub mod errors;
-// #[doc(hidden)]
-// pub mod hyperedges;
-// mod indexes;
-// #[doc(hidden)]
-// pub mod iterator;
-// mod shared;
-#[doc(hidden)]
-mod types;
-// mod utils;
-// #[doc(hidden)]
-// pub mod vertices;
 
-use std::{
-    fmt::{Debug, Display, Formatter},
-    hash::Hash,
-    marker::PhantomData,
-    ops::Deref,
-    sync::Arc,
-};
+use std::{fmt::Debug, sync::Arc};
 
+use errors::HypergraphError;
 use quick_cache::sync::Cache;
 use tokio::{
     fs::{create_dir_all, read_dir, read_to_string},
     sync::{mpsc, oneshot, Mutex},
 };
-use tracing::{debug, error, info, span, warn, Level};
-//
-// use bi_hash_map::BiHashMap;
-use types::{AIndexMap, AIndexSet, ARandomState};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-//
-// // Reexport indexes at this level.
-// pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
-//
 
-// /// Shared Trait for the vertices.
-// /// Must be implemented to use the library.
-// pub trait VertexTrait: Clone + Debug + Display {}
-//
-// impl<T> VertexTrait for T where T: Clone + Debug + Display {}
-//
-// /// Shared Trait for the hyperedges.
-// /// Must be implemented to use the library.
-// pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
-//
-// impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
+type HypergraphEntitySender<V, HE, R> = mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
+type HypergraphUuidSender<V, HE> = mpsc::Sender<(Uuid, oneshot::Sender<Entity<V, HE>>)>;
 
-//
-// #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-// pub struct StorageContainer<A> {
-//     data: PhantomData<A>,
-//     index: Uuid,
-// }
-//
-// impl<A> StorageContainer<A> {
-//     pub fn new() -> Self {
-//         StorageContainer {
-//             data: PhantomData,
-//             index: Uuid::new_v7(),
-//         }
-//     }
-// }
-
+#[derive(Debug)]
 enum Entity<V, HE>
 where
-    V: Copy + Clone + Debug + Send + Sync,
-    HE: Copy + Clone + Debug + Send + Sync,
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
 {
     Hyperedge(HE),
     Vertex(V),
@@ -75,40 +28,48 @@ where
 #[derive(Debug)]
 struct MemoryCache<V, HE>
 where
-    V: Copy + Clone + Debug + Send + Sync,
-    HE: Copy + Clone + Debug + Send + Sync,
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
 {
     hyperedges: Arc<Cache<Uuid, HE>>,
     vertices: Arc<Cache<Uuid, V>>,
-    writer: mpsc::Sender<(Entity<V, HE>, oneshot::Sender<String>)>,
+    reader: HypergraphUuidSender<V, HE>,
+    writer: HypergraphEntitySender<V, HE, Uuid>,
 }
 
 impl<V, HE> MemoryCache<V, HE>
 where
-    V: Copy + Clone + Debug + Send + Sync + 'static,
-    HE: Copy + Clone + Debug + Send + Sync + 'static,
+    V: Clone + Debug + Send + Sync + 'static,
+    HE: Clone + Debug + Send + Sync + 'static,
 {
-    async fn new() -> Result<Self, ()> {
-        info!("Creating IOManager");
+    async fn new() -> Result<Self, HypergraphError> {
+        info!("Creating MemoryCache");
 
-        let sender = Self::get_writer().await?;
+        let hyperedges = Arc::new(Cache::new(10_000));
+        let vertices = Arc::new(Cache::new(10_000));
+        let reader = Self::get_reader(hyperedges.clone(), vertices.clone()).await?;
+        let writer = Self::get_writer(hyperedges.clone(), vertices.clone()).await?;
 
         Ok(Self {
-            hyperedges: Arc::new(Cache::new(10_000)),
-            vertices: Arc::new(Cache::new(10_000)),
-            writer: sender,
+            hyperedges,
+            vertices,
+            reader,
+            writer,
         })
     }
 
     #[tracing::instrument]
-    async fn get_reader() -> Result<mpsc::Sender<(Entity<V, HE>, oneshot::Sender<String>)>, ()> {
-        let (sender, mut rx) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<String>)>(1);
+    async fn get_reader(
+        hyperedges: Arc<Cache<Uuid, HE>>,
+        vertices: Arc<Cache<Uuid, V>>,
+    ) -> Result<HypergraphUuidSender<V, HE>, HypergraphError> {
+        let (sender, mut receiver) = mpsc::channel::<(Uuid, oneshot::Sender<Entity<V, HE>>)>(1);
 
         tokio::spawn(async move {
-            while let Some((todo, response)) = rx.recv().await {
+            while let Some((todo, response)) = receiver.recv().await {
                 debug!("Reading from in-memory cache.");
 
-                response.send(String::from("hello")).unwrap();
+                // response.send(Entity::Vertex(123)).unwrap();
             }
         });
 
@@ -116,14 +77,24 @@ where
     }
 
     #[tracing::instrument]
-    async fn get_writer() -> Result<mpsc::Sender<(Entity<V, HE>, oneshot::Sender<String>)>, ()> {
-        let (sender, mut rx) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<String>)>(1);
+    async fn get_writer(
+        hyperedges: Arc<Cache<Uuid, HE>>,
+        vertices: Arc<Cache<Uuid, V>>,
+    ) -> Result<HypergraphEntitySender<V, HE, Uuid>, HypergraphError> {
+        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
 
         tokio::spawn(async move {
-            while let Some((todo, response)) = rx.recv().await {
+            while let Some((entity, response)) = receiver.recv().await {
                 debug!("Writing to in-memory cache.");
 
-                response.send(String::from("hello")).unwrap();
+                let uuid = Uuid::now_v7();
+
+                match entity {
+                    Entity::Hyperedge(hyperedge) => hyperedges.insert(uuid, hyperedge),
+                    Entity::Vertex(vertex) => vertices.insert(uuid, vertex),
+                }
+                debug!("{}", uuid.to_string());
+                response.send(uuid).unwrap();
             }
         });
 
@@ -132,28 +103,112 @@ where
 }
 
 #[derive(Debug)]
-struct IOManager {
-    sender: mpsc::Sender<(String, oneshot::Sender<String>)>,
+struct IOManager<V, HE>
+where
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
+{
+    writer: mpsc::Sender<(Entity<V, HE>, oneshot::Sender<Uuid>)>,
 }
 
-impl IOManager {
+impl<V, HE> IOManager<V, HE>
+where
+    V: Clone + Debug + Send + Sync + 'static,
+    HE: Clone + Debug + Send + Sync + 'static,
+{
     #[tracing::instrument]
-    async fn new() -> Result<Self, ()> {
+    async fn new() -> Result<Self, HypergraphError> {
         info!("Creating IOManager");
 
-        let sender = Self::get_writer().await?;
+        let writer = Self::get_writer().await?;
 
-        Ok(Self { sender })
+        Ok(Self { writer })
     }
 
     #[tracing::instrument]
-    async fn get_writer() -> Result<mpsc::Sender<(String, oneshot::Sender<String>)>, ()> {
-        let (sender, mut rx) = mpsc::channel::<(String, oneshot::Sender<String>)>(1);
+    async fn get_writer() -> Result<HypergraphEntitySender<V, HE, Uuid>, HypergraphError> {
+        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
 
         tokio::spawn(async move {
-            while let Some((todo, response)) = rx.recv().await {
+            while let Some((todo, response)) = receiver.recv().await {
                 debug!("Writing to disk.");
-                response.send(String::from("hello")).unwrap();
+                // response.send(String::from("hello")).unwrap();
+            }
+        });
+
+        Ok(sender)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Handles<V, HE>
+where
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
+{
+    cache_writer: HypergraphEntitySender<V, HE, Uuid>,
+}
+
+impl<V, HE> Handles<V, HE>
+where
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
+{
+    fn new(cache_writer: HypergraphEntitySender<V, HE, Uuid>) -> Self {
+        Self { cache_writer }
+    }
+}
+
+#[derive(Debug)]
+struct EntityManager<V, HE>
+where
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
+{
+    writer: mpsc::Sender<(Entity<V, HE>, oneshot::Sender<Uuid>)>,
+}
+
+impl<V, HE> EntityManager<V, HE>
+where
+    V: Clone + Debug + Send + Sync + 'static,
+    HE: Clone + Debug + Send + Sync + 'static,
+{
+    async fn new(handles: Handles<V, HE>) -> Result<Self, HypergraphError> {
+        info!("Creating EntityManager");
+
+        let writer = Self::get_writer(handles.clone()).await?;
+
+        Ok(Self { writer })
+    }
+
+    #[tracing::instrument]
+    async fn get_writer(
+        handles: Handles<V, HE>,
+    ) -> Result<HypergraphEntitySender<V, HE, Uuid>, HypergraphError> {
+        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
+        // let handles = self.handles.clone();
+
+        tokio::spawn(async move {
+            while let Some((entity, response)) = receiver.recv().await {
+                debug!("Writing with entity manager.");
+
+                let (tsender, treceiver) = oneshot::channel();
+
+                handles
+                    .cache_writer
+                    .send((entity, tsender))
+                    .await
+                    .map_err(|_| HypergraphError::VertexInsertion)
+                    .unwrap();
+
+                let uuid = treceiver
+                    .await
+                    .map_err(|_| HypergraphError::VertexInsertion)
+                    .unwrap();
+
+                debug!("Vertex {} added", uuid.to_string());
+
+                response.send(uuid).unwrap();
             }
         });
 
@@ -165,42 +220,72 @@ impl IOManager {
 #[derive(Debug)]
 pub struct Hypergraph<V, HE>
 where
-    V: Copy + Clone + Debug + Send + Sync,
-    HE: Copy + Clone + Debug + Send + Sync,
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
 {
-    cache: MemoryCache<V, HE>,
-    writer: IOManager,
+    entity_manager: EntityManager<V, HE>,
+    io_manager: IOManager<V, HE>,
+    memory_cache: MemoryCache<V, HE>,
 }
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: Copy + Clone + Debug + Send + Sync + 'static,
-    HE: Copy + Clone + Debug + Send + Sync + 'static,
+    V: Clone + Debug + Send + Sync + 'static,
+    HE: Clone + Debug + Send + Sync + 'static,
 {
     #[tracing::instrument]
-    pub async fn init() -> Result<Self, ()> {
+    pub async fn init() -> Result<Self, HypergraphError> {
         info!("Init Hypergraph");
 
+        let io_manager = IOManager::new().await?;
+        let memory_cache = MemoryCache::new().await?;
+
         Ok(Self {
-            cache: MemoryCache::new().await?,
-            writer: IOManager::new().await?,
+            entity_manager: EntityManager::new(Handles::new(memory_cache.writer.clone())).await?,
+            io_manager,
+            memory_cache,
         })
     }
 
     #[tracing::instrument]
-    pub async fn add_vertex(self, vertex: V) -> Result<(), ()> {
-        let (tx, rx) = oneshot::channel();
+    pub async fn add_vertex(&self, weight: V) -> Result<Uuid, HypergraphError> {
+        let (sender, receiver) = oneshot::channel();
 
-        self.cache
+        self.entity_manager
             .writer
-            .send((Entity::Vertex(vertex), tx))
+            .send((Entity::Vertex(weight), sender))
             .await
-            .unwrap();
+            .map_err(|_| HypergraphError::VertexInsertion)?;
 
-        let response = rx.await.unwrap();
+        let uuid = receiver
+            .await
+            .map_err(|_| HypergraphError::VertexInsertion)?;
 
-        debug!(response);
+        debug!("Vertex {} added", uuid.to_string());
 
-        Ok(())
+        Ok(uuid)
+    }
+
+    #[tracing::instrument]
+    pub async fn add_hyperedge(
+        &self,
+        weight: HE,
+        vertices: &[Uuid],
+    ) -> Result<Uuid, HypergraphError> {
+        let (sender, receiver) = oneshot::channel();
+
+        self.entity_manager
+            .writer
+            .send((Entity::Hyperedge(weight), sender))
+            .await
+            .map_err(|_| HypergraphError::HyperedgeInsertion)?;
+
+        let uuid = receiver
+            .await
+            .map_err(|_| HypergraphError::HyperedgeInsertion)?;
+
+        debug!("Hyperedge {} added", uuid.to_string());
+
+        Ok(uuid)
     }
 }

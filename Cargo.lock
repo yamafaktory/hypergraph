@@ -298,9 +298,7 @@ checksum = "d77f7ec81a6d05a3abb01ab6eb7590f6083d08449fe5a1c8b1e620283546ccb7"
 name = "hypergraph"
 version = "2.1.2"
 dependencies = [
- "ahash",
  "criterion",
- "indexmap",
  "itertools 0.12.0",
  "quick_cache",
  "rayon",
@@ -309,17 +307,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
-]
-
-[[package]]
-name = "indexmap"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
-dependencies = [
- "equivalent",
- "hashbrown",
- "rayon",
 ]
 
 [[package]]

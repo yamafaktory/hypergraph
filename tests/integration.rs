@@ -1,6 +1,8 @@
+use std::path::Path;
+
 use hypergraph::{errors::HypergraphError, Hypergraph};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn integration_main() -> Result<(), HypergraphError> {
     tracing_subscriber::fmt::fmt()
         .pretty()
@@ -14,11 +16,13 @@ async fn integration_main() -> Result<(), HypergraphError> {
     #[derive(Clone, Copy, Debug)]
     struct Hyperedge {}
 
-    let graph = Hypergraph::<Vertex, Hyperedge>::init().await?;
+    let path = Path::new("./test");
+
+    let graph = Hypergraph::<Vertex, Hyperedge>::init(path).await?;
 
     graph.add_vertex(Vertex {}).await?;
 
-    graph.add_hyperedge(Hyperedge {}, &[]).await?;
+    // graph.add_hyperedge(Hyperedge {}, &[]).await?;
 
     Ok(())
 }

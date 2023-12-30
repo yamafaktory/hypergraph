@@ -3,6 +3,17 @@ use thiserror::Error;
 /// Enumeration of all the possible errors.
 #[derive(Debug, Error)]
 pub enum HypergraphError {
+    /// Error when the databases can't be created.
+    #[error("Databases can't be created")]
+    DatabasesCreation,
+    /// Error when the path can't be created.
+    #[error("Path can't be created")]
+    PathCreation,
+    /// Error when the path is not accessible.
+    /// This could be the case when the listing permission is denied on one of
+    /// the parent directories.
+    #[error("Path is not accessible")]
+    PathNotAccessible,
     /// Error when a vertex is inserted.
     #[error("Vertex couldn't be inserted")]
     VertexInsertion,

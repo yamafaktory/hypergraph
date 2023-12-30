@@ -1,16 +1,23 @@
 #[doc(hidden)]
 pub mod errors;
 
-use std::{fmt::Debug, path::Path, sync::Arc};
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use errors::HypergraphError;
 use quick_cache::sync::Cache;
 use tokio::{
-    fs::{create_dir_all, read_dir, read_to_string},
+    fs::{create_dir_all, read_dir, read_to_string, try_exists, File},
     sync::{mpsc, oneshot, Mutex},
 };
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
+
+static VERTICES_DB: &str = "vertices.db";
+static HYPEREDGES_DB: &str = "hyperedges.db";
 
 type HypergraphEntitySender<V, HE> = mpsc::Sender<Entity<V, HE>>;
 type HypergraphEntitySenderWithResponse<V, HE, R> =
@@ -110,6 +117,8 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
+    hyperedges_db_path: PathBuf,
+    vertices_db_path: PathBuf,
     writer: HypergraphEntitySender<V, HE>,
 }
 
@@ -119,12 +128,50 @@ where
     HE: Clone + Debug + Send + Sync + 'static,
 {
     #[instrument]
-    async fn start() -> Result<Self, HypergraphError> {
+    async fn start<P>(path: P) -> Result<Self, HypergraphError>
+    where
+        P: AsRef<Path> + Copy + Debug,
+    {
         info!("Starting IOManager");
+
+        let vertices_db_path = path.as_ref().join(VERTICES_DB);
+        let hyperedges_db_path = path.as_ref().join(HYPEREDGES_DB);
+
+        match try_exists(path).await {
+            Ok(true) => {
+                debug!("Path already exists");
+            }
+            Ok(false) => {
+                debug!("Path does not exist");
+
+                create_dir_all(path)
+                    .await
+                    .map_err(|_| HypergraphError::PathCreation)?;
+
+                File::create(vertices_db_path.clone())
+                    .await
+                    .map_err(|_| HypergraphError::DatabasesCreation)?
+                    .sync_all()
+                    .await
+                    .map_err(|_| HypergraphError::DatabasesCreation)?;
+
+                File::create(hyperedges_db_path.clone())
+                    .await
+                    .map_err(|_| HypergraphError::DatabasesCreation)?
+                    .sync_all()
+                    .await
+                    .map_err(|_| HypergraphError::DatabasesCreation)?;
+            }
+            Err(_) => return Err(HypergraphError::PathNotAccessible),
+        };
 
         let writer = Self::get_writer().await?;
 
-        Ok(Self { writer })
+        Ok(Self {
+            hyperedges_db_path,
+            vertices_db_path,
+            writer,
+        })
     }
 
     #[instrument]
@@ -247,10 +294,13 @@ where
     HE: Clone + Debug + Send + Sync + 'static,
 {
     #[instrument]
-    pub async fn init(path: impl AsRef<Path> + std::fmt::Debug) -> Result<Self, HypergraphError> {
+    pub async fn init<P>(path: P) -> Result<Self, HypergraphError>
+    where
+        P: AsRef<Path> + Copy + Debug,
+    {
         info!("Init Hypergraph");
 
-        let io_manager = IOManager::start().await?;
+        let io_manager = IOManager::start(path).await?;
         let memory_cache = MemoryCache::start().await?;
 
         Ok(Self {

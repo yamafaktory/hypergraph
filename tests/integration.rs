@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use hypergraph::{errors::HypergraphError, Hypergraph};
+use serde::Serialize;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn integration_main() -> Result<(), HypergraphError> {
@@ -10,7 +11,7 @@ async fn integration_main() -> Result<(), HypergraphError> {
         .with_thread_ids(true)
         .init();
 
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, Serialize)]
     struct Vertex {}
 
     #[derive(Clone, Copy, Debug)]
@@ -20,9 +21,9 @@ async fn integration_main() -> Result<(), HypergraphError> {
 
     let graph = Hypergraph::<Vertex, Hyperedge>::init(path).await?;
 
-    graph.add_vertex(Vertex {}).await?;
+    let id = graph.add_vertex(Vertex {}).await?;
 
-    // graph.add_hyperedge(Hyperedge {}, &[]).await?;
+    graph.add_hyperedge(Hyperedge {}, vec![id]).await?;
 
     Ok(())
 }

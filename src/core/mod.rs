@@ -12,10 +12,10 @@ use ahash::RandomState;
 use bincode::{deserialize, serialize};
 use errors::HypergraphError;
 use quick_cache::sync::Cache;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::{
-    fs::{create_dir_all, try_exists, File},
-    io::AsyncReadExt,
+    fs::{create_dir_all, try_exists, File, OpenOptions},
+    io::{AsyncReadExt, AsyncWriteExt},
     sync::{mpsc, oneshot},
 };
 use tracing::{debug, error, info, instrument, warn};
@@ -24,10 +24,9 @@ use uuid::Uuid;
 static VERTICES_DB: &str = "vertices.db";
 static HYPEREDGES_DB: &str = "hyperedges.db";
 
-type HypergraphEntitySender<V, HE> = mpsc::Sender<Entity<V, HE>>;
-type HypergraphEntitySenderWithResponse<V, HE, R> =
-    mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
-type HypergraphUuidSender<V, HE> = mpsc::Sender<(Uuid, oneshot::Sender<Entity<V, HE>>)>;
+type EntityWithUuidSender<V, HE> = mpsc::Sender<(Entity<V, HE>, Uuid)>;
+type EntitySenderWithResponse<V, HE, R> = mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
+type UuidSender<V, HE> = mpsc::Sender<(Uuid, oneshot::Sender<Entity<V, HE>>)>;
 
 #[derive(Clone, Debug)]
 enum Entity<V, HE>
@@ -42,7 +41,7 @@ where
 pub(crate) type HashSet<K> = DefaultHashSet<K, RandomState>;
 pub(crate) type HashMap<K, V> = DefaultHashMap<K, V, RandomState>;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct Vertex<V> {
     relations: HashSet<Uuid>,
     weight: V,
@@ -78,8 +77,8 @@ where
 {
     hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
     vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    reader: HypergraphUuidSender<V, HE>,
-    writer: HypergraphEntitySenderWithResponse<V, HE, Uuid>,
+    reader: UuidSender<V, HE>,
+    writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
 impl<V, HE> MemoryCache<V, HE>
@@ -107,7 +106,7 @@ where
     async fn get_reader(
         hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
         vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    ) -> Result<HypergraphUuidSender<V, HE>, HypergraphError> {
+    ) -> Result<UuidSender<V, HE>, HypergraphError> {
         let (sender, mut receiver) = mpsc::channel::<(Uuid, oneshot::Sender<Entity<V, HE>>)>(1);
 
         tokio::spawn(async move {
@@ -125,7 +124,7 @@ where
     async fn get_writer(
         hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
         vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    ) -> Result<HypergraphEntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
+    ) -> Result<EntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
         let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
 
         tokio::spawn(async move {
@@ -156,12 +155,12 @@ where
     hyperedges_db_path: Arc<Path>,
     vertices_db_path: Arc<Path>,
     path: Arc<Path>,
-    writer: Option<HypergraphEntitySender<V, HE>>,
+    writer: Option<EntityWithUuidSender<V, HE>>,
 }
 
 impl<V, HE> IOManager<V, HE>
 where
-    V: Clone + Debug + Send + Sync + Serialize + 'static,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     HE: Clone + Debug + Send + Sync + 'static,
 {
     #[instrument]
@@ -197,6 +196,7 @@ where
                 if let Ok(exists) = try_exists(self.vertices_db_path.clone()).await {
                     if !exists {
                         self.create_entity_db(self.vertices_db_path.clone()).await?;
+                        debug!("Vertices storage file was not found and has been created");
                     }
                 } else {
                     return Err(HypergraphError::DatabasesCreation);
@@ -206,6 +206,7 @@ where
                     if !exists {
                         self.create_entity_db(self.hyperedges_db_path.clone())
                             .await?;
+                        debug!("Hyperedges storage file was not found and has been created");
                     }
                 } else {
                     return Err(HypergraphError::DatabasesCreation);
@@ -232,7 +233,7 @@ where
         File::create(path)
             .await
             .map_err(|_| HypergraphError::DatabasesCreation)?
-            .sync_all()
+            .sync_data()
             .await
             .map_err(|_| HypergraphError::DatabasesCreation)?;
 
@@ -240,30 +241,39 @@ where
     }
 
     #[instrument]
-    async fn get_writer(&self) -> Result<HypergraphEntitySender<V, HE>, HypergraphError> {
-        let (sender, mut receiver) = mpsc::channel::<Entity<V, HE>>(1);
+    async fn get_writer(&self) -> Result<EntityWithUuidSender<V, HE>, HypergraphError> {
+        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, Uuid)>(1);
         let vertices_db_path = self.vertices_db_path.clone();
 
         tokio::spawn(async move {
-            while let Some(entity) = receiver.recv().await {
+            while let Some((entity, uuid)) = receiver.recv().await {
                 debug!("Writing to disk.");
 
                 match entity {
                     Entity::Hyperedge(hyperedge) => {}
                     Entity::Vertex(vertex) => {
-                        let mut file = File::open(vertices_db_path.clone()).await.unwrap();
+                        let mut file = OpenOptions::new()
+                            .read(true)
+                            .write(true)
+                            .open(vertices_db_path.clone())
+                            .await
+                            .unwrap();
                         let metadata = file.metadata().await.unwrap();
+                        let mut data: HashMap<Uuid, Vertex<V>> = HashMap::default();
 
-                        if metadata.len() == 0 {
-                            let mut data: HashMap<Uuid, Vertex<V>> = HashMap::default();
-                            data.insert(Uuid::now_v7(), vertex);
-                            let t = serialize(&data).unwrap();
-                            dbg!(t);
-                        } else {
+                        if metadata.len() != 0 {
                             let mut contents = vec![];
                             file.read_to_end(&mut contents).await.unwrap();
-                            let decompressed: Vec<u8> = deserialize(&contents).unwrap();
+
+                            data = deserialize(&contents).unwrap();
                         }
+
+                        data.insert(uuid, vertex);
+
+                        let bytes = serialize(&data).unwrap();
+
+                        file.write_all(&bytes).await.unwrap();
+                        file.sync_data().await.unwrap();
                     }
                 }
             }
@@ -279,8 +289,8 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    io_manager_writer: HypergraphEntitySender<V, HE>,
-    memory_cache_writer: HypergraphEntitySenderWithResponse<V, HE, Uuid>,
+    io_manager_writer: EntityWithUuidSender<V, HE>,
+    memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
 impl<V, HE> Handles<V, HE>
@@ -289,8 +299,8 @@ where
     HE: Clone + Debug + Send + Sync,
 {
     fn new(
-        io_manager_writer: HypergraphEntitySender<V, HE>,
-        memory_cache_writer: HypergraphEntitySenderWithResponse<V, HE, Uuid>,
+        io_manager_writer: EntityWithUuidSender<V, HE>,
+        memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
     ) -> Self {
         Self {
             io_manager_writer,
@@ -324,7 +334,7 @@ where
     #[instrument]
     async fn get_writer(
         handles: Handles<V, HE>,
-    ) -> Result<HypergraphEntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
+    ) -> Result<EntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
         let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
 
         tokio::spawn(async move {
@@ -346,9 +356,11 @@ where
                     .map_err(|_| HypergraphError::VertexInsertion)
                     .unwrap();
 
+                // We don't wait for the IOManager to respond since we use a
+                // write-through strategy.
                 handles
                     .io_manager_writer
-                    .send(entity_copy)
+                    .send((entity_copy, uuid))
                     .await
                     .map_err(|_| HypergraphError::VertexInsertion)
                     .unwrap();
@@ -365,7 +377,7 @@ where
 #[derive(Debug)]
 pub struct Hypergraph<V, HE>
 where
-    V: Clone + Debug + Send + Serialize + Sync,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Serialize + Sync,
     HE: Clone + Debug + Send + Sync,
 {
     entity_manager: EntityManager<V, HE>,
@@ -375,7 +387,7 @@ where
 
 impl<V, HE> Hypergraph<V, HE>
 where
-    V: Clone + Debug + Send + Sync + Serialize + 'static,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     HE: Clone + Debug + Send + Sync + 'static,
 {
     #[instrument]

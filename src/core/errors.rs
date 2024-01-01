@@ -17,6 +17,9 @@ pub enum HypergraphError {
     /// Error when a vertex is inserted.
     #[error("Vertex couldn't be inserted")]
     VertexInsertion,
+    /// Error when a vertex is retrieved.
+    #[error("Vertex couldn't be retrieved")]
+    VertexRetrieval,
     /// Error when an hyperedge is inserted.
     #[error("Hyperedge couldn't be inserted")]
     HyperedgeInsertion,

@@ -23,6 +23,10 @@ async fn integration_main() -> Result<(), HypergraphError> {
     let graph = Hypergraph::<Vertex, Hyperedge>::init(path).await?;
 
     let id = graph.add_vertex(Vertex {}).await?;
+
+    let vertex = graph.get_vertex(id).await?;
+
+    dbg!(vertex);
     sleep(Duration::from_millis(5000)).await;
     // graph.add_hyperedge(Hyperedge {}, vec![id]).await?;
 

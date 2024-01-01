@@ -18,15 +18,23 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{mpsc, oneshot},
 };
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 static VERTICES_DB: &str = "vertices.db";
 static HYPEREDGES_DB: &str = "hyperedges.db";
 
 type EntityWithUuidSender<V, HE> = mpsc::Sender<(Entity<V, HE>, Uuid)>;
+type EntityKindWithUuidSenderWithResponse<V, HE> =
+    mpsc::Sender<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>;
 type EntitySenderWithResponse<V, HE, R> = mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
 type UuidSender<V, HE> = mpsc::Sender<(Uuid, oneshot::Sender<Entity<V, HE>>)>;
+
+#[derive(Clone, Debug)]
+enum EntityKind {
+    Hyperedge,
+    Vertex,
+}
 
 #[derive(Clone, Debug)]
 enum Entity<V, HE>
@@ -42,7 +50,7 @@ pub(crate) type HashSet<K> = DefaultHashSet<K, RandomState>;
 pub(crate) type HashMap<K, V> = DefaultHashMap<K, V, RandomState>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Vertex<V> {
+pub struct Vertex<V> {
     relations: HashSet<Uuid>,
     weight: V,
 }
@@ -54,7 +62,7 @@ impl<V> Vertex<V> {
 }
 
 #[derive(Clone, Debug)]
-struct Hyperedge<HE> {
+pub struct Hyperedge<HE> {
     relations: Vec<Uuid>,
     weight: HE,
 }
@@ -65,10 +73,6 @@ impl<HE> Hyperedge<HE> {
     }
 }
 
-struct Vertices<V>(HashMap<Uuid, Vertex<V>>);
-
-struct Hyperedges<HE>(HashMap<Uuid, Hyperedge<HE>>);
-
 #[derive(Debug)]
 struct MemoryCache<V, HE>
 where
@@ -77,7 +81,7 @@ where
 {
     hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
     vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    reader: UuidSender<V, HE>,
+    reader: EntityKindWithUuidSenderWithResponse<V, HE>,
     writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -106,14 +110,20 @@ where
     async fn get_reader(
         hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
         vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    ) -> Result<UuidSender<V, HE>, HypergraphError> {
-        let (sender, mut receiver) = mpsc::channel::<(Uuid, oneshot::Sender<Entity<V, HE>>)>(1);
+    ) -> Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
+        let (sender, mut receiver) =
+            mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
 
         tokio::spawn(async move {
-            while let Some((todo, response)) = receiver.recv().await {
+            while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
                 debug!("Reading from in-memory cache.");
 
-                // response.send(Entity::Vertex(123)).unwrap();
+                let entity = match entity_kind {
+                    EntityKind::Hyperedge => hyperedges.get(&uuid).map(Entity::Hyperedge),
+                    EntityKind::Vertex => vertices.get(&uuid).map(Entity::Vertex),
+                };
+
+                response.send(entity).unwrap();
             }
         });
 
@@ -155,6 +165,7 @@ where
     hyperedges_db_path: Arc<Path>,
     vertices_db_path: Arc<Path>,
     path: Arc<Path>,
+    reader: Option<EntityKindWithUuidSenderWithResponse<V, HE>>,
     writer: Option<EntityWithUuidSender<V, HE>>,
 }
 
@@ -178,13 +189,16 @@ where
             hyperedges_db_path,
             vertices_db_path,
             path,
+            reader: None,
             writer: None,
         })
     }
 
     async fn start(&mut self) -> Result<(), HypergraphError> {
+        let reader = self.get_reader().await?;
         let writer = self.get_writer().await?;
 
+        self.reader = Some(reader);
         self.writer = Some(writer);
 
         let path = self.path.clone();
@@ -241,6 +255,48 @@ where
     }
 
     #[instrument]
+    async fn get_reader(
+        &self,
+    ) -> Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
+        let (sender, mut receiver) =
+            mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
+        let vertices_db_path = self.vertices_db_path.clone();
+
+        tokio::spawn(async move {
+            while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
+                debug!("Reading from disk.");
+
+                let mut entity = None;
+
+                match entity_kind {
+                    EntityKind::Hyperedge => {}
+                    EntityKind::Vertex => {
+                        let mut file = OpenOptions::new()
+                            .read(true)
+                            .open(vertices_db_path.clone())
+                            .await
+                            .unwrap();
+                        let metadata = file.metadata().await.unwrap();
+
+                        if metadata.len() != 0 {
+                            let mut contents = vec![];
+                            file.read_to_end(&mut contents).await.unwrap();
+
+                            let data: HashMap<Uuid, Vertex<V>> = deserialize(&contents).unwrap();
+
+                            entity = data.get(&uuid).cloned().map(Entity::Vertex);
+                        }
+                    }
+                };
+
+                response.send(entity).unwrap();
+            }
+        });
+
+        Ok(sender)
+    }
+
+    #[instrument]
     async fn get_writer(&self) -> Result<EntityWithUuidSender<V, HE>, HypergraphError> {
         let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, Uuid)>(1);
         let vertices_db_path = self.vertices_db_path.clone();
@@ -289,7 +345,9 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
+    io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
     io_manager_writer: EntityWithUuidSender<V, HE>,
+    memory_cache_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
     memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -299,11 +357,15 @@ where
     HE: Clone + Debug + Send + Sync,
 {
     fn new(
+        io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
         io_manager_writer: EntityWithUuidSender<V, HE>,
+        memory_cache_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
         memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
     ) -> Self {
         Self {
+            io_manager_reader,
             io_manager_writer,
+            memory_cache_reader,
             memory_cache_writer,
         }
     }
@@ -315,7 +377,8 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    writer: mpsc::Sender<(Entity<V, HE>, oneshot::Sender<Uuid>)>,
+    reader: EntityKindWithUuidSenderWithResponse<V, HE>,
+    writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
 impl<V, HE> EntityManager<V, HE>
@@ -326,9 +389,62 @@ where
     async fn start(handles: Handles<V, HE>) -> Result<Self, HypergraphError> {
         info!("Starting EntityManager");
 
+        let reader = Self::get_reader(handles.clone()).await?;
         let writer = Self::get_writer(handles.clone()).await?;
 
-        Ok(Self { writer })
+        Ok(Self { reader, writer })
+    }
+
+    #[instrument]
+    async fn get_reader(
+        handles: Handles<V, HE>,
+    ) -> Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
+        let (sender, mut receiver) =
+            mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
+
+        tokio::spawn(async move {
+            while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
+                debug!("Reading with entity manager.");
+
+                let (sender, receiver) = oneshot::channel();
+                let entity_kind_copy = entity_kind.clone();
+
+                handles
+                    .memory_cache_reader
+                    .send(((entity_kind, uuid), sender))
+                    .await
+                    .map_err(|_| HypergraphError::VertexInsertion)
+                    .unwrap();
+
+                let mut entity = receiver
+                    .await
+                    .map_err(|_| HypergraphError::VertexInsertion)
+                    .unwrap();
+
+                // We use a read-through strategy here.
+                if entity.is_none() {
+                    let (sender, receiver) = oneshot::channel();
+
+                    handles
+                        .io_manager_reader
+                        .send(((entity_kind_copy, uuid), sender))
+                        .await
+                        .map_err(|_| HypergraphError::VertexInsertion)
+                        .unwrap();
+
+                    entity = receiver
+                        .await
+                        .map_err(|_| HypergraphError::VertexInsertion)
+                        .unwrap();
+
+                    // TODO: cache miss but on disk -> sync cache
+                }
+
+                response.send(entity).unwrap();
+            }
+        });
+
+        Ok(sender)
     }
 
     #[instrument]
@@ -404,7 +520,9 @@ where
 
         Ok(Self {
             entity_manager: EntityManager::start(Handles::new(
+                io_manager.reader.clone().unwrap(),
                 io_manager.writer.clone().unwrap(),
+                memory_cache.reader.clone(),
                 memory_cache.writer.clone(),
             ))
             .await?,
@@ -433,6 +551,34 @@ where
         debug!("Vertex {} added", uuid.to_string());
 
         Ok(uuid)
+    }
+
+    #[instrument]
+    pub async fn get_vertex(&self, uuid: Uuid) -> Result<Option<Vertex<V>>, HypergraphError> {
+        let (sender, receiver) = oneshot::channel();
+
+        self.entity_manager
+            .reader
+            .send(((EntityKind::Vertex, uuid), sender))
+            .await
+            .map_err(|_| HypergraphError::VertexRetrieval)?;
+
+        let vertex = receiver
+            .await
+            .map_err(|_| HypergraphError::VertexRetrieval)?;
+
+        if vertex.is_some() {
+            debug!("Vertex {} found", uuid.to_string());
+
+            match vertex.unwrap() {
+                Entity::Hyperedge(_) => unreachable!(),
+                Entity::Vertex(vertex) => Ok(Some(vertex)),
+            }
+        } else {
+            debug!("Vertex {} not found", uuid.to_string());
+
+            Ok(None)
+        }
     }
 
     #[instrument]

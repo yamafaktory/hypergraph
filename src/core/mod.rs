@@ -4,7 +4,10 @@ pub mod errors;
 use std::{
     collections::{HashMap as DefaultHashMap, HashSet as DefaultHashSet},
     fmt::Debug,
+    future::Future,
     path::Path,
+    pin::Pin,
+    process::Output,
     sync::Arc,
 };
 
@@ -24,11 +27,99 @@ use uuid::Uuid;
 static VERTICES_DB: &str = "vertices.db";
 static HYPEREDGES_DB: &str = "hyperedges.db";
 
+struct Actor<A, R>
+where
+    A: Send + Sync + 'static,
+    R: Send + Sync + 'static,
+{
+    handler: &'static Handler<A, R>,
+    receiver: mpsc::Receiver<ActorMessage<A, R>>,
+}
+
 type EntityWithUuidSender<V, HE> = mpsc::Sender<(Entity<V, HE>, Uuid)>;
 type EntityKindWithUuidSenderWithResponse<V, HE> =
     mpsc::Sender<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>;
 type EntitySenderWithResponse<V, HE, R> = mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
 type UuidSender<V, HE> = mpsc::Sender<(Uuid, oneshot::Sender<Entity<V, HE>>)>;
+
+enum ActorMessage<A, R> {
+    GetResponse {
+        argument: A,
+        respond_to: oneshot::Sender<R>,
+    },
+}
+
+type Handler<A, R> =
+    dyn Fn(A) -> Pin<Box<dyn Future<Output = Result<R, HypergraphError>> + Send + 'static>> + Sync;
+
+impl<A, R> Actor<A, R>
+where
+    A: Send + Sync + 'static,
+    R: Send + Sync + 'static,
+{
+    fn new(handler: &'static Handler<A, R>, receiver: mpsc::Receiver<ActorMessage<A, R>>) -> Self {
+        Actor { handler, receiver }
+    }
+    async fn handle_message(&mut self, msg: ActorMessage<A, R>) {
+        match msg {
+            ActorMessage::GetResponse {
+                argument,
+                respond_to,
+            } => {
+                let t = (self.handler)(argument).await.unwrap();
+
+                // The `let _ =` ignores any errors when sending.
+                //
+                // This can happen if the `select!` macro is used
+                // to cancel waiting for the response.
+                let _ = respond_to.send(t);
+            }
+        }
+    }
+}
+
+async fn run_my_actor<A, R>(mut actor: Actor<A, R>)
+where
+    A: Send + Sync,
+    R: Send + Sync,
+{
+    while let Some(msg) = actor.receiver.recv().await {
+        actor.handle_message(msg);
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct ActorHandle<A, R> {
+    sender: mpsc::Sender<ActorMessage<A, R>>,
+}
+
+impl<A, R> ActorHandle<A, R>
+where
+    A: Send + Sync + 'static,
+    R: Send + Sync + 'static,
+{
+    pub(crate) fn new(handler: &'static Handler<A, R>) -> Self {
+        let (sender, receiver) = mpsc::channel(8);
+        let actor = Actor::new(handler, receiver);
+        tokio::spawn(run_my_actor(actor));
+
+        Self { sender }
+    }
+
+    pub(crate) async fn get_message(&self, argument: A) -> R {
+        let (send, recv) = oneshot::channel();
+        let msg = ActorMessage::GetResponse {
+            argument,
+            respond_to: send,
+        };
+
+        // Ignore send errors. If this send fails, so does the
+        // recv.await below. There's no reason to check the
+        // failure twice.
+        let _ = self.sender.send(msg).await;
+        recv.await.expect("Actor task has been killed")
+    }
+}
 
 #[derive(Clone, Debug)]
 enum EntityKind {
@@ -111,6 +202,15 @@ where
         hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
         vertices: Arc<Cache<Uuid, Vertex<V>>>,
     ) -> Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
+        let a = ActorHandle::<String, String>::new(&|a| {
+            //
+            Box::pin(async {
+                //
+                Ok(String::from("done"))
+            })
+        });
+        let t = a.get_message(String::new()).await;
+
         let (sender, mut receiver) =
             mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
 

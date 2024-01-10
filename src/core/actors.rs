@@ -1,34 +1,32 @@
-use std::{future::Future, pin::Pin};
-
+use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, info, instrument};
 
 use crate::errors::HypergraphError;
 
-type Handler<A, R> =
-    dyn Fn(A) -> Pin<Box<dyn Future<Output = Result<R, HypergraphError>> + Send + 'static>> + Sync;
+type Handler<'a, A, R> = dyn Fn(A) -> BoxFuture<'a, Result<R, HypergraphError>> + Send + Sync;
 
-struct Actor<A, R>
+struct Actor<'a, A, R>
 where
     A: Send + Sync + 'static,
     R: Send + Sync + 'static,
 {
-    handler: &'static Handler<A, R>,
+    handler: &'a Handler<'a, A, R>,
     receiver: mpsc::Receiver<ActorMessage<A, R>>,
 }
 
 struct ActorMessage<A, R>(A, oneshot::Sender<R>);
 
-impl<A, R> Actor<A, R>
+impl<'a, A, R> Actor<'a, A, R>
 where
-    A: Send + Sync + 'static,
-    R: Send + Sync + 'static,
+    A: Send + Sync,
+    R: Send + Sync,
 {
-    fn new(handler: &'static Handler<A, R>, receiver: mpsc::Receiver<ActorMessage<A, R>>) -> Self {
+    fn new(handler: &'a Handler<'a, A, R>, receiver: mpsc::Receiver<ActorMessage<A, R>>) -> Self {
         Actor { handler, receiver }
     }
 
-    async fn handle_message(&mut self, ActorMessage(argument, sender): ActorMessage<A, R>) {
+    async fn handle_message(&self, ActorMessage(argument, sender): ActorMessage<A, R>) {
         let response = (self.handler)(argument).await.unwrap();
 
         // Ignore send errors.
@@ -36,7 +34,7 @@ where
     }
 }
 
-async fn runner<A, R>(mut actor: Actor<A, R>)
+async fn runner<A, R>(mut actor: Actor<'_, A, R>)
 where
     A: Send + Sync,
     R: Send + Sync,

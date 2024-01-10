@@ -2,7 +2,7 @@ use std::{path::Path, time::Duration};
 
 use hypergraph::{errors::HypergraphError, Hypergraph};
 use serde::{Deserialize, Serialize};
-use tokio::time::sleep;
+use tokio::{fs::remove_dir_all, time::sleep};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn integration_main() -> Result<(), HypergraphError> {
@@ -29,6 +29,8 @@ async fn integration_main() -> Result<(), HypergraphError> {
     dbg!(vertex);
     sleep(Duration::from_millis(5000)).await;
     // graph.add_hyperedge(Hyperedge {}, vec![id]).await?;
+
+    let _ = remove_dir_all(path).await;
 
     Ok(())
 }

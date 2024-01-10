@@ -13,12 +13,13 @@ use std::{
 use ahash::RandomState;
 use bincode::{deserialize, serialize};
 use errors::HypergraphError;
+use futures::{future::BoxFuture, FutureExt};
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{create_dir_all, try_exists, File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::{mpsc, oneshot},
+    sync::{mpsc, oneshot, Mutex},
 };
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
@@ -110,17 +111,21 @@ where
         })
     }
 
+    async fn test(
+        self,
+        entity_kind: EntityKind,
+        uuid: Uuid,
+    ) -> Result<Option<Entity<V, HE>>, HypergraphError> {
+        Ok(None)
+    }
+
     #[tracing::instrument]
     async fn get_reader(
         hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
         vertices: Arc<Cache<Uuid, Vertex<V>>>,
     ) -> ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>> {
-        // Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
-        let hyperedges = hyperedges.clone();
-        let vertices = vertices.clone();
         ActorHandle::<(EntityKind, Uuid), Option<Entity<V, HE>>>::new(&|(entity_kind, uuid)| {
-            //
-            Box::pin(async move {
+            async move {
                 debug!("Reading from in-memory cache.");
                 // let entity = match entity_kind {
                 //     EntityKind::Hyperedge => hyperedges.get(&uuid).map(Entity::Hyperedge),
@@ -129,8 +134,10 @@ where
 
                 // Ok(entity)
                 Ok(None)
-            })
+            }
+            .boxed()
         })
+
         // let t = a.process(12).await?;
         // debug!(t);
 
@@ -370,7 +377,7 @@ where
 {
     io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
     io_manager_writer: EntityWithUuidSender<V, HE>,
-    memory_cache_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
+    memory_cache_reader: ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>>,
     memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -382,7 +389,7 @@ where
     fn new(
         io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
         io_manager_writer: EntityWithUuidSender<V, HE>,
-        memory_cache_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
+        memory_cache_reader: ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>>,
         memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
     ) -> Self {
         Self {
@@ -429,17 +436,11 @@ where
             while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
                 debug!("Reading with entity manager.");
 
-                let (sender, receiver) = oneshot::channel();
                 let entity_kind_copy = entity_kind.clone();
 
-                handles
+                let mut entity = handles
                     .memory_cache_reader
-                    .send(((entity_kind, uuid), sender))
-                    .await
-                    .map_err(|_| HypergraphError::VertexInsertion)
-                    .unwrap();
-
-                let mut entity = receiver
+                    .process((entity_kind, uuid))
                     .await
                     .map_err(|_| HypergraphError::VertexInsertion)
                     .unwrap();

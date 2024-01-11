@@ -1,3 +1,5 @@
+use std::{marker::PhantomData, sync::Arc};
+
 use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, info, instrument};
@@ -6,24 +8,33 @@ use crate::errors::HypergraphError;
 
 type Handler<'a, A, R> = dyn Fn(A) -> BoxFuture<'a, Result<R, HypergraphError>> + Send + Sync;
 
-struct Actor<'a, A, R>
+struct Actor<'a, S, A, R>
 where
     A: Send + Sync + 'static,
     R: Send + Sync + 'static,
 {
     handler: &'a Handler<'a, A, R>,
     receiver: mpsc::Receiver<ActorMessage<A, R>>,
+    state: S,
 }
 
 struct ActorMessage<A, R>(A, oneshot::Sender<R>);
 
-impl<'a, A, R> Actor<'a, A, R>
+impl<'a, A, R, S> Actor<'a, S, A, R>
 where
     A: Send + Sync,
     R: Send + Sync,
 {
-    fn new(handler: &'a Handler<'a, A, R>, receiver: mpsc::Receiver<ActorMessage<A, R>>) -> Self {
-        Actor { handler, receiver }
+    fn new(
+        state: S,
+        handler: &'a Handler<'a, A, R>,
+        receiver: mpsc::Receiver<ActorMessage<A, R>>,
+    ) -> Self {
+        Actor {
+            state,
+            handler,
+            receiver,
+        }
     }
 
     async fn handle_message(&self, ActorMessage(argument, sender): ActorMessage<A, R>) {
@@ -34,7 +45,7 @@ where
     }
 }
 
-async fn runner<A, R>(mut actor: Actor<'_, A, R>)
+async fn runner<S, A, R>(mut actor: Actor<'_, S, A, R>)
 where
     A: Send + Sync,
     R: Send + Sync,
@@ -45,22 +56,27 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ActorHandle<A, R> {
+pub(crate) struct ActorHandle<S, A, R> {
     sender: mpsc::Sender<ActorMessage<A, R>>,
+    state: PhantomData<S>,
 }
 
-impl<A, R> ActorHandle<A, R>
+impl<S, A, R> ActorHandle<S, A, R>
 where
+    S: Send + Sync + 'static,
     A: Send + Sync + 'static,
     R: Send + Sync + 'static,
 {
-    pub(crate) fn new(handler: &'static Handler<A, R>) -> Self {
+    pub(crate) fn new(state: S, handler: &'static Handler<A, R>) -> Self {
         let (sender, receiver) = mpsc::channel(8);
-        let actor = Actor::new(handler, receiver);
+        let actor = Actor::new(state, handler, receiver);
 
         tokio::spawn(runner(actor));
 
-        Self { sender }
+        Self {
+            sender,
+            state: PhantomData,
+        }
     }
 
     pub(crate) async fn process(&self, argument: A) -> Result<R, HypergraphError> {

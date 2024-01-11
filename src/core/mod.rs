@@ -86,7 +86,7 @@ where
 {
     hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
     vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    reader: ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>>,
+    reader: ActorHandle<Arc<Cache<Uuid, Hyperedge<HE>>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
     writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -123,8 +123,9 @@ where
     async fn get_reader(
         hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
         vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    ) -> ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>> {
-        ActorHandle::<(EntityKind, Uuid), Option<Entity<V, HE>>>::new(&|(entity_kind, uuid)| {
+    ) -> ActorHandle<Arc<Cache<Uuid, Hyperedge<HE>>>, (EntityKind, Uuid), Option<Entity<V, HE>>>
+    {
+        let t = &|state| {
             async move {
                 debug!("Reading from in-memory cache.");
                 // let entity = match entity_kind {
@@ -136,7 +137,8 @@ where
                 Ok(None)
             }
             .boxed()
-        })
+        };
+        ActorHandle::new(hyperedges, t)
 
         // let t = a.process(12).await?;
         // debug!(t);
@@ -377,7 +379,8 @@ where
 {
     io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
     io_manager_writer: EntityWithUuidSender<V, HE>,
-    memory_cache_reader: ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>>,
+    memory_cache_reader:
+        ActorHandle<Arc<Cache<Uuid, Hyperedge<HE>>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
     memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -389,7 +392,11 @@ where
     fn new(
         io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
         io_manager_writer: EntityWithUuidSender<V, HE>,
-        memory_cache_reader: ActorHandle<(EntityKind, Uuid), Option<Entity<V, HE>>>,
+        memory_cache_reader: ActorHandle<
+            Arc<Cache<Uuid, Hyperedge<HE>>>,
+            (EntityKind, Uuid),
+            Option<Entity<V, HE>>,
+        >,
         memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
     ) -> Self {
         Self {

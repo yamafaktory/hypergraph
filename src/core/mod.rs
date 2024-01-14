@@ -13,13 +13,13 @@ use std::{
 use ahash::RandomState;
 use bincode::{deserialize, serialize};
 use errors::HypergraphError;
-use futures::{future::BoxFuture, FutureExt};
+use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{create_dir_all, try_exists, File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::{mpsc, oneshot, Mutex},
+    sync::{mpsc, oneshot},
 };
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
@@ -29,11 +29,9 @@ use crate::actors::ActorHandle;
 static VERTICES_DB: &str = "vertices.db";
 static HYPEREDGES_DB: &str = "hyperedges.db";
 
-type EntityWithUuidSender<V, HE> = mpsc::Sender<(Entity<V, HE>, Uuid)>;
 type EntityKindWithUuidSenderWithResponse<V, HE> =
     mpsc::Sender<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>;
 type EntitySenderWithResponse<V, HE, R> = mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
-type UuidSender<V, HE> = mpsc::Sender<(Uuid, oneshot::Sender<Entity<V, HE>>)>;
 
 #[derive(Clone, Debug)]
 enum EntityKind {
@@ -103,9 +101,9 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    reader: ActorHandle<Arc<MemoryCacheState<V, HE>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
     state: Arc<MemoryCacheState<V, HE>>,
-    writer: EntitySenderWithResponse<V, HE, Uuid>,
+    reader: ActorHandle<Arc<MemoryCacheState<V, HE>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+    writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Entity<V, HE>, Uuid>,
 }
 
 impl<V, HE> MemoryCache<V, HE>
@@ -116,13 +114,14 @@ where
     async fn start() -> Result<Self, HypergraphError> {
         info!("Starting MemoryCache");
 
+        // TODO: make this `Option` to customize.
         let state = Arc::new(MemoryCacheState::new(10_000, 10_000));
         let reader = Self::get_reader(state.clone()).await;
-        let writer = Self::get_writer(state.clone()).await?;
+        let writer = Self::get_writer(state.clone()).await;
 
         Ok(Self {
             reader,
-            state: Arc::new(MemoryCacheState::new(10_000, 10_000)),
+            state,
             writer,
         })
     }
@@ -149,11 +148,9 @@ where
     #[instrument]
     async fn get_writer(
         state: Arc<MemoryCacheState<V, HE>>,
-    ) -> Result<EntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
-        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
-
-        tokio::spawn(async move {
-            while let Some((entity, response)) = receiver.recv().await {
+    ) -> ActorHandle<Arc<MemoryCacheState<V, HE>>, Entity<V, HE>, Uuid> {
+        ActorHandle::new(state, &|state, entity| {
+            async move {
                 debug!("Writing to in-memory cache.");
 
                 let uuid = Uuid::now_v7();
@@ -163,11 +160,10 @@ where
                     Entity::Vertex(vertex) => state.vertices.insert(uuid, vertex),
                 }
 
-                response.send(uuid).unwrap();
+                Ok(uuid)
             }
-        });
-
-        Ok(sender)
+            .boxed()
+        })
     }
 }
 
@@ -180,13 +176,13 @@ where
     hyperedges_db_path: Arc<Path>,
     vertices_db_path: Arc<Path>,
     path: Arc<Path>,
-    reader: Option<EntityKindWithUuidSenderWithResponse<V, HE>>,
-    writer: Option<EntityWithUuidSender<V, HE>>,
+    reader: Option<ActorHandle<Arc<Path>, (EntityKind, Uuid), Option<Entity<V, HE>>>>,
+    writer: Option<ActorHandle<Arc<Path>, (Entity<V, HE>, Uuid), ()>>,
 }
 
 impl<V, HE> IOManager<V, HE>
 where
-    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Serialize + Sync + 'static,
     HE: Clone + Debug + Send + Sync + 'static,
 {
     #[instrument]
@@ -210,8 +206,8 @@ where
     }
 
     async fn start(&mut self) -> Result<(), HypergraphError> {
-        let reader = self.get_reader().await?;
-        let writer = self.get_writer().await?;
+        let reader = self.get_reader().await;
+        let writer = self.get_writer().await;
 
         self.reader = Some(reader);
         self.writer = Some(writer);
@@ -272,85 +268,85 @@ where
     #[instrument]
     async fn get_reader(
         &self,
-    ) -> Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
-        let (sender, mut receiver) =
-            mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
-        let vertices_db_path = self.vertices_db_path.clone();
+    ) -> ActorHandle<Arc<Path>, (EntityKind, Uuid), Option<Entity<V, HE>>> {
+        ActorHandle::new(
+            self.vertices_db_path.clone(),
+            &|vertices_db_path, (entity_kind, uuid)| {
+                async move {
+                    debug!("Reading from disk.");
 
-        tokio::spawn(async move {
-            while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
-                debug!("Reading from disk.");
+                    let mut entity = None;
 
-                let mut entity = None;
+                    match entity_kind {
+                        EntityKind::Hyperedge => {}
+                        EntityKind::Vertex => {
+                            let mut file = OpenOptions::new()
+                                .read(true)
+                                .open(vertices_db_path.clone())
+                                .await
+                                .unwrap();
+                            let metadata = file.metadata().await.unwrap();
 
-                match entity_kind {
-                    EntityKind::Hyperedge => {}
-                    EntityKind::Vertex => {
-                        let mut file = OpenOptions::new()
-                            .read(true)
-                            .open(vertices_db_path.clone())
-                            .await
-                            .unwrap();
-                        let metadata = file.metadata().await.unwrap();
+                            if metadata.len() != 0 {
+                                let mut contents = vec![];
+                                file.read_to_end(&mut contents).await.unwrap();
 
-                        if metadata.len() != 0 {
-                            let mut contents = vec![];
-                            file.read_to_end(&mut contents).await.unwrap();
+                                let data: HashMap<Uuid, Vertex<V>> =
+                                    deserialize(&contents).unwrap();
 
-                            let data: HashMap<Uuid, Vertex<V>> = deserialize(&contents).unwrap();
-
-                            entity = data.get(&uuid).cloned().map(Entity::Vertex);
+                                entity = data.get(&uuid).cloned().map(Entity::Vertex);
+                            }
                         }
-                    }
-                };
+                    };
 
-                response.send(entity).unwrap();
-            }
-        });
-
-        Ok(sender)
+                    Ok(entity)
+                }
+                .boxed()
+            },
+        )
     }
 
     #[instrument]
-    async fn get_writer(&self) -> Result<EntityWithUuidSender<V, HE>, HypergraphError> {
-        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, Uuid)>(1);
-        let vertices_db_path = self.vertices_db_path.clone();
+    async fn get_writer(&self) -> ActorHandle<Arc<Path>, (Entity<V, HE>, Uuid), ()> {
+        ActorHandle::new(
+            self.vertices_db_path.clone(),
+            &|vertices_db_path, (entity, uuid)| {
+                async move {
+                    debug!("Writing to disk.");
 
-        tokio::spawn(async move {
-            while let Some((entity, uuid)) = receiver.recv().await {
-                debug!("Writing to disk.");
+                    match entity {
+                        Entity::Hyperedge(hyperedge) => {}
+                        Entity::Vertex(vertex) => {
+                            let mut file = OpenOptions::new()
+                                .read(true)
+                                .write(true)
+                                .open(vertices_db_path.clone())
+                                .await
+                                .unwrap();
+                            let metadata = file.metadata().await.unwrap();
+                            let mut data: HashMap<Uuid, Vertex<V>> = HashMap::default();
 
-                match entity {
-                    Entity::Hyperedge(hyperedge) => {}
-                    Entity::Vertex(vertex) => {
-                        let mut file = OpenOptions::new()
-                            .read(true)
-                            .write(true)
-                            .open(vertices_db_path.clone())
-                            .await
-                            .unwrap();
-                        let metadata = file.metadata().await.unwrap();
-                        let mut data: HashMap<Uuid, Vertex<V>> = HashMap::default();
+                            if metadata.len() != 0 {
+                                let mut contents = vec![];
+                                file.read_to_end(&mut contents).await.unwrap();
 
-                        if metadata.len() != 0 {
-                            let mut contents = vec![];
-                            file.read_to_end(&mut contents).await.unwrap();
+                                data = deserialize(&contents).unwrap();
+                            }
 
-                            data = deserialize(&contents).unwrap();
+                            data.insert(uuid, vertex);
+
+                            let bytes = serialize(&data).unwrap();
+
+                            file.write_all(&bytes).await.unwrap();
+                            file.sync_data().await.unwrap();
                         }
+                    };
 
-                        data.insert(uuid, vertex);
-
-                        let bytes = serialize(&data).unwrap();
-
-                        file.write_all(&bytes).await.unwrap();
-                        file.sync_data().await.unwrap();
-                    }
+                    Ok(())
                 }
-            }
-        });
-
-        Ok(sender)
+                .boxed()
+            },
+        )
     }
 }
 
@@ -360,11 +356,11 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
-    io_manager_writer: EntityWithUuidSender<V, HE>,
+    io_manager_reader: ActorHandle<Arc<Path>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+    io_manager_writer: ActorHandle<Arc<Path>, (Entity<V, HE>, Uuid), ()>,
     memory_cache_reader:
         ActorHandle<Arc<MemoryCacheState<V, HE>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
-    memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
+    memory_cache_writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Entity<V, HE>, Uuid>,
 }
 
 impl<V, HE> Handles<V, HE>
@@ -373,14 +369,15 @@ where
     HE: Clone + Debug + Send + Sync,
 {
     fn new(
-        io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
-        io_manager_writer: EntityWithUuidSender<V, HE>,
+        io_manager_reader: ActorHandle<Arc<Path>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+        io_manager_writer: ActorHandle<Arc<Path>, (Entity<V, HE>, Uuid), ()>,
+
         memory_cache_reader: ActorHandle<
             Arc<MemoryCacheState<V, HE>>,
             (EntityKind, Uuid),
             Option<Entity<V, HE>>,
         >,
-        memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
+        memory_cache_writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Entity<V, HE>, Uuid>,
     ) -> Self {
         Self {
             io_manager_reader,
@@ -437,16 +434,9 @@ where
 
                 // We use a read-through strategy here.
                 if entity.is_none() {
-                    let (sender, receiver) = oneshot::channel();
-
-                    handles
+                    entity = handles
                         .io_manager_reader
-                        .send(((entity_kind_copy, uuid), sender))
-                        .await
-                        .map_err(|_| HypergraphError::VertexInsertion)
-                        .unwrap();
-
-                    entity = receiver
+                        .process((entity_kind_copy, uuid))
                         .await
                         .map_err(|_| HypergraphError::VertexInsertion)
                         .unwrap();
@@ -472,16 +462,10 @@ where
                 debug!("Writing with entity manager.");
 
                 let entity_copy = entity.clone();
-                let (sender, receiver) = oneshot::channel();
 
-                handles
+                let uuid = handles
                     .memory_cache_writer
-                    .send((entity, sender))
-                    .await
-                    .map_err(|_| HypergraphError::VertexInsertion)
-                    .unwrap();
-
-                let uuid = receiver
+                    .process(entity)
                     .await
                     .map_err(|_| HypergraphError::VertexInsertion)
                     .unwrap();
@@ -490,7 +474,7 @@ where
                 // write-through strategy.
                 handles
                     .io_manager_writer
-                    .send((entity_copy, uuid))
+                    .process((entity_copy, uuid))
                     .await
                     .map_err(|_| HypergraphError::VertexInsertion)
                     .unwrap();

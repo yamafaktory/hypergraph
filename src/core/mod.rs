@@ -79,14 +79,32 @@ impl<HE> Hyperedge<HE> {
 }
 
 #[derive(Debug)]
+struct MemoryCacheState<V, HE> {
+    hyperedges: Cache<Uuid, Hyperedge<HE>>,
+    vertices: Cache<Uuid, Vertex<V>>,
+}
+
+impl<V, HE> MemoryCacheState<V, HE>
+where
+    V: Clone,
+    HE: Clone,
+{
+    fn new(hyperedges_cache_size: usize, vertices_cache_size: usize) -> Self {
+        Self {
+            hyperedges: Cache::new(hyperedges_cache_size),
+            vertices: Cache::new(vertices_cache_size),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct MemoryCache<V, HE>
 where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
-    vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    reader: ActorHandle<Arc<Cache<Uuid, Hyperedge<HE>>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+    reader: ActorHandle<Arc<MemoryCacheState<V, HE>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+    state: Arc<MemoryCacheState<V, HE>>,
     writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -98,74 +116,39 @@ where
     async fn start() -> Result<Self, HypergraphError> {
         info!("Starting MemoryCache");
 
-        let hyperedges = Arc::new(Cache::new(10_000));
-        let vertices = Arc::new(Cache::new(10_000));
-        let reader = Self::get_reader(hyperedges.clone(), vertices.clone()).await;
-        let writer = Self::get_writer(hyperedges.clone(), vertices.clone()).await?;
+        let state = Arc::new(MemoryCacheState::new(10_000, 10_000));
+        let reader = Self::get_reader(state.clone()).await;
+        let writer = Self::get_writer(state.clone()).await?;
 
         Ok(Self {
-            hyperedges,
-            vertices,
             reader,
+            state: Arc::new(MemoryCacheState::new(10_000, 10_000)),
             writer,
         })
     }
 
-    async fn test(
-        self,
-        entity_kind: EntityKind,
-        uuid: Uuid,
-    ) -> Result<Option<Entity<V, HE>>, HypergraphError> {
-        Ok(None)
-    }
-
     #[tracing::instrument]
     async fn get_reader(
-        hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
-        vertices: Arc<Cache<Uuid, Vertex<V>>>,
-    ) -> ActorHandle<Arc<Cache<Uuid, Hyperedge<HE>>>, (EntityKind, Uuid), Option<Entity<V, HE>>>
-    {
-        let t = &|state| {
+        state: Arc<MemoryCacheState<V, HE>>,
+    ) -> ActorHandle<Arc<MemoryCacheState<V, HE>>, (EntityKind, Uuid), Option<Entity<V, HE>>> {
+        ActorHandle::new(state, &|state, (entity_kind, uuid)| {
             async move {
                 debug!("Reading from in-memory cache.");
-                // let entity = match entity_kind {
-                //     EntityKind::Hyperedge => hyperedges.get(&uuid).map(Entity::Hyperedge),
-                //     EntityKind::Vertex => vertices.get(&uuid).map(Entity::Vertex),
-                // };
 
-                // Ok(entity)
-                Ok(None)
+                let entity = match entity_kind {
+                    EntityKind::Hyperedge => state.hyperedges.get(&uuid).map(Entity::Hyperedge),
+                    EntityKind::Vertex => state.vertices.get(&uuid).map(Entity::Vertex),
+                };
+
+                Ok(entity)
             }
             .boxed()
-        };
-        ActorHandle::new(hyperedges, t)
-
-        // let t = a.process(12).await?;
-        // debug!(t);
-
-        // let (sender, mut receiver) =
-        //     mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
-        //
-        // tokio::spawn(async move {
-        //     while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
-        //         debug!("Reading from in-memory cache.");
-        //
-        //         let entity = match entity_kind {
-        //             EntityKind::Hyperedge => hyperedges.get(&uuid).map(Entity::Hyperedge),
-        //             EntityKind::Vertex => vertices.get(&uuid).map(Entity::Vertex),
-        //         };
-        //
-        //         response.send(entity).unwrap();
-        //     }
-        // });
-        //
-        // Ok(sender)
+        })
     }
 
     #[instrument]
     async fn get_writer(
-        hyperedges: Arc<Cache<Uuid, Hyperedge<HE>>>,
-        vertices: Arc<Cache<Uuid, Vertex<V>>>,
+        state: Arc<MemoryCacheState<V, HE>>,
     ) -> Result<EntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
         let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
 
@@ -176,8 +159,8 @@ where
                 let uuid = Uuid::now_v7();
 
                 match entity {
-                    Entity::Hyperedge(hyperedge) => hyperedges.insert(uuid, hyperedge),
-                    Entity::Vertex(vertex) => vertices.insert(uuid, vertex),
+                    Entity::Hyperedge(hyperedge) => state.hyperedges.insert(uuid, hyperedge),
+                    Entity::Vertex(vertex) => state.vertices.insert(uuid, vertex),
                 }
 
                 response.send(uuid).unwrap();
@@ -380,7 +363,7 @@ where
     io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
     io_manager_writer: EntityWithUuidSender<V, HE>,
     memory_cache_reader:
-        ActorHandle<Arc<Cache<Uuid, Hyperedge<HE>>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+        ActorHandle<Arc<MemoryCacheState<V, HE>>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
     memory_cache_writer: EntitySenderWithResponse<V, HE, Uuid>,
 }
 
@@ -393,7 +376,7 @@ where
         io_manager_reader: EntityKindWithUuidSenderWithResponse<V, HE>,
         io_manager_writer: EntityWithUuidSender<V, HE>,
         memory_cache_reader: ActorHandle<
-            Arc<Cache<Uuid, Hyperedge<HE>>>,
+            Arc<MemoryCacheState<V, HE>>,
             (EntityKind, Uuid),
             Option<Entity<V, HE>>,
         >,

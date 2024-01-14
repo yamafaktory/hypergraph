@@ -1,34 +1,38 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::future::BoxFuture;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, info, instrument};
 
 use crate::errors::HypergraphError;
 
-type Handler<'a, A, R> = dyn Fn(A) -> BoxFuture<'a, Result<R, HypergraphError>> + Send + Sync;
+/// S -> State
+/// P -> Payload
+/// R -> Response
+type Handler<'a, S, P, R> = dyn Fn(S, P) -> BoxFuture<'a, Result<R, HypergraphError>> + Send + Sync;
 
-struct Actor<'a, S, A, R>
+struct Actor<'a, S, P, R>
 where
-    A: Send + Sync + 'static,
-    R: Send + Sync + 'static,
+    S: Send + Sync,
+    P: Send + Sync,
+    R: Send + Sync,
 {
-    handler: &'a Handler<'a, A, R>,
-    receiver: mpsc::Receiver<ActorMessage<A, R>>,
+    handler: &'a Handler<'a, S, P, R>,
+    receiver: mpsc::Receiver<ActorMessage<P, R>>,
     state: S,
 }
 
-struct ActorMessage<A, R>(A, oneshot::Sender<R>);
+struct ActorMessage<P, R>(P, oneshot::Sender<R>);
 
-impl<'a, A, R, S> Actor<'a, S, A, R>
+impl<'a, S, P, R> Actor<'a, S, P, R>
 where
-    A: Send + Sync,
+    S: Clone + Send + Sync,
+    P: Send + Sync,
     R: Send + Sync,
 {
     fn new(
         state: S,
-        handler: &'a Handler<'a, A, R>,
-        receiver: mpsc::Receiver<ActorMessage<A, R>>,
+        handler: &'a Handler<'a, S, P, R>,
+        receiver: mpsc::Receiver<ActorMessage<P, R>>,
     ) -> Self {
         Actor {
             state,
@@ -37,17 +41,18 @@ where
         }
     }
 
-    async fn handle_message(&self, ActorMessage(argument, sender): ActorMessage<A, R>) {
-        let response = (self.handler)(argument).await.unwrap();
+    async fn handle_message(&self, ActorMessage(payload, sender): ActorMessage<P, R>) {
+        let response = (self.handler)(self.state.clone(), payload).await.unwrap();
 
         // Ignore send errors.
         let _ = sender.send(response);
     }
 }
 
-async fn runner<S, A, R>(mut actor: Actor<'_, S, A, R>)
+async fn runner<S, P, R>(mut actor: Actor<'_, S, P, R>)
 where
-    A: Send + Sync,
+    S: Clone + Send + Sync,
+    P: Send + Sync,
     R: Send + Sync,
 {
     while let Some(msg) = actor.receiver.recv().await {
@@ -56,20 +61,20 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ActorHandle<S, A, R> {
-    sender: mpsc::Sender<ActorMessage<A, R>>,
+pub(crate) struct ActorHandle<S, P, R> {
+    sender: mpsc::Sender<ActorMessage<P, R>>,
     state: PhantomData<S>,
 }
 
-impl<S, A, R> ActorHandle<S, A, R>
+impl<S, P, R> ActorHandle<S, P, R>
 where
-    S: Send + Sync + 'static,
-    A: Send + Sync + 'static,
-    R: Send + Sync + 'static,
+    S: Clone + Send + Sync,
+    P: Send + Sync,
+    R: Send + Sync,
 {
-    pub(crate) fn new(state: S, handler: &'static Handler<A, R>) -> Self {
+    pub(crate) fn new(state: S, handler: &'static Handler<S, P, R>) -> Self {
         let (sender, receiver) = mpsc::channel(8);
-        let actor = Actor::new(state, handler, receiver);
+        let actor = Actor::new(state.clone(), handler, receiver);
 
         tokio::spawn(runner(actor));
 
@@ -79,9 +84,9 @@ where
         }
     }
 
-    pub(crate) async fn process(&self, argument: A) -> Result<R, HypergraphError> {
+    pub(crate) async fn process(&self, payload: P) -> Result<R, HypergraphError> {
         let (send, recv) = oneshot::channel();
-        let message = ActorMessage(argument, send);
+        let message = ActorMessage(payload, send);
 
         // Ignore send errors. If this send fails, so does the recv.await below.
         let _ = self.sender.send(message).await;

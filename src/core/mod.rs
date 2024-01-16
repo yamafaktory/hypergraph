@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{create_dir_all, try_exists, File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::{mpsc, oneshot},
 };
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
@@ -28,10 +27,6 @@ use crate::actors::ActorHandle;
 
 static VERTICES_DB: &str = "vertices.db";
 static HYPEREDGES_DB: &str = "hyperedges.db";
-
-type EntityKindWithUuidSenderWithResponse<V, HE> =
-    mpsc::Sender<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>;
-type EntitySenderWithResponse<V, HE, R> = mpsc::Sender<(Entity<V, HE>, oneshot::Sender<R>)>;
 
 #[derive(Clone, Debug)]
 enum EntityKind {
@@ -371,7 +366,6 @@ where
     fn new(
         io_manager_reader: ActorHandle<Arc<Path>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
         io_manager_writer: ActorHandle<Arc<Path>, (Entity<V, HE>, Uuid), ()>,
-
         memory_cache_reader: ActorHandle<
             Arc<MemoryCacheState<V, HE>>,
             (EntityKind, Uuid),
@@ -394,8 +388,8 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    reader: EntityKindWithUuidSenderWithResponse<V, HE>,
-    writer: EntitySenderWithResponse<V, HE, Uuid>,
+    reader: ActorHandle<Handles<V, HE>, (EntityKind, Uuid), Option<Entity<V, HE>>>,
+    writer: ActorHandle<Handles<V, HE>, Entity<V, HE>, Uuid>,
 }
 
 impl<V, HE> EntityManager<V, HE>
@@ -406,8 +400,8 @@ where
     async fn start(handles: Handles<V, HE>) -> Result<Self, HypergraphError> {
         info!("Starting EntityManager");
 
-        let reader = Self::get_reader(handles.clone()).await?;
-        let writer = Self::get_writer(handles.clone()).await?;
+        let reader = Self::get_reader(handles.clone()).await;
+        let writer = Self::get_writer(handles.clone()).await;
 
         Ok(Self { reader, writer })
     }
@@ -415,12 +409,9 @@ where
     #[instrument]
     async fn get_reader(
         handles: Handles<V, HE>,
-    ) -> Result<EntityKindWithUuidSenderWithResponse<V, HE>, HypergraphError> {
-        let (sender, mut receiver) =
-            mpsc::channel::<((EntityKind, Uuid), oneshot::Sender<Option<Entity<V, HE>>>)>(1);
-
-        tokio::spawn(async move {
-            while let Some(((entity_kind, uuid), response)) = receiver.recv().await {
+    ) -> ActorHandle<Handles<V, HE>, (EntityKind, Uuid), Option<Entity<V, HE>>> {
+        ActorHandle::new(handles, &|handles, (entity_kind, uuid)| {
+            async move {
                 debug!("Reading with entity manager.");
 
                 let entity_kind_copy = entity_kind.clone();
@@ -444,21 +435,18 @@ where
                     // TODO: cache miss but on disk -> sync cache
                 }
 
-                response.send(entity).unwrap();
+                Ok(entity)
             }
-        });
-
-        Ok(sender)
+            .boxed()
+        })
     }
 
     #[instrument]
     async fn get_writer(
         handles: Handles<V, HE>,
-    ) -> Result<EntitySenderWithResponse<V, HE, Uuid>, HypergraphError> {
-        let (sender, mut receiver) = mpsc::channel::<(Entity<V, HE>, oneshot::Sender<Uuid>)>(1);
-
-        tokio::spawn(async move {
-            while let Some((entity, response)) = receiver.recv().await {
+    ) -> ActorHandle<Handles<V, HE>, Entity<V, HE>, Uuid> {
+        ActorHandle::new(handles, &|handles, entity| {
+            async move {
                 debug!("Writing with entity manager.");
 
                 let entity_copy = entity.clone();
@@ -479,11 +467,10 @@ where
                     .map_err(|_| HypergraphError::VertexInsertion)
                     .unwrap();
 
-                response.send(uuid).unwrap();
+                Ok(uuid)
             }
-        });
-
-        Ok(sender)
+            .boxed()
+        })
     }
 }
 
@@ -531,18 +518,10 @@ where
 
     #[instrument]
     pub async fn add_vertex(&self, weight: V) -> Result<Uuid, HypergraphError> {
-        let (sender, receiver) = oneshot::channel();
-
-        self.entity_manager
+        let uuid = self
+            .entity_manager
             .writer
-            .send((
-                Entity::Vertex(Vertex::new(HashSet::default(), weight)),
-                sender,
-            ))
-            .await
-            .map_err(|_| HypergraphError::VertexInsertion)?;
-
-        let uuid = receiver
+            .process(Entity::Vertex(Vertex::new(HashSet::default(), weight)))
             .await
             .map_err(|_| HypergraphError::VertexInsertion)?;
 
@@ -553,15 +532,10 @@ where
 
     #[instrument]
     pub async fn get_vertex(&self, uuid: Uuid) -> Result<Option<Vertex<V>>, HypergraphError> {
-        let (sender, receiver) = oneshot::channel();
-
-        self.entity_manager
+        let vertex = self
+            .entity_manager
             .reader
-            .send(((EntityKind::Vertex, uuid), sender))
-            .await
-            .map_err(|_| HypergraphError::VertexRetrieval)?;
-
-        let vertex = receiver
+            .process((EntityKind::Vertex, uuid))
             .await
             .map_err(|_| HypergraphError::VertexRetrieval)?;
 
@@ -585,15 +559,10 @@ where
         weight: HE,
         vertices: Vec<Uuid>,
     ) -> Result<Uuid, HypergraphError> {
-        let (sender, receiver) = oneshot::channel();
-
-        self.entity_manager
+        let uuid = self
+            .entity_manager
             .writer
-            .send((Entity::Hyperedge(Hyperedge::new(vertices, weight)), sender))
-            .await
-            .map_err(|_| HypergraphError::HyperedgeInsertion)?;
-
-        let uuid = receiver
+            .process(Entity::Hyperedge(Hyperedge::new(vertices, weight)))
             .await
             .map_err(|_| HypergraphError::HyperedgeInsertion)?;
 

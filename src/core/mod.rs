@@ -25,8 +25,10 @@ use uuid::Uuid;
 
 use crate::actors::ActorHandle;
 
+static VERTICES_CACHE_SIZE: usize = 10_000;
 static VERTICES_DB: &str = "vertices.db";
 static HYPEREDGES_DB: &str = "hyperedges.db";
+static HYPEREDGES_CACHE_SIZE: usize = 10_000;
 
 #[derive(Clone, Debug)]
 enum EntityKind {
@@ -106,11 +108,16 @@ where
     V: Clone + Debug + Send + Sync + 'static,
     HE: Clone + Debug + Send + Sync + 'static,
 {
-    async fn start() -> Result<Self, HypergraphError> {
+    async fn start(
+        hyperedges_cache_size: usize,
+        vertices_cache_size: usize,
+    ) -> Result<Self, HypergraphError> {
         info!("Starting MemoryCache");
 
-        // TODO: make this `Option` to customize.
-        let state = Arc::new(MemoryCacheState::new(10_000, 10_000));
+        let state = Arc::new(MemoryCacheState::new(
+            hyperedges_cache_size,
+            vertices_cache_size,
+        ));
         let reader = Self::get_reader(state.clone()).await;
         let writer = Self::get_writer(state.clone()).await;
 
@@ -491,15 +498,25 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     HE: Clone + Debug + Send + Sync + 'static,
 {
-    #[instrument]
     pub async fn init<P>(path: P) -> Result<Self, HypergraphError>
+    where
+        P: AsRef<Path> + Copy + Debug,
+    {
+        Self::init_with_config(path, HYPEREDGES_CACHE_SIZE, VERTICES_CACHE_SIZE).await
+    }
+
+    pub async fn init_with_config<P>(
+        path: P,
+        hyperedges_cache_size: usize,
+        vertices_cache_size: usize,
+    ) -> Result<Self, HypergraphError>
     where
         P: AsRef<Path> + Copy + Debug,
     {
         info!("Init Hypergraph");
 
         let mut io_manager = IOManager::new(path).await?;
-        let memory_cache = MemoryCache::start().await?;
+        let memory_cache = MemoryCache::start(hyperedges_cache_size, vertices_cache_size).await?;
 
         io_manager.start().await?;
 

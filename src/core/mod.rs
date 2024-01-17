@@ -548,7 +548,7 @@ where
     }
 
     #[instrument]
-    pub async fn get_vertex(&self, uuid: Uuid) -> Result<Option<Vertex<V>>, HypergraphError> {
+    pub async fn get_vertex(&self, uuid: Uuid) -> Result<Option<V>, HypergraphError> {
         let vertex = self
             .entity_manager
             .reader
@@ -561,7 +561,7 @@ where
 
             match vertex.unwrap() {
                 Entity::Hyperedge(_) => unreachable!(),
-                Entity::Vertex(vertex) => Ok(Some(vertex)),
+                Entity::Vertex(vertex) => Ok(Some(vertex.weight)),
             }
         } else {
             debug!("Vertex {} not found", uuid.to_string());

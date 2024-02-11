@@ -1,125 +1,44 @@
 #[doc(hidden)]
 pub mod actors;
 #[doc(hidden)]
+pub mod collections;
+#[doc(hidden)]
+pub mod defaults;
+#[doc(hidden)]
+pub mod entities;
+#[doc(hidden)]
 pub mod errors;
+#[doc(hidden)]
+pub mod file;
+#[doc(hidden)]
+pub mod operations;
 
-use std::{
-    borrow::Borrow,
-    collections::{HashMap as DefaultHashMap, HashSet as DefaultHashSet},
-    fmt::Debug,
-    path::Path,
-    sync::Arc,
-};
+use std::{borrow::Borrow, fmt::Debug, path::Path, sync::Arc};
 
-use ahash::RandomState;
-use bincode::{deserialize, serialize};
+use bincode::deserialize;
 use errors::HypergraphError;
 use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{create_dir_all, try_exists, File, OpenOptions},
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncReadExt,
 };
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use crate::actors::ActorHandle;
-
-static VERTICES_CACHE_SIZE: usize = 10_000;
-static VERTICES_DB: &str = "vertices.db";
-static HYPEREDGES_DB: &str = "hyperedges.db";
-static HYPEREDGES_CACHE_SIZE: usize = 10_000;
-
-#[derive(Clone, Copy, Debug)]
-enum EntityKind {
-    Hyperedge,
-    Vertex,
-}
-
-#[derive(Clone, Debug)]
-enum Entity<V, HE>
-where
-    V: Clone + Debug + Send + Sync,
-    HE: Clone + Debug + Send + Sync,
-{
-    Hyperedge(Hyperedge<HE>),
-    Vertex(Vertex<V>),
-}
-
-#[derive(Clone, Debug)]
-enum EntityRelation {
-    Hyperedge(Vec<Uuid>),
-    Vertex(HashSet<Uuid>),
-}
-
-#[derive(Clone, Debug)]
-enum EntityWeight<V, HE>
-where
-    V: Clone + Debug + Send + Sync,
-    HE: Clone + Debug + Send + Sync,
-{
-    Hyperedge(HE),
-    Vertex(V),
-}
-
-impl<V, HE> From<&EntityWeight<V, HE>> for EntityKind
-where
-    V: Clone + Debug + Send + Sync,
-    HE: Clone + Debug + Send + Sync,
-{
-    fn from(entity_weight: &EntityWeight<V, HE>) -> Self {
-        match entity_weight {
-            EntityWeight::Hyperedge(_) => EntityKind::Hyperedge,
-            EntityWeight::Vertex(_) => EntityKind::Vertex,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct ReadOp(Uuid, EntityKind);
-
-#[derive(Clone, Debug)]
-enum WriteOp<V, HE>
-where
-    V: Clone + Debug + Send + Sync,
-    HE: Clone + Debug + Send + Sync,
-{
-    Create(Uuid, EntityWeight<V, HE>),
-    Delete(Uuid, EntityKind),
-    UpdateRelation(Uuid, EntityRelation),
-    UpdateWeight(Uuid, EntityWeight<V, HE>),
-}
-
-pub(crate) type HashSet<K> = DefaultHashSet<K, RandomState>;
-pub(crate) type HashMap<K, V> = DefaultHashMap<K, V, RandomState>;
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Vertex<V> {
-    hyperedges: HashSet<Uuid>,
-    weight: V,
-}
-
-impl<V> Vertex<V> {
-    fn new(weight: V) -> Self {
-        Self {
-            hyperedges: HashSet::default(),
-            weight,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Hyperedge<HE> {
-    vertices: Vec<Uuid>,
-    weight: HE,
-}
-
-impl<HE> Hyperedge<HE> {
-    fn new(vertices: Vec<Uuid>, weight: HE) -> Self {
-        Self { vertices, weight }
-    }
-}
+use self::{
+    defaults::{HYPEREDGES_CACHE_SIZE, VERTICES_CACHE_SIZE},
+    entities::{Entity, Hyperedge, Vertex},
+};
+use crate::{
+    actors::ActorHandle,
+    collections::HashMap,
+    defaults::{HYPEREDGES_DB, VERTICES_DB},
+    entities::{EntityKind, EntityRelation, EntityWeight},
+    file::write_to_file,
+    operations::{ReadOp, WriteOp},
+};
 
 #[derive(Debug)]
 struct MemoryCacheState<V, HE> {
@@ -260,7 +179,7 @@ where
     vertices_db_path: Arc<Path>,
     path: Arc<Path>,
     reader: Option<ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>>>,
-    writer: Option<ActorHandle<Arc<Path>, Arc<WriteOp<V, HE>>, ()>>,
+    writer: Option<ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()>>,
 }
 
 impl<V, HE> IOManager<V, HE>
@@ -367,14 +286,17 @@ where
                             .read(true)
                             .open(vertices_db_path.clone())
                             .await
-                            .unwrap();
-                        let metadata = file.metadata().await.unwrap();
+                            .map_err(|_| HypergraphError::PathNotAccessible)?;
+                        let metadata = file.metadata().await.map_err(|_| HypergraphError::File)?;
 
                         if metadata.len() != 0 {
                             let mut contents = vec![];
-                            file.read_to_end(&mut contents).await.unwrap();
+                            file.read_to_end(&mut contents)
+                                .await
+                                .map_err(|_| HypergraphError::File)?;
 
-                            let data: HashMap<Uuid, Vertex<V>> = deserialize(&contents).unwrap();
+                            let data: HashMap<Uuid, Vertex<V>> = deserialize(&contents)
+                                .map_err(|_| HypergraphError::Deserialization)?;
 
                             entity = data.get(&uuid).cloned().map(Entity::Vertex);
                         }
@@ -388,40 +310,17 @@ where
     }
 
     #[instrument]
-    async fn get_writer(&self) -> ActorHandle<Arc<Path>, Arc<WriteOp<V, HE>>, ()> {
+    async fn get_writer(&self) -> ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()> {
         ActorHandle::new(
-            self.vertices_db_path.clone(),
-            &|vertices_db_path, write_op| {
+            (
+                self.hyperedges_db_path.clone(),
+                self.vertices_db_path.clone(),
+            ),
+            &|paths, write_op| {
                 async move {
                     match write_op.borrow() {
                         WriteOp::Create(uuid, entity_weight) => {
-                            match entity_weight {
-                                EntityWeight::Hyperedge(weight) => {}
-                                EntityWeight::Vertex(weight) => {
-                                    let mut file = OpenOptions::new()
-                                        .read(true)
-                                        .write(true)
-                                        .open(vertices_db_path.clone())
-                                        .await
-                                        .unwrap();
-                                    let metadata = file.metadata().await.unwrap();
-                                    let mut data: HashMap<Uuid, Vertex<V>> = HashMap::default();
-
-                                    if metadata.len() != 0 {
-                                        let mut contents = vec![];
-                                        file.read_to_end(&mut contents).await.unwrap();
-
-                                        data = deserialize(&contents).unwrap();
-                                    }
-
-                                    data.insert(*uuid, Vertex::new(weight.clone()));
-
-                                    let bytes = serialize(&data).unwrap();
-
-                                    file.write_all(&bytes).await.unwrap();
-                                    file.sync_data().await.unwrap();
-                                }
-                            };
+                            write_to_file(uuid, entity_weight, paths).await?;
                         }
                         WriteOp::Delete(_, _) => todo!(),
                         WriteOp::UpdateRelation(_, _) => todo!(),
@@ -445,7 +344,7 @@ where
     HE: Clone + Debug + Send + Sync,
 {
     io_manager_reader: ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>>,
-    io_manager_writer: ActorHandle<Arc<Path>, Arc<WriteOp<V, HE>>, ()>,
+    io_manager_writer: ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()>,
     memory_cache_reader: ActorHandle<Arc<MemoryCacheState<V, HE>>, ReadOp, Option<Entity<V, HE>>>,
     memory_cache_writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Arc<WriteOp<V, HE>>, Uuid>,
 }
@@ -457,7 +356,7 @@ where
 {
     fn new(
         io_manager_reader: ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>>,
-        io_manager_writer: ActorHandle<Arc<Path>, Arc<WriteOp<V, HE>>, ()>,
+        io_manager_writer: ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()>,
         memory_cache_reader: ActorHandle<
             Arc<MemoryCacheState<V, HE>>,
             ReadOp,
@@ -632,6 +531,7 @@ where
 
         Ok(Self {
             entity_manager: EntityManager::start(Handles::new(
+                // We can safely unwrap here as we've just created the handles.
                 io_manager.reader.clone().unwrap(),
                 io_manager.writer.clone().unwrap(),
                 memory_cache.reader.clone(),
@@ -684,12 +584,12 @@ where
             .reader
             .process(ReadOp(uuid, EntityKind::Vertex))
             .await
-            .map_err(|_| HypergraphError::VertexRetrieval)?;
+            .map_err(|_| HypergraphError::EntityNotFound)?;
 
-        if vertex.is_some() {
+        if let Some(vertex) = vertex {
             debug!("Vertex {} found", uuid.to_string());
 
-            match vertex.unwrap() {
+            match vertex {
                 Entity::Hyperedge(_) => unreachable!(),
                 Entity::Vertex(vertex) => Ok(Some(vertex.weight)),
             }

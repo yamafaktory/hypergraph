@@ -14,15 +14,21 @@ pub enum HypergraphError {
     /// the parent directories.
     #[error("Path is not accessible")]
     PathNotAccessible,
-    /// Error when a vertex is inserted.
-    #[error("Vertex couldn't be inserted")]
-    VertexInsertion,
     /// Error when a vertex is retrieved.
     #[error("Vertex couldn't be retrieved")]
     VertexRetrieval,
     /// Error when an hyperedge is inserted.
     #[error("Hyperedge couldn't be inserted")]
     HyperedgeInsertion,
+    /// Error when an entity is not found.
+    #[error("Entity not found")]
+    EntityNotFound,
+    /// Error when an entity is created.
+    #[error("Entity couldn't be created")]
+    EntityCreation,
+    /// Error when updating an entity.
+    #[error("Entity couldn't be updated")]
+    EntityUpdate,
     //
     //
     //

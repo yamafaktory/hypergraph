@@ -16,7 +16,7 @@ async fn sequential_tests() -> Result<(), HypergraphError> {
 async fn integration_add_get_vertex() -> Result<(), HypergraphError> {
     let (graph, clear) = prepare(false).await?;
 
-    let id = graph.add_vertex(Vertex {}).await?;
+    let id = graph.create_vertex(Vertex {}).await?;
 
     let vertex = graph.get_vertex(id).await?;
 
@@ -30,7 +30,7 @@ async fn integration_add_get_vertex() -> Result<(), HypergraphError> {
 async fn integration_add_get_vertex_no_cache() -> Result<(), HypergraphError> {
     let (graph, clear) = prepare(true).await?;
 
-    let id = graph.add_vertex(Vertex {}).await?;
+    let id = graph.create_vertex(Vertex {}).await?;
 
     let vertex = graph.get_vertex(id).await?;
 

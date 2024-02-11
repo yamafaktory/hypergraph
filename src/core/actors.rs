@@ -60,6 +60,9 @@ where
     }
 }
 
+/// S -> State
+/// P -> Payload
+/// R -> Response
 #[derive(Clone, Debug)]
 pub(crate) struct ActorHandle<S, P, R> {
     sender: mpsc::Sender<ActorMessage<P, R>>,

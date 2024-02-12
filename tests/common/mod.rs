@@ -10,7 +10,7 @@ static PATH: &str = "./test";
 #[derive(Clone, Copy, Debug, Eq, Deserialize, PartialEq, Serialize)]
 pub(crate) struct Vertex {}
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Deserialize, PartialEq, Serialize)]
 pub(crate) struct Hyperedge {}
 
 type Handler<'a> = dyn Fn() -> BoxFuture<'a, Result<(), Error>> + Send + Sync;

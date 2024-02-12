@@ -20,7 +20,7 @@ impl<V> Vertex<V> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Hyperedge<HE> {
     pub(crate) vertices: Vec<Uuid>,
     pub(crate) weight: HE,
@@ -41,7 +41,7 @@ pub(crate) enum EntityKind {
     Vertex,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) enum Entity<V, HE>
 where
     V: Clone + Debug + Send + Sync,

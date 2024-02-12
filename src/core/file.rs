@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, path::Path, sync::Arc};
 
 use bincode::{deserialize, serialize};
+use serde::{Deserialize, Serialize};
 use tokio::{
     fs::OpenOptions,
     io::{AsyncReadExt, AsyncWriteExt},
@@ -8,7 +9,7 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    entities::{EntityKind, EntityWeight, Hyperedge, Vertex},
+    entities::{Entity, EntityKind, EntityWeight, Hyperedge, Vertex},
     errors::HypergraphError,
 };
 
@@ -18,8 +19,8 @@ pub(crate) async fn write_to_file<V, HE>(
     paths: (Arc<Path>, Arc<Path>),
 ) -> Result<(), HypergraphError>
 where
-    V: Clone + Debug + Send + Sync,
-    HE: Clone + Debug + Send + Sync,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let entity_kind = entity_weight.into();
     let mut file = OpenOptions::new()
@@ -32,7 +33,7 @@ where
         .await
         .map_err(|_| HypergraphError::PathNotAccessible)?;
     let metadata = file.metadata().await.map_err(|_| HypergraphError::File)?;
-    let mut data = HashMap::default();
+    let mut data: HashMap<Uuid, Entity<V, HE>> = HashMap::default();
 
     if metadata.len() != 0 {
         let mut contents = vec![];
@@ -40,15 +41,18 @@ where
             .await
             .map_err(|_| HypergraphError::File)?;
 
-        data = deserialize(&contents).map_err(|_| HypergraphError::Deserialization)?;
+        data = deserialize(&contents).map_err(|e| {
+            dbg!(e);
+            return HypergraphError::Deserialization;
+        })?;
     }
 
     match entity_weight {
         EntityWeight::Hyperedge(weight) => {
-            data.insert(*uuid, Hyperedge::new(weight));
+            data.insert(*uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
         }
         EntityWeight::Vertex(weight) => {
-            data.insert(*uuid, Vertex::new(weight));
+            data.insert(*uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
         }
     };
 

@@ -127,7 +127,7 @@ where
                         match entity_weight {
                             EntityWeight::Hyperedge(weight) => state
                                 .hyperedges
-                                .insert(*uuid, Hyperedge::new(vec![], weight.clone())),
+                                .insert(*uuid, Hyperedge::new(weight.to_owned())),
                             EntityWeight::Vertex(weight) => {
                                 state.vertices.insert(*uuid, Vertex::new(weight.clone()))
                             }
@@ -185,7 +185,7 @@ where
 impl<V, HE> IOManager<V, HE>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Serialize + Sync + 'static,
-    HE: Clone + Debug + Send + Sync + 'static,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Serialize + Sync + 'static,
 {
     #[instrument]
     async fn new<P>(path: P) -> Result<Self, HypergraphError>
@@ -295,10 +295,10 @@ where
                                 .await
                                 .map_err(|_| HypergraphError::File)?;
 
-                            let data: HashMap<Uuid, Vertex<V>> = deserialize(&contents)
+                            let data: HashMap<Uuid, Entity<V, HE>> = deserialize(&contents)
                                 .map_err(|_| HypergraphError::Deserialization)?;
 
-                            entity = data.get(&uuid).cloned().map(Entity::Vertex);
+                            entity = data.get(&uuid).cloned();
                         }
                     }
                 };
@@ -495,7 +495,7 @@ where
 pub struct Hypergraph<V, HE>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Serialize + Sync,
-    HE: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Serialize + Sync,
 {
     entity_manager: EntityManager<V, HE>,
     io_manager: IOManager<V, HE>,
@@ -505,7 +505,7 @@ where
 impl<V, HE> Hypergraph<V, HE>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
-    HE: Clone + Debug + Send + Sync + 'static,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
     pub async fn init<P>(path: P) -> Result<Self, HypergraphError>
     where

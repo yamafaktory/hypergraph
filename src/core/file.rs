@@ -41,10 +41,7 @@ where
             .await
             .map_err(|_| HypergraphError::File)?;
 
-        data = deserialize(&contents).map_err(|e| {
-            dbg!(e);
-            return HypergraphError::Deserialization;
-        })?;
+        data = deserialize(&contents).map_err(|_| HypergraphError::Deserialization)?;
     }
 
     match entity_weight {

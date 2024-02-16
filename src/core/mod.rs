@@ -129,39 +129,80 @@ where
                                 .hyperedges
                                 .insert(*uuid, Hyperedge::new(weight.to_owned())),
                             EntityWeight::Vertex(weight) => {
-                                state.vertices.insert(*uuid, Vertex::new(weight.clone()))
+                                state.vertices.insert(*uuid, Vertex::new(weight.to_owned()))
                             }
                         }
 
-                        Ok(uuid.clone())
+                        Ok(*uuid)
                     }
-                    WriteOp::Delete(_, _) => todo!(),
-                    WriteOp::UpdateRelation(uuid, relation) => {
-                        match relation {
-                            EntityRelation::Hyperedge(vertices) => {
-                                // state.hyperedges.replace(uuid, vertices, false);
+                    WriteOp::Delete(uuid, entity_kind) => {
+                        match entity_kind {
+                            EntityKind::Hyperedge => {
+                                state.hyperedges.remove(uuid);
                             }
-                            EntityRelation::Vertex(hyperedges) => {
-                                // state.vertices.replace(uuid, hyperedges, false);
+                            EntityKind::Vertex => {
+                                state.vertices.remove(uuid);
                             }
                         };
 
-                        Ok(uuid.clone())
+                        Ok(*uuid)
                     }
-                    WriteOp::UpdateWeight(uuid, weight) => {
-                        match weight {
-                            EntityWeight::Hyperedge(weight) => {
-                                if let Some(mut hyperedge) = state.hyperedges.get(uuid) {
-                                    hyperedge.weight = weight.clone();
-                                    state.hyperedges.replace(*uuid, hyperedge, false);
-                                } else {
-                                    // TODO: error not found ?
-                                };
-                            }
-                            EntityWeight::Vertex(weight) => todo!(),
+                    WriteOp::UpdateRelation(uuid, relation) => match relation {
+                        EntityRelation::Hyperedge(vertices) => {
+                            if let Some(mut hyperedge) = state.hyperedges.get(uuid) {
+                                hyperedge.vertices = vertices.to_vec();
+
+                                return state
+                                    .hyperedges
+                                    .replace(*uuid, hyperedge, false)
+                                    .map_err(|_| HypergraphError::EntityUpdate)
+                                    .map(|_| *uuid);
+                            };
+
+                            Err(HypergraphError::EntityUpdate)
                         }
-                        Ok(uuid.clone())
-                    }
+                        EntityRelation::Vertex(hyperedges) => {
+                            if let Some(mut vertex) = state.vertices.get(uuid) {
+                                vertex.hyperedges = hyperedges.to_owned();
+
+                                return state
+                                    .vertices
+                                    .replace(*uuid, vertex, false)
+                                    .map_err(|_| HypergraphError::EntityUpdate)
+                                    .map(|_| *uuid);
+                            };
+
+                            Err(HypergraphError::EntityUpdate)
+                        }
+                    },
+                    WriteOp::UpdateWeight(uuid, weight) => match weight {
+                        EntityWeight::Hyperedge(weight) => {
+                            if let Some(mut hyperedge) = state.hyperedges.get(uuid) {
+                                hyperedge.weight = weight.to_owned();
+
+                                return state
+                                    .hyperedges
+                                    .replace(*uuid, hyperedge, false)
+                                    .map_err(|_| HypergraphError::EntityUpdate)
+                                    .map(|_| *uuid);
+                            };
+
+                            Err(HypergraphError::EntityUpdate)
+                        }
+                        EntityWeight::Vertex(weight) => {
+                            if let Some(mut vertex) = state.vertices.get(uuid) {
+                                vertex.weight = weight.to_owned();
+
+                                return state
+                                    .vertices
+                                    .replace(*uuid, vertex, false)
+                                    .map_err(|_| HypergraphError::EntityUpdate)
+                                    .map(|_| *uuid);
+                            };
+
+                            Err(HypergraphError::EntityUpdate)
+                        }
+                    },
                 }
             }
             .boxed()
@@ -405,21 +446,19 @@ where
             async move {
                 debug!("Reading with entity manager.");
 
-                let mut entity = handles
-                    .memory_cache_reader
-                    .process(read_op)
-                    .await
-                    .map_err(|_| HypergraphError::EntityNotFound)?;
+                let mut entity = handles.memory_cache_reader.process(read_op).await?;
 
                 // We use a read-through strategy here.
+                // This is a cache miss and we need to sync the cache with the data on disk.
                 if entity.is_none() {
-                    entity = handles
-                        .io_manager_reader
-                        .process(read_op)
-                        .await
-                        .map_err(|_| HypergraphError::EntityNotFound)?;
+                    entity = handles.io_manager_reader.process(read_op).await?;
 
-                    // TODO: cache miss but on disk -> sync cache
+                    if let Some(ref entity) = entity {
+                        handles
+                            .memory_cache_writer
+                            .process(Arc::new(WriteOp::Create(read_op.get_uuid(), entity.into())))
+                            .await?;
+                    };
                 }
 
                 Ok(entity)
@@ -434,54 +473,58 @@ where
     ) -> ActorHandle<Handles<V, HE>, Arc<WriteOp<V, HE>>, Uuid> {
         ActorHandle::new(handles, &|handles, write_op| {
             async move {
+                debug!("Writing with entity manager.");
+
                 match write_op.borrow() {
                     WriteOp::Create(..) => {
-                        debug!("Writing with entity manager.");
-
                         let uuid = handles
                             .memory_cache_writer
                             .process(write_op.clone())
-                            .await
-                            .map_err(|_| HypergraphError::EntityCreation)?;
+                            .await?;
 
                         // We don't wait for the IOManager to respond since we use a
                         // write-through strategy.
-                        handles
-                            .io_manager_writer
-                            .process(write_op.clone())
-                            .await
-                            .map_err(|_| HypergraphError::EntityCreation)?;
+                        handles.io_manager_writer.process(write_op.clone()).await?;
 
                         Ok(uuid)
                     }
-                    WriteOp::Delete(_, _) => {
-                        todo!()
+                    WriteOp::Delete(uuid, _) => {
+                        handles
+                            .memory_cache_writer
+                            .process(write_op.clone())
+                            .await?;
+
+                        handles.io_manager_writer.process(write_op.clone()).await?;
+
+                        Ok(*uuid)
                     }
                     WriteOp::UpdateWeight(uuid, weight) => {
-                        debug!("Updating with entity manager.");
-
-                        let result = handles
+                        // Try to read the entity from cache.
+                        let entity = handles
                             .memory_cache_reader
                             .process(ReadOp(*uuid, weight.into()))
-                            .await
-                            .map_err(|_| HypergraphError::EntityUpdate)?;
+                            .await?;
 
                         // Here we have a cache hit.
-                        // Update the cache, then the local data.
-                        if result.is_some() {
-                            handles
-                                .memory_cache_writer
-                                .process(Arc::new(WriteOp::UpdateWeight(*uuid, weight.clone())))
-                                .await
-                                .map_err(|_| HypergraphError::EntityUpdate)?;
+                        // Either update or create the cache.
+                        let write_op = Arc::new(if entity.is_some() {
+                            WriteOp::UpdateWeight(*uuid, weight.clone())
                         } else {
-                            return Err(HypergraphError::EntityNotFound);
-                        }
+                            WriteOp::Create(*uuid, weight.clone())
+                        });
+
+                        handles.memory_cache_writer.process(write_op).await?;
+
+                        // Sync the data on disk.
+                        handles
+                            .io_manager_writer
+                            .process(Arc::new(WriteOp::UpdateWeight(*uuid, weight.clone())))
+                            .await?;
 
                         Ok(*uuid)
                     }
                     WriteOp::UpdateRelation(uuid, entity) => {
-                        todo!();
+                        todo!()
                     }
                 }
             }
@@ -553,8 +596,7 @@ where
                 uuid,
                 EntityWeight::Vertex(weight),
             )))
-            .await
-            .map_err(|_| HypergraphError::EntityCreation)?;
+            .await?;
 
         debug!("Vertex {} created", uuid.to_string());
 
@@ -569,8 +611,7 @@ where
     //             uuid,
     //             weight: EntityWeight::Vertex(weight),
     //         })
-    //         .await
-    //         .map_err(|_| HypergraphError::VertexInsertion)?;
+    //         .await?;
     //
     //     // debug!("Vertex {} updated", uuid.to_string());
     //
@@ -583,8 +624,7 @@ where
             .entity_manager
             .reader
             .process(ReadOp(uuid, EntityKind::Vertex))
-            .await
-            .map_err(|_| HypergraphError::EntityNotFound)?;
+            .await?;
 
         if let Some(vertex) = vertex {
             debug!("Vertex {} found", uuid.to_string());

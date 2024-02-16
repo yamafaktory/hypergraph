@@ -67,6 +67,19 @@ where
     Vertex(V),
 }
 
+impl<V, HE> From<&Entity<V, HE>> for EntityWeight<V, HE>
+where
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
+{
+    fn from(entity: &Entity<V, HE>) -> Self {
+        match entity {
+            Entity::Hyperedge(hyperedge) => EntityWeight::Hyperedge(hyperedge.weight.to_owned()),
+            Entity::Vertex(vertex) => EntityWeight::Vertex(vertex.weight.to_owned()),
+        }
+    }
+}
+
 impl<V, HE> From<&EntityWeight<V, HE>> for EntityKind
 where
     V: Clone + Debug + Send + Sync,

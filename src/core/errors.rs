@@ -23,9 +23,6 @@ pub enum HypergraphError {
     /// Deserialization error.
     #[error("Deserialization failed")]
     Deserialization,
-    /// Error when an hyperedge is inserted.
-    #[error("Hyperedge couldn't be inserted")]
-    HyperedgeInsertion,
     /// Error when an entity is not found.
     #[error("Entity not found")]
     EntityNotFound,

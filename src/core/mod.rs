@@ -27,16 +27,12 @@ use tokio::{
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use self::{
-    defaults::{HYPEREDGES_CACHE_SIZE, VERTICES_CACHE_SIZE},
-    entities::{Entity, Hyperedge, Vertex},
-};
 use crate::{
     actors::ActorHandle,
     collections::HashMap,
-    defaults::{HYPEREDGES_DB, VERTICES_DB},
-    entities::{EntityKind, EntityRelation, EntityWeight},
-    file::write_to_file,
+    defaults::{HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
+    entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
+    file::{write_relation_to_file, write_weight_to_file},
     operations::{ReadOp, WriteOp},
 };
 
@@ -360,12 +356,14 @@ where
             &|paths, write_op| {
                 async move {
                     match write_op.borrow() {
-                        WriteOp::Create(uuid, entity_weight) => {
-                            write_to_file(uuid, entity_weight, paths).await?;
+                        WriteOp::Create(uuid, entity_weight)
+                        | WriteOp::UpdateWeight(uuid, entity_weight) => {
+                            write_weight_to_file(uuid, entity_weight, paths).await?;
                         }
                         WriteOp::Delete(_, _) => todo!(),
-                        WriteOp::UpdateRelation(_, _) => todo!(),
-                        WriteOp::UpdateWeight(uuid, weight) => todo!(),
+                        WriteOp::UpdateRelation(uuid, entity_relation) => {
+                            write_relation_to_file::<V, HE>(uuid, entity_relation, paths).await?;
+                        }
                     };
 
                     debug!("Writing to disk.");
@@ -620,16 +618,16 @@ where
 
     #[instrument]
     pub async fn get_vertex(&self, uuid: Uuid) -> Result<Option<V>, HypergraphError> {
-        let vertex = self
+        let entity = self
             .entity_manager
             .reader
             .process(ReadOp(uuid, EntityKind::Vertex))
             .await?;
 
-        if let Some(vertex) = vertex {
+        if let Some(entity) = entity {
             debug!("Vertex {} found", uuid.to_string());
 
-            match vertex {
+            match entity {
                 Entity::Hyperedge(_) => unreachable!(),
                 Entity::Vertex(vertex) => Ok(Some(vertex.weight)),
             }

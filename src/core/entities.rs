@@ -57,6 +57,15 @@ pub(crate) enum EntityRelation {
     Vertex(HashSet<Uuid>),
 }
 
+impl From<&EntityRelation> for EntityKind {
+    fn from(entity_relation: &EntityRelation) -> Self {
+        match entity_relation {
+            EntityRelation::Hyperedge(_) => EntityKind::Hyperedge,
+            EntityRelation::Vertex(_) => EntityKind::Vertex,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum EntityWeight<V, HE>
 where

@@ -27,12 +27,13 @@ use tokio::{
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
+use self::file::Paths;
 use crate::{
     actors::ActorHandle,
     collections::HashMap,
     defaults::{HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
-    file::{write_relation_to_file, write_weight_to_file},
+    file::{remove_entity_from_file, write_relation_to_file, write_weight_to_file},
     operations::{ReadOp, WriteOp},
 };
 
@@ -95,14 +96,25 @@ where
     async fn get_reader(
         state: Arc<MemoryCacheState<V, HE>>,
     ) -> ActorHandle<Arc<MemoryCacheState<V, HE>>, ReadOp, Option<Entity<V, HE>>> {
-        ActorHandle::new(state, &|state, ReadOp(uuid, entity_kind)| {
+        ActorHandle::new(state, &|state, read_op| {
             async move {
-                debug!("Reading from in-memory cache.");
+                info!("Reading from in-memory cache {}", read_op);
 
+                let ReadOp(uuid, entity_kind) = read_op;
                 let entity = match entity_kind {
                     EntityKind::Hyperedge => state.hyperedges.get(&uuid).map(Entity::Hyperedge),
                     EntityKind::Vertex => state.vertices.get(&uuid).map(Entity::Vertex),
                 };
+
+                info!(
+                    "{} {}",
+                    read_op,
+                    if entity.is_some() {
+                        "found"
+                    } else {
+                        "not found"
+                    }
+                );
 
                 Ok(entity)
             }
@@ -212,11 +224,9 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    hyperedges_db_path: Arc<Path>,
-    vertices_db_path: Arc<Path>,
-    path: Arc<Path>,
-    reader: Option<ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>>>,
-    writer: Option<ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()>>,
+    paths: Arc<Paths>,
+    reader: Option<ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>>>,
+    writer: Option<ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()>>,
 }
 
 impl<V, HE> IOManager<V, HE>
@@ -231,14 +241,16 @@ where
     {
         info!("Creating new IOManager");
 
-        let vertices_db_path = path.as_ref().join(VERTICES_DB).into();
-        let hyperedges_db_path = path.as_ref().join(HYPEREDGES_DB).into();
-        let path = path.as_ref().to_path_buf().into();
+        let path = path.as_ref();
+        let hyperedges = path.join(HYPEREDGES_DB);
+        let vertices = path.join(VERTICES_DB);
 
         Ok(Self {
-            hyperedges_db_path,
-            vertices_db_path,
-            path,
+            paths: Arc::new(Paths {
+                hyperedges,
+                vertices,
+                root: path.to_path_buf(),
+            }),
             reader: None,
             writer: None,
         })
@@ -251,25 +263,26 @@ where
         self.reader = Some(reader);
         self.writer = Some(writer);
 
-        let path = self.path.clone();
+        let hyperedges_path = &self.paths.hyperedges;
+        let vertices_path = &self.paths.vertices;
+        let root_path = &self.paths.root;
 
-        match try_exists(path.clone()).await {
+        match try_exists(root_path).await {
             Ok(true) => {
                 debug!("Path already exists");
 
-                if let Ok(exists) = try_exists(self.vertices_db_path.clone()).await {
+                if let Ok(exists) = try_exists(vertices_path).await {
                     if !exists {
-                        self.create_entity_db(self.vertices_db_path.clone()).await?;
+                        self.create_entity_db(vertices_path).await?;
                         debug!("Vertices storage file was not found and has been created");
                     }
                 } else {
                     return Err(HypergraphError::DatabasesCreation);
                 }
 
-                if let Ok(exists) = try_exists(self.hyperedges_db_path.clone()).await {
+                if let Ok(exists) = try_exists(hyperedges_path).await {
                     if !exists {
-                        self.create_entity_db(self.hyperedges_db_path.clone())
-                            .await?;
+                        self.create_entity_db(hyperedges_path).await?;
                         debug!("Hyperedges storage file was not found and has been created");
                     }
                 } else {
@@ -279,13 +292,12 @@ where
             Ok(false) => {
                 debug!("Path does not exist");
 
-                create_dir_all(path.clone())
+                create_dir_all(root_path)
                     .await
                     .map_err(|_| HypergraphError::PathCreation)?;
 
-                self.create_entity_db(self.vertices_db_path.clone()).await?;
-                self.create_entity_db(self.hyperedges_db_path.clone())
-                    .await?;
+                self.create_entity_db(vertices_path).await?;
+                self.create_entity_db(hyperedges_path).await?;
             }
             Err(_) => return Err(HypergraphError::PathNotAccessible),
         };
@@ -293,7 +305,10 @@ where
         Ok(())
     }
 
-    async fn create_entity_db(&self, path: Arc<Path>) -> Result<(), HypergraphError> {
+    async fn create_entity_db<P>(&self, path: P) -> Result<(), HypergraphError>
+    where
+        P: AsRef<Path>,
+    {
         File::create(path)
             .await
             .map_err(|_| HypergraphError::DatabasesCreation)?
@@ -305,23 +320,20 @@ where
     }
 
     #[instrument]
-    async fn get_reader(&self) -> ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>> {
-        ActorHandle::new(self.vertices_db_path.clone(), &|vertices_db_path,
-                                                          ReadOp(
-            uuid,
-            entity_kind,
-        )| {
+    async fn get_reader(&self) -> ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>> {
+        ActorHandle::new(self.paths.clone(), &|paths, read_op| {
             async move {
-                debug!("Reading from disk.");
+                info!("Reading from disk {}", read_op);
 
                 let mut entity = None;
+                let ReadOp(uuid, entity_kind) = read_op;
 
                 match entity_kind {
                     EntityKind::Hyperedge => {}
                     EntityKind::Vertex => {
                         let mut file = OpenOptions::new()
                             .read(true)
-                            .open(vertices_db_path.clone())
+                            .open(&paths.vertices)
                             .await
                             .map_err(|_| HypergraphError::PathNotAccessible)?;
                         let metadata = file.metadata().await.map_err(|_| HypergraphError::File)?;
@@ -340,6 +352,16 @@ where
                     }
                 };
 
+                info!(
+                    "{} {}",
+                    read_op,
+                    if entity.is_some() {
+                        "found"
+                    } else {
+                        "not found"
+                    }
+                );
+
                 Ok(entity)
             }
             .boxed()
@@ -347,32 +369,28 @@ where
     }
 
     #[instrument]
-    async fn get_writer(&self) -> ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()> {
-        ActorHandle::new(
-            (
-                self.hyperedges_db_path.clone(),
-                self.vertices_db_path.clone(),
-            ),
-            &|paths, write_op| {
-                async move {
-                    match write_op.borrow() {
-                        WriteOp::Create(uuid, entity_weight)
-                        | WriteOp::UpdateWeight(uuid, entity_weight) => {
-                            write_weight_to_file(uuid, entity_weight, paths).await?;
-                        }
-                        WriteOp::Delete(_, _) => todo!(),
-                        WriteOp::UpdateRelation(uuid, entity_relation) => {
-                            write_relation_to_file::<V, HE>(uuid, entity_relation, paths).await?;
-                        }
-                    };
+    async fn get_writer(&self) -> ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()> {
+        ActorHandle::new(self.paths.clone(), &|paths, write_op| {
+            async move {
+                debug!("Writing to disk {}.", write_op);
 
-                    debug!("Writing to disk.");
+                match write_op.borrow() {
+                    WriteOp::Create(uuid, entity_weight)
+                    | WriteOp::UpdateWeight(uuid, entity_weight) => {
+                        write_weight_to_file(uuid, entity_weight, paths).await?;
+                    }
+                    WriteOp::Delete(uuid, entity_kind) => {
+                        remove_entity_from_file::<V, HE>(uuid, entity_kind, paths).await?
+                    }
+                    WriteOp::UpdateRelation(uuid, entity_relation) => {
+                        write_relation_to_file::<V, HE>(uuid, entity_relation, paths).await?;
+                    }
+                };
 
-                    Ok(())
-                }
-                .boxed()
-            },
-        )
+                Ok(())
+            }
+            .boxed()
+        })
     }
 }
 
@@ -382,8 +400,8 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    io_manager_reader: ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>>,
-    io_manager_writer: ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()>,
+    io_manager_reader: ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>>,
+    io_manager_writer: ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()>,
     memory_cache_reader: ActorHandle<Arc<MemoryCacheState<V, HE>>, ReadOp, Option<Entity<V, HE>>>,
     memory_cache_writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Arc<WriteOp<V, HE>>, Uuid>,
 }
@@ -394,8 +412,8 @@ where
     HE: Clone + Debug + Send + Sync,
 {
     fn new(
-        io_manager_reader: ActorHandle<Arc<Path>, ReadOp, Option<Entity<V, HE>>>,
-        io_manager_writer: ActorHandle<(Arc<Path>, Arc<Path>), Arc<WriteOp<V, HE>>, ()>,
+        io_manager_reader: ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>>,
+        io_manager_writer: ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()>,
         memory_cache_reader: ActorHandle<
             Arc<MemoryCacheState<V, HE>>,
             ReadOp,
@@ -482,7 +500,10 @@ where
 
                         // We don't wait for the IOManager to respond since we use a
                         // write-through strategy.
-                        handles.io_manager_writer.process(write_op.clone()).await?;
+                        handles
+                            .io_manager_writer
+                            .process(write_op.clone())
+                            .now_or_never();
 
                         Ok(uuid)
                     }
@@ -584,7 +605,7 @@ where
         })
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub async fn create_vertex(&self, weight: V) -> Result<Uuid, HypergraphError> {
         let uuid = Uuid::now_v7();
 
@@ -597,6 +618,18 @@ where
             .await?;
 
         debug!("Vertex {} created", uuid.to_string());
+
+        Ok(uuid)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn delete_vertex(&self, uuid: Uuid) -> Result<Uuid, HypergraphError> {
+        self.entity_manager
+            .writer
+            .process(Arc::new(WriteOp::Delete(uuid, EntityKind::Vertex)))
+            .await?;
+
+        debug!("Vertex {} deleted", uuid.to_string());
 
         Ok(uuid)
     }
@@ -616,7 +649,7 @@ where
     //     Ok(())
     // }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub async fn get_vertex(&self, uuid: Uuid) -> Result<Option<V>, HypergraphError> {
         let entity = self
             .entity_manager

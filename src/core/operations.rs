@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use uuid::Uuid;
 
@@ -11,9 +11,11 @@ impl ReadOp {
     pub(crate) fn get_uuid(&self) -> Uuid {
         self.0
     }
+}
 
-    pub(crate) fn get_entity_kind(&self) -> EntityKind {
-        self.1
+impl fmt::Display for ReadOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.1, self.0)
     }
 }
 
@@ -27,4 +29,19 @@ where
     Delete(Uuid, EntityKind),
     UpdateRelation(Uuid, EntityRelation),
     UpdateWeight(Uuid, EntityWeight<V, HE>),
+}
+
+impl<V, HE> fmt::Display for WriteOp<V, HE>
+where
+    V: Clone + Debug + Send + Sync,
+    HE: Clone + Debug + Send + Sync,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WriteOp::Create(uuid, _) => write!(f, "Create {}", uuid),
+            WriteOp::Delete(uuid, _) => write!(f, "Delete {}", uuid),
+            WriteOp::UpdateRelation(uuid, _) => write!(f, "Update relation {}", uuid),
+            WriteOp::UpdateWeight(uuid, _) => write!(f, "Update weight {}", uuid),
+        }
+    }
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, path::Path, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf, sync::Arc};
 
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,13 @@ use crate::{
     errors::HypergraphError,
 };
 
+#[derive(Debug)]
+pub(crate) struct Paths {
+    pub(crate) hyperedges: PathBuf,
+    pub(crate) vertices: PathBuf,
+    pub(crate) root: PathBuf,
+}
+
 struct FileWithData<V, HE>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
@@ -24,18 +31,20 @@ where
 
 async fn get_file_with_data<V, HE>(
     entity_kind: EntityKind,
-    paths: (Arc<Path>, Arc<Path>),
+    paths: Arc<Paths>,
 ) -> Result<FileWithData<V, HE>, HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let mut file = OpenOptions::new()
+        .create(true) //TODO: remove unecessary check file logic
+        .truncate(false)
         .read(true)
         .write(true)
         .open(match entity_kind {
-            EntityKind::Hyperedge => paths.0,
-            EntityKind::Vertex => paths.1,
+            EntityKind::Hyperedge => &paths.hyperedges,
+            EntityKind::Vertex => &paths.vertices,
         })
         .await
         .map_err(|_| HypergraphError::PathNotAccessible)?;
@@ -54,17 +63,32 @@ where
     Ok(FileWithData { file, data })
 }
 
+async fn serialize_and_sync<V, HE>(
+    FileWithData { mut file, data }: FileWithData<V, HE>,
+) -> Result<(), HypergraphError>
+where
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+{
+    let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
+    dbg!(123, data.clone());
+    file.write_all(&bytes)
+        .await
+        .map_err(|_| HypergraphError::File)?;
+    file.sync_data().await.map_err(|_| HypergraphError::File)
+}
+
 pub(crate) async fn write_relation_to_file<V, HE>(
     uuid: &Uuid,
     entity_relation: &EntityRelation,
-    paths: (Arc<Path>, Arc<Path>),
+    paths: Arc<Paths>,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let entity_kind = entity_relation.into();
-    let FileWithData { mut file, mut data }: FileWithData<V, HE> =
+    let FileWithData { file, mut data }: FileWithData<V, HE> =
         get_file_with_data(entity_kind, paths).await?;
     let entity = data.get_mut(uuid).ok_or(HypergraphError::EntityUpdate)?;
 
@@ -83,27 +107,20 @@ where
         },
     };
 
-    let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
-
-    file.write_all(&bytes)
-        .await
-        .map_err(|_| HypergraphError::File)?;
-    file.sync_data().await.map_err(|_| HypergraphError::File)?;
-
-    Ok(())
+    serialize_and_sync(FileWithData { file, data }).await
 }
 
 pub(crate) async fn write_weight_to_file<V, HE>(
     uuid: &Uuid,
     entity_weight: &EntityWeight<V, HE>,
-    paths: (Arc<Path>, Arc<Path>),
+    paths: Arc<Paths>,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let entity_kind = entity_weight.into();
-    let FileWithData { mut file, mut data }: FileWithData<V, HE> =
+    let FileWithData { file, mut data }: FileWithData<V, HE> =
         get_file_with_data(entity_kind, paths).await?;
 
     match entity_weight {
@@ -115,12 +132,22 @@ where
         }
     };
 
-    let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
+    serialize_and_sync(FileWithData { file, data }).await
+}
 
-    file.write_all(&bytes)
-        .await
-        .map_err(|_| HypergraphError::File)?;
-    file.sync_data().await.map_err(|_| HypergraphError::File)?;
+pub(crate) async fn remove_entity_from_file<V, HE>(
+    uuid: &Uuid,
+    entity_kind: &EntityKind,
+    paths: Arc<Paths>,
+) -> Result<(), HypergraphError>
+where
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+{
+    let FileWithData { file, mut data }: FileWithData<V, HE> =
+        get_file_with_data(*entity_kind, paths).await?;
 
-    Ok(())
+    data.remove(uuid).ok_or(HypergraphError::EntityNotFound)?;
+
+    serialize_and_sync(FileWithData { file, data }).await
 }

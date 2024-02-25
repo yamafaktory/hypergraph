@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -39,6 +39,15 @@ impl<HE> Hyperedge<HE> {
 pub(crate) enum EntityKind {
     Hyperedge,
     Vertex,
+}
+
+impl fmt::Display for EntityKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EntityKind::Hyperedge => write!(f, "Hyperedge"),
+            EntityKind::Vertex => write!(f, "Vertex"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

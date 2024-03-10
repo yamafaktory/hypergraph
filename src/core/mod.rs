@@ -15,22 +15,17 @@ pub mod operations;
 
 use std::{borrow::Borrow, fmt::Debug, path::Path, sync::Arc};
 
-use bincode::deserialize;
 use errors::HypergraphError;
 use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    fs::{create_dir_all, try_exists, File, OpenOptions},
-    io::AsyncReadExt,
-};
+use tokio::fs::{create_dir_all, try_exists, File};
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use self::file::Paths;
+use self::file::{read_data_from_file, Paths};
 use crate::{
     actors::ActorHandle,
-    collections::HashMap,
     defaults::{HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
     file::{remove_entity_from_file, write_relation_to_file, write_weight_to_file},
@@ -325,32 +320,9 @@ where
             async move {
                 info!("Reading from disk {}", read_op);
 
-                let mut entity = None;
                 let ReadOp(uuid, entity_kind) = read_op;
-
-                match entity_kind {
-                    EntityKind::Hyperedge => {}
-                    EntityKind::Vertex => {
-                        let mut file = OpenOptions::new()
-                            .read(true)
-                            .open(&paths.vertices)
-                            .await
-                            .map_err(|_| HypergraphError::PathNotAccessible)?;
-                        let metadata = file.metadata().await.map_err(|_| HypergraphError::File)?;
-
-                        if metadata.len() != 0 {
-                            let mut contents = vec![];
-                            file.read_to_end(&mut contents)
-                                .await
-                                .map_err(|_| HypergraphError::File)?;
-
-                            let data: HashMap<Uuid, Entity<V, HE>> = deserialize(&contents)
-                                .map_err(|_| HypergraphError::Deserialization)?;
-
-                            entity = data.get(&uuid).cloned();
-                        }
-                    }
-                };
+                let data = read_data_from_file(entity_kind, paths).await?;
+                let entity = data.get(&uuid).cloned();
 
                 info!(
                     "{} {}",

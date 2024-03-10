@@ -93,8 +93,6 @@ where
 
         // Ignore send errors. If this send fails, so does the recv.await below.
         let _ = self.sender.send(message).await;
-        let response = recv.await.map_err(|_| HypergraphError::PathCreation)?;
-
-        Ok(response)
+        recv.await.map_err(|_| HypergraphError::PathCreation)
     }
 }

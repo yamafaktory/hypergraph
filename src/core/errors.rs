@@ -13,7 +13,7 @@ pub enum HypergraphError {
     /// This could be the case when the listing permission is denied on one of
     /// the parent directories.
     #[error("Path is not accessible")]
-    PathNotAccessible,
+    PathNotAccessible(#[source] std::io::Error, std::path::PathBuf),
     /// File error.
     #[error("File error")]
     File,

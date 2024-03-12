@@ -19,16 +19,17 @@ use errors::HypergraphError;
 use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
-use tokio::fs::{create_dir_all, try_exists, File};
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use self::file::{read_data_from_file, Paths};
 use crate::{
     actors::ActorHandle,
     defaults::{HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
-    file::{remove_entity_from_file, write_relation_to_file, write_weight_to_file},
+    file::{
+        read_data_from_file, remove_entity_from_file, write_relation_to_file, write_weight_to_file,
+        Paths,
+    },
     operations::{ReadOp, WriteOp},
 };
 
@@ -258,59 +259,6 @@ where
         self.reader = Some(reader);
         self.writer = Some(writer);
 
-        let hyperedges_path = &self.paths.hyperedges;
-        let vertices_path = &self.paths.vertices;
-        let root_path = &self.paths.root;
-
-        match try_exists(root_path).await {
-            Ok(true) => {
-                debug!("Path already exists");
-
-                if let Ok(exists) = try_exists(vertices_path).await {
-                    if !exists {
-                        self.create_entity_db(vertices_path).await?;
-                        debug!("Vertices storage file was not found and has been created");
-                    }
-                } else {
-                    return Err(HypergraphError::DatabasesCreation);
-                }
-
-                if let Ok(exists) = try_exists(hyperedges_path).await {
-                    if !exists {
-                        self.create_entity_db(hyperedges_path).await?;
-                        debug!("Hyperedges storage file was not found and has been created");
-                    }
-                } else {
-                    return Err(HypergraphError::DatabasesCreation);
-                }
-            }
-            Ok(false) => {
-                debug!("Path does not exist");
-
-                create_dir_all(root_path)
-                    .await
-                    .map_err(|_| HypergraphError::PathCreation)?;
-
-                self.create_entity_db(vertices_path).await?;
-                self.create_entity_db(hyperedges_path).await?;
-            }
-            Err(_) => return Err(HypergraphError::PathNotAccessible),
-        };
-
-        Ok(())
-    }
-
-    async fn create_entity_db<P>(&self, path: P) -> Result<(), HypergraphError>
-    where
-        P: AsRef<Path>,
-    {
-        File::create(path)
-            .await
-            .map_err(|_| HypergraphError::DatabasesCreation)?
-            .sync_data()
-            .await
-            .map_err(|_| HypergraphError::DatabasesCreation)?;
-
         Ok(())
     }
 
@@ -321,7 +269,7 @@ where
                 info!("Reading from disk {}", read_op);
 
                 let ReadOp(uuid, entity_kind) = read_op;
-                let data = read_data_from_file(entity_kind, paths).await?;
+                let data = read_data_from_file(&entity_kind, &uuid, paths).await?;
                 let entity = data.get(&uuid).cloned();
 
                 info!(

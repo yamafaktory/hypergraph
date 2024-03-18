@@ -19,12 +19,13 @@ use errors::HypergraphError;
 use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
+use tokio::fs::create_dir_all;
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use crate::{
     actors::ActorHandle,
-    defaults::{HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
+    defaults::{DB_EXT, HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
     file::{
         read_data_from_file, remove_entity_from_file, write_relation_to_file, write_weight_to_file,
@@ -238,8 +239,12 @@ where
         info!("Creating new IOManager");
 
         let path = path.as_ref();
-        let hyperedges = path.join(HYPEREDGES_DB);
-        let vertices = path.join(VERTICES_DB);
+
+        let mut hyperedges = path.join(HYPEREDGES_DB);
+        hyperedges.set_extension(DB_EXT);
+
+        let mut vertices = path.join(VERTICES_DB);
+        vertices.set_extension(DB_EXT);
 
         Ok(Self {
             paths: Arc::new(Paths {
@@ -255,6 +260,10 @@ where
     async fn start(&mut self) -> Result<(), HypergraphError> {
         let reader = self.get_reader().await;
         let writer = self.get_writer().await;
+
+        create_dir_all(&self.paths.root)
+            .await
+            .map_err(|_| HypergraphError::PathCreation)?;
 
         self.reader = Some(reader);
         self.writer = Some(writer);

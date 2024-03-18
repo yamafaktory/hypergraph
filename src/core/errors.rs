@@ -3,9 +3,6 @@ use thiserror::Error;
 /// Enumeration of all the possible errors.
 #[derive(Debug, Error)]
 pub enum HypergraphError {
-    /// Error when the databases can't be created.
-    #[error("Databases can't be created")]
-    DatabasesCreation,
     /// Error when the path can't be created.
     #[error("Path can't be created")]
     PathCreation,
@@ -16,7 +13,9 @@ pub enum HypergraphError {
     PathNotAccessible(#[source] std::io::Error, std::path::PathBuf),
     /// File error.
     #[error("File error")]
-    File,
+    File(#[source] std::io::Error),
+    #[error("File error")]
+    FileWithoutSource(),
     /// Serialization error.
     #[error("Serialization failed")]
     Serialization,
@@ -32,4 +31,7 @@ pub enum HypergraphError {
     /// Error when updating an entity.
     #[error("Entity couldn't be updated")]
     EntityUpdate,
+    /// Processing error.
+    #[error("Processing failed")]
+    Processing,
 }

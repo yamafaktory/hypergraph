@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     collections::HashMap,
+    defaults::DB_EXT,
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
     errors::HypergraphError,
 };
@@ -90,7 +91,12 @@ async fn get_chunk_path(
 
     write_to_file(&entity_database, db_path).await?;
 
-    Ok(Path::new(&format!("{}.db", file_uuid)).to_path_buf())
+    let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
+        .iter()
+        .collect();
+
+    path.set_extension(DB_EXT);
+    Ok(path)
 }
 
 async fn read_from_file<D, P>(path: P) -> Result<Option<D>, HypergraphError>
@@ -98,7 +104,8 @@ where
     D: Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     P: AsRef<Path>,
 {
-    let t = path.as_ref().to_path_buf();
+    let path_buf = path.as_ref().to_path_buf();
+    let t = path_buf.clone();
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -106,14 +113,14 @@ where
         .truncate(false)
         .open(path)
         .await
-        .map_err(|error| HypergraphError::PathNotAccessible(error, t))?;
-    let metadata = file.metadata().await.map_err(|_| HypergraphError::File)?;
-
+        .map_err(|error| HypergraphError::PathNotAccessible(error, path_buf))?;
+    let metadata = file.metadata().await.map_err(HypergraphError::File)?;
+    dbg!(t, metadata.clone(), metadata.len());
     if metadata.len() != 0 {
         let mut contents = vec![];
         file.read_to_end(&mut contents)
             .await
-            .map_err(|_| HypergraphError::File)?;
+            .map_err(HypergraphError::File)?;
 
         return deserialize(&contents)
             .map_err(|_| HypergraphError::Deserialization)
@@ -130,7 +137,7 @@ where
 {
     let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
 
-    write(path, bytes).await.map_err(|_| HypergraphError::File)
+    write(path, bytes).await.map_err(HypergraphError::File)
 }
 
 pub(crate) async fn read_data_from_file<V, HE>(
@@ -143,10 +150,10 @@ where
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let chunk_path = get_chunk_path(entity_kind, paths.clone(), uuid).await?;
-
-    read_from_file(chunk_path)
-        .await?
-        .ok_or(HypergraphError::File)
+    dbg!(chunk_path.clone());
+    let t = read_from_file(chunk_path).await?;
+    dbg!(t.clone()); // is none!
+    t.ok_or_else(HypergraphError::FileWithoutSource)
 }
 
 async fn write_data_to_file<V, HE>(

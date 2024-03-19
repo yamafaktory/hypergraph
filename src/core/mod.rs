@@ -279,6 +279,7 @@ where
 
                 let ReadOp(uuid, entity_kind) = read_op;
                 let data = read_data_from_file(&entity_kind, &uuid, paths).await?;
+                dbg!(data.clone());
                 let entity = data.get(&uuid).cloned();
 
                 info!(
@@ -304,9 +305,11 @@ where
                 debug!("Writing to disk {}.", write_op);
 
                 match write_op.borrow() {
-                    WriteOp::Create(uuid, entity_weight)
-                    | WriteOp::UpdateWeight(uuid, entity_weight) => {
-                        write_weight_to_file(uuid, entity_weight, paths).await?;
+                    WriteOp::Create(uuid, entity_weight) => {
+                        write_weight_to_file(uuid, entity_weight, paths, false).await?;
+                    }
+                    WriteOp::UpdateWeight(uuid, entity_weight) => {
+                        write_weight_to_file(uuid, entity_weight, paths, true).await?;
                     }
                     WriteOp::Delete(uuid, entity_kind) => {
                         remove_entity_from_file::<V, HE>(uuid, entity_kind, paths).await?

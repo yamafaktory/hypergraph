@@ -56,7 +56,37 @@ impl EntityDatabase {
     }
 }
 
-async fn get_chunk_path(
+async fn try_get_existing_chunk_path(
+    entity_kind: &EntityKind,
+    paths: Arc<Paths>,
+    uuid: &Uuid,
+) -> Result<PathBuf, HypergraphError> {
+    let db_path = match entity_kind {
+        EntityKind::Hyperedge => &paths.hyperedges,
+        EntityKind::Vertex => &paths.vertices,
+    };
+
+    let entity_database_from_disk: Option<EntityDatabase> = read_from_file(db_path).await?;
+
+    if let Some(entity_database) = entity_database_from_disk {
+        dbg!(entity_database.map.clone(), uuid);
+        let file_uuid = entity_database
+            .map
+            .get(uuid)
+            .ok_or(HypergraphError::EntityNotFound)?;
+
+        let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
+            .iter()
+            .collect();
+        path.set_extension(DB_EXT);
+
+        Ok(path)
+    } else {
+        Err(HypergraphError::EntityNotFound)
+    }
+}
+
+async fn generate_new_chunk_path(
     entity_kind: &EntityKind,
     paths: Arc<Paths>,
     uuid: &Uuid,
@@ -85,7 +115,7 @@ async fn get_chunk_path(
     } else {
         entity_database
             .map
-            .insert(entity_database.pool.free_slot, *uuid);
+            .insert(*uuid, entity_database.pool.free_slot);
         &entity_database.pool.free_slot
     };
 
@@ -94,8 +124,8 @@ async fn get_chunk_path(
     let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
         .iter()
         .collect();
-
     path.set_extension(DB_EXT);
+
     Ok(path)
 }
 
@@ -105,7 +135,6 @@ where
     P: AsRef<Path>,
 {
     let path_buf = path.as_ref().to_path_buf();
-    let t = path_buf.clone();
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -115,7 +144,7 @@ where
         .await
         .map_err(|error| HypergraphError::PathNotAccessible(error, path_buf))?;
     let metadata = file.metadata().await.map_err(HypergraphError::File)?;
-    dbg!(t, metadata.clone(), metadata.len());
+
     if metadata.len() != 0 {
         let mut contents = vec![];
         file.read_to_end(&mut contents)
@@ -149,8 +178,8 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let chunk_path = get_chunk_path(entity_kind, paths.clone(), uuid).await?;
-    dbg!(chunk_path.clone());
+    let chunk_path = try_get_existing_chunk_path(entity_kind, paths.clone(), uuid).await?;
+    dbg!("READ", uuid, chunk_path.clone());
     let t = read_from_file(chunk_path).await?;
     dbg!(t.clone()); // is none!
     t.ok_or_else(HypergraphError::FileWithoutSource)
@@ -166,7 +195,7 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let chunk_path = get_chunk_path(entity_kind, paths.clone(), uuid).await?;
+    let chunk_path = generate_new_chunk_path(entity_kind, paths.clone(), uuid).await?;
 
     write_to_file(&data, chunk_path).await
 }
@@ -206,13 +235,19 @@ pub(crate) async fn write_weight_to_file<V, HE>(
     uuid: &Uuid,
     entity_weight: &EntityWeight<V, HE>,
     paths: Arc<Paths>,
+    update: bool,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let entity_kind: EntityKind = entity_weight.into();
-    let mut data = read_data_from_file::<V, HE>(&entity_kind, uuid, paths.clone()).await?;
+
+    let mut data = if update {
+        read_data_from_file::<V, HE>(&entity_kind, uuid, paths.clone()).await?
+    } else {
+        HashMap::default()
+    };
 
     match entity_weight {
         EntityWeight::Hyperedge(weight) => {
@@ -223,7 +258,9 @@ where
         }
     };
 
-    write_data_to_file(&entity_kind, uuid, data, paths).await
+    write_data_to_file(&entity_kind, uuid, data, paths).await?;
+
+    Ok(())
 }
 
 pub(crate) async fn remove_entity_from_file<V, HE>(

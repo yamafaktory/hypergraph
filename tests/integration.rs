@@ -1,7 +1,7 @@
 mod common;
-
 use common::{get_tracing_subscriber, prepare, Vertex};
 use hypergraph::errors::HypergraphError;
+use tokio::time::{sleep, Duration};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sequential_tests() -> Result<(), HypergraphError> {
@@ -20,15 +20,19 @@ async fn integration_add_get_delete_vertex(
 
     let uuid = graph.create_vertex(Vertex {}).await?;
 
+    sleep(Duration::from_millis(5000)).await;
+
     let vertex = graph.get_vertex(uuid).await?;
 
     assert_eq!(vertex.unwrap(), Vertex {});
 
-    // graph.delete_vertex(uuid).await?;
+    graph.delete_vertex(uuid).await?;
 
-    // let vertex = graph.get_vertex(uuid).await?;
+    sleep(Duration::from_millis(5000)).await;
 
-    // assert_eq!(vertex, None);
+    let vertex = graph.get_vertex(uuid).await?;
+
+    assert_eq!(vertex, None);
 
     let _ = clear().await;
 

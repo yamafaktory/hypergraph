@@ -67,7 +67,7 @@ async fn try_get_existing_chunk_path(
     };
 
     let entity_database_from_disk: Option<EntityDatabase> = read_from_file(db_path).await?;
-
+    dbg!(entity_database_from_disk.is_some());
     if let Some(entity_database) = entity_database_from_disk {
         dbg!(entity_database.map.clone(), uuid);
         let file_uuid = entity_database
@@ -82,6 +82,7 @@ async fn try_get_existing_chunk_path(
 
         Ok(path)
     } else {
+        dbg!(23234);
         Err(HypergraphError::EntityNotFound)
     }
 }
@@ -110,7 +111,7 @@ async fn generate_new_chunk_path(
         entity_database.pool.slot_count -= 1;
     }
 
-    let file_uuid = if entity_database.map.contains_key(uuid) {
+    let file_uuid = if let Some(uuid) = entity_database.map.get(uuid) {
         uuid
     } else {
         entity_database
@@ -118,7 +119,7 @@ async fn generate_new_chunk_path(
             .insert(*uuid, entity_database.pool.free_slot);
         &entity_database.pool.free_slot
     };
-
+    dbg!(entity_database.map.clone());
     write_to_file(&entity_database, db_path).await?;
 
     let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
@@ -135,6 +136,7 @@ where
     P: AsRef<Path>,
 {
     let path_buf = path.as_ref().to_path_buf();
+    let p = path_buf.clone();
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -144,7 +146,7 @@ where
         .await
         .map_err(|error| HypergraphError::PathNotAccessible(error, path_buf))?;
     let metadata = file.metadata().await.map_err(HypergraphError::File)?;
-
+    dbg!(p);
     if metadata.len() != 0 {
         let mut contents = vec![];
         file.read_to_end(&mut contents)

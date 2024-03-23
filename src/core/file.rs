@@ -67,9 +67,8 @@ async fn try_get_existing_chunk_path(
     };
 
     let entity_database_from_disk: Option<EntityDatabase> = read_from_file(db_path).await?;
-    dbg!(entity_database_from_disk.is_some());
+
     if let Some(entity_database) = entity_database_from_disk {
-        dbg!(entity_database.map.clone(), uuid);
         let file_uuid = entity_database
             .map
             .get(uuid)
@@ -82,7 +81,6 @@ async fn try_get_existing_chunk_path(
 
         Ok(path)
     } else {
-        dbg!(23234);
         Err(HypergraphError::EntityNotFound)
     }
 }
@@ -119,7 +117,7 @@ async fn generate_new_chunk_path(
             .insert(*uuid, entity_database.pool.free_slot);
         &entity_database.pool.free_slot
     };
-    dbg!(entity_database.map.clone());
+
     write_to_file(&entity_database, db_path).await?;
 
     let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
@@ -136,7 +134,6 @@ where
     P: AsRef<Path>,
 {
     let path_buf = path.as_ref().to_path_buf();
-    let p = path_buf.clone();
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -146,9 +143,10 @@ where
         .await
         .map_err(|error| HypergraphError::PathNotAccessible(error, path_buf))?;
     let metadata = file.metadata().await.map_err(HypergraphError::File)?;
-    dbg!(p);
+
     if metadata.len() != 0 {
         let mut contents = vec![];
+
         file.read_to_end(&mut contents)
             .await
             .map_err(HypergraphError::File)?;
@@ -181,10 +179,10 @@ where
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let chunk_path = try_get_existing_chunk_path(entity_kind, paths.clone(), uuid).await?;
-    dbg!("READ", uuid, chunk_path.clone());
-    let t = read_from_file(chunk_path).await?;
-    dbg!(t.clone()); // is none!
-    t.ok_or_else(HypergraphError::FileWithoutSource)
+
+    read_from_file(chunk_path)
+        .await?
+        .ok_or_else(HypergraphError::FileWithoutSource)
 }
 
 async fn write_data_to_file<V, HE>(
@@ -197,7 +195,7 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let chunk_path = generate_new_chunk_path(entity_kind, paths.clone(), uuid).await?;
+    let chunk_path = generate_new_chunk_path(entity_kind, paths, uuid).await?;
 
     write_to_file(&data, chunk_path).await
 }

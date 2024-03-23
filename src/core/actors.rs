@@ -95,4 +95,14 @@ where
         let _ = self.sender.send(message).await;
         recv.await.map_err(|_| HypergraphError::Processing)
     }
+
+    pub(crate) async fn process_no_response(&self, payload: P) -> Result<(), HypergraphError> {
+        let (send, _) = oneshot::channel();
+        let message = ActorMessage(payload, send);
+
+        // Ignore send errors. If this send fails, so does the recv.await below.
+        let _ = self.sender.send(message).await;
+
+        Ok(())
+    }
 }

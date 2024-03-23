@@ -19,7 +19,7 @@ use errors::HypergraphError;
 use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
-use tokio::fs::create_dir_all;
+use tokio::{fs::create_dir_all, try_join};
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
@@ -425,17 +425,14 @@ where
 
                 match write_op.borrow() {
                     WriteOp::Create(..) => {
-                        let uuid = handles
-                            .memory_cache_writer
-                            .process(write_op.clone())
-                            .await?;
-
                         // We don't wait for the IOManager to respond since we use a
                         // write-through strategy.
-                        handles
-                            .io_manager_writer
-                            .process(write_op.clone())
-                            .now_or_never();
+                        let (uuid, _) = try_join!(
+                            handles.memory_cache_writer.process(write_op.clone()),
+                            handles
+                                .io_manager_writer
+                                .process_no_response(write_op.clone())
+                        )?;
 
                         Ok(uuid)
                     }

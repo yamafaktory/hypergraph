@@ -27,15 +27,17 @@ pub(crate) struct Paths {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct EntityDatabase {
-    chunk_to_entities_map: HashMap<Uuid, HashSet<Uuid>>,
+struct ChunkManager {
     chunk_free_slots_map: HashMap<Uuid, u16>,
+    chunk_to_entities_map: HashMap<Uuid, HashSet<Uuid>>,
+    entity_to_chunk_map: HashMap<Uuid, Uuid>,
 }
 
-impl EntityDatabase {
+impl ChunkManager {
     fn new() -> Self {
         Self {
             chunk_to_entities_map: HashMap::default(),
+            entity_to_chunk_map: HashMap::default(),
             chunk_free_slots_map: HashMap::default(),
         }
     }
@@ -54,25 +56,35 @@ impl EntityDatabase {
             EntityKind::Vertex => &paths.vertices,
         };
 
-        return db_path.to_path_buf();
+        db_path.to_path_buf()
     }
 
-    async fn get_or_init(
-        &self,
+    async fn init(
+        &mut self,
         entity_kind: &EntityKind,
         paths: Arc<Paths>,
-    ) -> Result<Self, HypergraphError> {
-        let ref db_path = self.get_db_path(entity_kind, paths);
+    ) -> Result<(), HypergraphError> {
+        // Get the database path.
+        let db_path = &self.get_db_path(entity_kind, paths);
 
-        if let Some(entity_database) = read_from_file(db_path).await? {
-            return Ok(entity_database);
+        // Try to read from disk and update the struct if available.
+        let data: Option<ChunkManager> = read_from_file(db_path).await?;
+        if let Some(chunk_manager) = data {
+            self.chunk_to_entities_map = chunk_manager.chunk_to_entities_map;
+            self.entity_to_chunk_map = chunk_manager.entity_to_chunk_map;
+            self.chunk_free_slots_map = chunk_manager.chunk_free_slots_map;
+
+            return Ok(());
         }
 
-        let entity_database = Self::new();
+        // Otherwise generate a new struct and write to disk.
+        let chunk_manager = Self::new();
+        write_to_file(&chunk_manager, db_path).await?;
+        self.chunk_to_entities_map = chunk_manager.chunk_to_entities_map;
+        self.entity_to_chunk_map = chunk_manager.entity_to_chunk_map;
+        self.chunk_free_slots_map = chunk_manager.chunk_free_slots_map;
 
-        write_to_file(&entity_database, db_path).await?;
-
-        Ok(entity_database)
+        Ok(())
     }
 
     fn insert_new_chunk(&mut self) -> Uuid {
@@ -100,7 +112,7 @@ impl EntityDatabase {
         }
 
         // Here all chunks are full, insert a new one.
-        return self.insert_new_chunk();
+        self.insert_new_chunk()
     }
 
     async fn sync_to_disk(
@@ -108,7 +120,7 @@ impl EntityDatabase {
         entity_kind: &EntityKind,
         paths: Arc<Paths>,
     ) -> Result<(), HypergraphError> {
-        let ref db_path = self.get_db_path(entity_kind, paths);
+        let db_path = &self.get_db_path(entity_kind, paths);
 
         write_to_file(self, db_path).await
     }
@@ -118,12 +130,25 @@ impl EntityDatabase {
         entity_kind: &EntityKind,
         paths: Arc<Paths>,
         uuid: &Uuid,
-    ) -> Result<(), HypergraphError>
+    ) -> Result<Option<Entity<V, HE>>, HypergraphError>
     where
         V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
         HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     {
-        Ok(())
+        // Ensure to init the database.
+        self.init(entity_kind, paths.clone()).await?;
+
+        // Try to retrieve the chunk UUID, its path and finally the entity from disk.
+        if let Some(chunk_uuid) = self.entity_to_chunk_map.get(uuid) {
+            let chunk_path = self.get_chunk_path(paths, chunk_uuid);
+            let data: Option<HashMap<Uuid, Entity<V, HE>>> = read_from_file(chunk_path).await?;
+
+            let entity = data.and_then(|map| map.get(uuid).cloned());
+
+            Ok(entity)
+        } else {
+            Ok(None)
+        }
     }
 
     async fn create_op<V, HE, U>(
@@ -138,7 +163,8 @@ impl EntityDatabase {
         HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
         U: FnOnce(&mut HashMap<Uuid, Entity<V, HE>>),
     {
-        self.get_or_init(entity_kind, paths.clone()).await?;
+        // Ensure to init the database.
+        self.init(entity_kind, paths.clone()).await?;
 
         // Find a free slot.
         let free_slot = self.find_free_slot();
@@ -158,6 +184,9 @@ impl EntityDatabase {
         self.chunk_to_entities_map
             .insert(free_slot, current_entities_in_chunk);
 
+        // Update the entity map.
+        self.entity_to_chunk_map.insert(*uuid, free_slot);
+
         // Sync the changes to disk.
         self.sync_to_disk(entity_kind, paths.clone()).await?;
 
@@ -166,20 +195,37 @@ impl EntityDatabase {
 
         // Try to retrieve the data from the chunk.
         // If the chunk doesn't exist yet - i.e. a None value - we need to create it.
-        let data: Option<HashMap<Uuid, Entity<V, HE>>> = read_from_file(chunk_path).await?;
-        let mut entities = data.unwrap_or(HashMap::default());
+        let data: Option<HashMap<Uuid, Entity<V, HE>>> = read_from_file(chunk_path.clone()).await?;
+        let mut entities = data.unwrap_or_default();
 
         // Run the updater.
         updater(&mut entities);
 
+        // Write to chunk file.
+        write_to_file(&entities, chunk_path).await?;
+
         Ok(())
     }
 
-    async fn update_op(&mut self) -> Result<(), HypergraphError> {
+    async fn update_op(
+        &mut self,
+        entity_kind: &EntityKind,
+        paths: Arc<Paths>,
+    ) -> Result<(), HypergraphError> {
+        // Ensure to init the database.
+        self.init(entity_kind, paths.clone()).await?;
+
         Ok(())
     }
 
-    async fn delete_op(&mut self) -> Result<(), HypergraphError> {
+    async fn delete_op(
+        &mut self,
+        entity_kind: &EntityKind,
+        paths: Arc<Paths>,
+    ) -> Result<(), HypergraphError> {
+        // Ensure to init the database.
+        self.init(entity_kind, paths.clone()).await?;
+
         Ok(())
     }
 }
@@ -225,25 +271,22 @@ where
     write(path, bytes).await.map_err(HypergraphError::File)
 }
 
-async fn write_data_to_file<V, HE>(
+pub(crate) async fn read_entity_from_file<V, HE>(
     entity_kind: &EntityKind,
     uuid: &Uuid,
-    data: HashMap<Uuid, Entity<V, HE>>,
     paths: Arc<Paths>,
-    update: bool,
-) -> Result<(), HypergraphError>
+) -> Result<Option<Entity<V, HE>>, HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    // let chunk_path = if update {
-    //     try_get_existing_chunk_path(entity_kind, paths.clone(), uuid).await?
-    // } else {
-    //     generate_new_chunk_path(entity_kind, paths, uuid).await?
-    // };
-    //
-    // write_to_file(&data, chunk_path).await
-    Ok(())
+    let mut chunk_manager = ChunkManager::new();
+
+    let entity = chunk_manager
+        .read_op::<V, HE>(entity_kind, paths, uuid)
+        .await?;
+
+    Ok(entity)
 }
 
 pub(crate) async fn write_relation_to_file<V, HE>(
@@ -275,13 +318,15 @@ where
     // };
     //
     // write_data_to_file(entity_kind, uuid, data, paths, true).await
-    let mut entity_database = EntityDatabase::new();
-    entity_database.create_op(
-        entity_kind,
-        paths,
-        uuid,
-        |data: &mut HashMap<Uuid, Entity<V, HE>>| {},
-    );
+    let mut chunk_manager = ChunkManager::new();
+    chunk_manager
+        .create_op(
+            entity_kind,
+            paths,
+            uuid,
+            |data: &mut HashMap<Uuid, Entity<V, HE>>| {},
+        )
+        .await?;
     Ok(())
 }
 
@@ -295,24 +340,26 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    // let entity_kind: EntityKind = entity_weight.into();
-    //
-    // let mut data = if update {
-    //     read_data_from_file::<V, HE>(&entity_kind, uuid, paths.clone()).await?
-    // } else {
-    //     HashMap::default()
-    // };
-    //
-    // match entity_weight {
-    //     EntityWeight::Hyperedge(weight) => {
-    //         data.insert(*uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
-    //     }
-    //     EntityWeight::Vertex(weight) => {
-    //         data.insert(*uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
-    //     }
-    // };
-    //
-    // write_data_to_file(&entity_kind, uuid, data, paths, update).await?;
+    let entity_kind: EntityKind = entity_weight.into();
+
+    let mut chunk_manager = ChunkManager::new();
+    chunk_manager
+        .create_op(
+            &entity_kind,
+            paths,
+            uuid,
+            |data: &mut HashMap<Uuid, Entity<V, HE>>| {
+                match entity_weight {
+                    EntityWeight::Hyperedge(weight) => {
+                        data.insert(*uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
+                    }
+                    EntityWeight::Vertex(weight) => {
+                        data.insert(*uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
+                    }
+                };
+            },
+        )
+        .await?;
 
     Ok(())
 }

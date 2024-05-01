@@ -28,8 +28,8 @@ use crate::{
     defaults::{DB_EXT, HYPEREDGES_CACHE_SIZE, HYPEREDGES_DB, VERTICES_CACHE_SIZE, VERTICES_DB},
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
     file::{
-        read_data_from_file, remove_entity_from_file, write_relation_to_file, write_weight_to_file,
-        Paths,
+        read_entity_from_file, remove_entity_from_file, write_relation_to_file,
+        write_weight_to_file, Paths,
     },
     operations::{ReadOp, WriteOp},
 };
@@ -278,9 +278,7 @@ where
                 info!("Reading from disk {}", read_op);
 
                 let ReadOp(uuid, entity_kind) = read_op;
-                let data = read_data_from_file(&entity_kind, &uuid, paths).await?;
-                dbg!(data.clone());
-                let entity = data.get(&uuid).cloned();
+                let entity = read_entity_from_file(&entity_kind, &uuid, paths).await?;
 
                 info!(
                     "{} {}",

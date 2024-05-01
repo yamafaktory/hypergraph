@@ -7,13 +7,13 @@ use std::{
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 use tokio::{
-    fs::{write, OpenOptions},
+    fs::{remove_file, write, OpenOptions},
     io::AsyncReadExt,
 };
 use uuid::Uuid;
 
 use crate::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     defaults::DB_EXT,
     entities::{Entity, EntityKind, EntityRelation, EntityWeight, Hyperedge, Vertex},
     errors::HypergraphError,
@@ -27,105 +27,161 @@ pub(crate) struct Paths {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Pool {
-    free_slot: Uuid,
-    slot_count: u16,
-}
-
-impl Pool {
-    fn new() -> Self {
-        Self {
-            free_slot: Uuid::now_v7(),
-            slot_count: u16::MAX,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 struct EntityDatabase {
-    pool: Pool,
-    map: HashMap<Uuid, Uuid>,
+    chunk_to_entities_map: HashMap<Uuid, HashSet<Uuid>>,
+    chunk_free_slots_map: HashMap<Uuid, u16>,
 }
 
 impl EntityDatabase {
     fn new() -> Self {
         Self {
-            pool: Pool::new(),
-            map: HashMap::default(),
+            chunk_to_entities_map: HashMap::default(),
+            chunk_free_slots_map: HashMap::default(),
         }
     }
-}
 
-async fn try_get_existing_chunk_path(
-    entity_kind: &EntityKind,
-    paths: Arc<Paths>,
-    uuid: &Uuid,
-) -> Result<PathBuf, HypergraphError> {
-    let db_path = match entity_kind {
-        EntityKind::Hyperedge => &paths.hyperedges,
-        EntityKind::Vertex => &paths.vertices,
-    };
+    fn get_chunk_path(&self, paths: Arc<Paths>, uuid: &Uuid) -> PathBuf {
+        let path = &paths.root;
+        let mut chunk_path = path.join(uuid.to_string());
+        chunk_path.set_extension(DB_EXT);
 
-    let entity_database_from_disk: Option<EntityDatabase> = read_from_file(db_path).await?;
-
-    if let Some(entity_database) = entity_database_from_disk {
-        let file_uuid = entity_database
-            .map
-            .get(uuid)
-            .ok_or(HypergraphError::EntityNotFound)?;
-
-        let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
-            .iter()
-            .collect();
-        path.set_extension(DB_EXT);
-
-        Ok(path)
-    } else {
-        Err(HypergraphError::EntityNotFound)
-    }
-}
-
-async fn generate_new_chunk_path(
-    entity_kind: &EntityKind,
-    paths: Arc<Paths>,
-    uuid: &Uuid,
-) -> Result<PathBuf, HypergraphError> {
-    let db_path = match entity_kind {
-        EntityKind::Hyperedge => &paths.hyperedges,
-        EntityKind::Vertex => &paths.vertices,
-    };
-
-    let entity_database_from_disk: Option<EntityDatabase> = read_from_file(db_path).await?;
-
-    let mut entity_database = match entity_database_from_disk {
-        Some(entity_database) => entity_database,
-        None => EntityDatabase::new(),
-    };
-
-    if entity_database.pool.slot_count == 1 {
-        entity_database.pool.free_slot = Uuid::now_v7();
-        entity_database.pool.slot_count = u16::MAX;
-    } else {
-        entity_database.pool.slot_count -= 1;
+        chunk_path
     }
 
-    let file_uuid = if let Some(uuid) = entity_database.map.get(uuid) {
+    fn get_db_path(&self, entity_kind: &EntityKind, paths: Arc<Paths>) -> PathBuf {
+        let db_path = match entity_kind {
+            EntityKind::Hyperedge => &paths.hyperedges,
+            EntityKind::Vertex => &paths.vertices,
+        };
+
+        return db_path.to_path_buf();
+    }
+
+    async fn get_or_init(
+        &self,
+        entity_kind: &EntityKind,
+        paths: Arc<Paths>,
+    ) -> Result<Self, HypergraphError> {
+        let ref db_path = self.get_db_path(entity_kind, paths);
+
+        if let Some(entity_database) = read_from_file(db_path).await? {
+            return Ok(entity_database);
+        }
+
+        let entity_database = Self::new();
+
+        write_to_file(&entity_database, db_path).await?;
+
+        Ok(entity_database)
+    }
+
+    fn insert_new_chunk(&mut self) -> Uuid {
+        let uuid = Uuid::now_v7();
+
+        self.chunk_free_slots_map.insert(uuid, u16::MAX);
+
         uuid
-    } else {
-        entity_database
-            .map
-            .insert(*uuid, entity_database.pool.free_slot);
-        &entity_database.pool.free_slot
-    };
+    }
 
-    write_to_file(&entity_database, db_path).await?;
+    fn find_free_slot(&mut self) -> Uuid {
+        // Empty map, insert new a new chunk.
+        if self.chunk_free_slots_map.is_empty() {
+            return self.insert_new_chunk();
+        }
 
-    let mut path: PathBuf = [paths.root.clone(), file_uuid.to_string().into()]
-        .iter()
-        .collect();
-    path.set_extension(DB_EXT);
+        // Return the next chunk with capacity.
+        for (&chunk_uuid, &capacity) in self.chunk_free_slots_map.iter() {
+            if capacity > 0 {
+                // Update the capacity of the chunk.
+                self.chunk_free_slots_map.insert(chunk_uuid, 234);
 
-    Ok(path)
+                return chunk_uuid;
+            }
+        }
+
+        // Here all chunks are full, insert a new one.
+        return self.insert_new_chunk();
+    }
+
+    async fn sync_to_disk(
+        &self,
+        entity_kind: &EntityKind,
+        paths: Arc<Paths>,
+    ) -> Result<(), HypergraphError> {
+        let ref db_path = self.get_db_path(entity_kind, paths);
+
+        write_to_file(self, db_path).await
+    }
+
+    async fn read_op<V, HE>(
+        &mut self,
+        entity_kind: &EntityKind,
+        paths: Arc<Paths>,
+        uuid: &Uuid,
+    ) -> Result<(), HypergraphError>
+    where
+        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    {
+        Ok(())
+    }
+
+    async fn create_op<V, HE, U>(
+        &mut self,
+        entity_kind: &EntityKind,
+        paths: Arc<Paths>,
+        uuid: &Uuid,
+        updater: U,
+    ) -> Result<(), HypergraphError>
+    where
+        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+        U: FnOnce(&mut HashMap<Uuid, Entity<V, HE>>),
+    {
+        self.get_or_init(entity_kind, paths.clone()).await?;
+
+        // Find a free slot.
+        let free_slot = self.find_free_slot();
+
+        // Get all the entities in this chunk.
+        // If this is a new chunk, fallback to an empty set.
+        let mut current_entities_in_chunk = self
+            .chunk_to_entities_map
+            .get(&free_slot)
+            .cloned()
+            .unwrap_or(HashSet::default());
+
+        // Add the new uuid to the set.
+        current_entities_in_chunk.insert(*uuid);
+
+        // Update the chunk map.
+        self.chunk_to_entities_map
+            .insert(free_slot, current_entities_in_chunk);
+
+        // Sync the changes to disk.
+        self.sync_to_disk(entity_kind, paths.clone()).await?;
+
+        // Get the chunk path.
+        let chunk_path = self.get_chunk_path(paths, &free_slot);
+
+        // Try to retrieve the data from the chunk.
+        // If the chunk doesn't exist yet - i.e. a None value - we need to create it.
+        let data: Option<HashMap<Uuid, Entity<V, HE>>> = read_from_file(chunk_path).await?;
+        let mut entities = data.unwrap_or(HashMap::default());
+
+        // Run the updater.
+        updater(&mut entities);
+
+        Ok(())
+    }
+
+    async fn update_op(&mut self) -> Result<(), HypergraphError> {
+        Ok(())
+    }
+
+    async fn delete_op(&mut self) -> Result<(), HypergraphError> {
+        Ok(())
+    }
 }
 
 async fn read_from_file<D, P>(path: P) -> Result<Option<D>, HypergraphError>
@@ -169,35 +225,25 @@ where
     write(path, bytes).await.map_err(HypergraphError::File)
 }
 
-pub(crate) async fn read_data_from_file<V, HE>(
-    entity_kind: &EntityKind,
-    uuid: &Uuid,
-    paths: Arc<Paths>,
-) -> Result<HashMap<Uuid, Entity<V, HE>>, HypergraphError>
-where
-    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-{
-    let chunk_path = try_get_existing_chunk_path(entity_kind, paths.clone(), uuid).await?;
-
-    read_from_file(chunk_path)
-        .await?
-        .ok_or_else(HypergraphError::FileWithoutSource)
-}
-
 async fn write_data_to_file<V, HE>(
     entity_kind: &EntityKind,
     uuid: &Uuid,
     data: HashMap<Uuid, Entity<V, HE>>,
     paths: Arc<Paths>,
+    update: bool,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let chunk_path = generate_new_chunk_path(entity_kind, paths, uuid).await?;
-
-    write_to_file(&data, chunk_path).await
+    // let chunk_path = if update {
+    //     try_get_existing_chunk_path(entity_kind, paths.clone(), uuid).await?
+    // } else {
+    //     generate_new_chunk_path(entity_kind, paths, uuid).await?
+    // };
+    //
+    // write_to_file(&data, chunk_path).await
+    Ok(())
 }
 
 pub(crate) async fn write_relation_to_file<V, HE>(
@@ -210,25 +256,33 @@ where
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
     let entity_kind = &entity_relation.into();
-    let mut data = read_data_from_file::<V, HE>(entity_kind, uuid, paths.clone()).await?;
-    let entity = data.get_mut(uuid).ok_or(HypergraphError::EntityUpdate)?;
-
-    match entity_relation {
-        EntityRelation::Hyperedge(vertices) => match entity {
-            Entity::Hyperedge(hyperedge) => {
-                hyperedge.vertices = vertices.to_owned();
-            }
-            Entity::Vertex(_) => unreachable!(),
-        },
-        EntityRelation::Vertex(hyperedges) => match entity {
-            Entity::Hyperedge(_) => unreachable!(),
-            Entity::Vertex(vertex) => {
-                vertex.hyperedges = hyperedges.to_owned();
-            }
-        },
-    };
-
-    write_data_to_file(entity_kind, uuid, data, paths).await
+    // let mut data = read_data_from_file::<V, HE>(entity_kind, uuid, paths.clone()).await?;
+    // let entity = data.get_mut(uuid).ok_or(HypergraphError::EntityUpdate)?;
+    //
+    // match entity_relation {
+    //     EntityRelation::Hyperedge(vertices) => match entity {
+    //         Entity::Hyperedge(hyperedge) => {
+    //             hyperedge.vertices = vertices.to_owned();
+    //         }
+    //         Entity::Vertex(_) => unreachable!(),
+    //     },
+    //     EntityRelation::Vertex(hyperedges) => match entity {
+    //         Entity::Hyperedge(_) => unreachable!(),
+    //         Entity::Vertex(vertex) => {
+    //             vertex.hyperedges = hyperedges.to_owned();
+    //         }
+    //     },
+    // };
+    //
+    // write_data_to_file(entity_kind, uuid, data, paths, true).await
+    let mut entity_database = EntityDatabase::new();
+    entity_database.create_op(
+        entity_kind,
+        paths,
+        uuid,
+        |data: &mut HashMap<Uuid, Entity<V, HE>>| {},
+    );
+    Ok(())
 }
 
 pub(crate) async fn write_weight_to_file<V, HE>(
@@ -241,24 +295,24 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let entity_kind: EntityKind = entity_weight.into();
-
-    let mut data = if update {
-        read_data_from_file::<V, HE>(&entity_kind, uuid, paths.clone()).await?
-    } else {
-        HashMap::default()
-    };
-
-    match entity_weight {
-        EntityWeight::Hyperedge(weight) => {
-            data.insert(*uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
-        }
-        EntityWeight::Vertex(weight) => {
-            data.insert(*uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
-        }
-    };
-
-    write_data_to_file(&entity_kind, uuid, data, paths).await?;
+    // let entity_kind: EntityKind = entity_weight.into();
+    //
+    // let mut data = if update {
+    //     read_data_from_file::<V, HE>(&entity_kind, uuid, paths.clone()).await?
+    // } else {
+    //     HashMap::default()
+    // };
+    //
+    // match entity_weight {
+    //     EntityWeight::Hyperedge(weight) => {
+    //         data.insert(*uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
+    //     }
+    //     EntityWeight::Vertex(weight) => {
+    //         data.insert(*uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
+    //     }
+    // };
+    //
+    // write_data_to_file(&entity_kind, uuid, data, paths, update).await?;
 
     Ok(())
 }
@@ -272,9 +326,15 @@ where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let mut data = read_data_from_file::<V, HE>(entity_kind, uuid, paths.clone()).await?;
-
-    data.remove(uuid).ok_or(HypergraphError::EntityNotFound)?;
-
-    write_data_to_file(entity_kind, uuid, data, paths).await
+    // let mut data = read_data_from_file::<V, HE>(entity_kind, uuid, paths.clone()).await?;
+    //
+    // data.remove(uuid).ok_or(HypergraphError::EntityNotFound)?;
+    //
+    // if data.is_empty() {
+    //     return remove_chunk(entity_kind, paths.clone(), uuid).await;
+    // }
+    //
+    // update_chunk(entity_kind, paths.clone(), uuid, data).await
+    //
+    Ok(())
 }

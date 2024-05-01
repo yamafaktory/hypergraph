@@ -14,8 +14,6 @@ pub enum HypergraphError {
     /// File error.
     #[error("File error")]
     File(#[source] std::io::Error),
-    #[error("File error")]
-    FileWithoutSource(),
     /// Serialization error.
     #[error("Serialization failed")]
     Serialization,
@@ -34,4 +32,12 @@ pub enum HypergraphError {
     /// Processing error.
     #[error("Processing failed")]
     Processing,
+
+    /// Chunk error.
+    #[error("Chunk error")]
+    Chunk,
+
+    /// EntityDatabase.
+    #[error("EntityDatabase error")]
+    EntityDatabase,
 }

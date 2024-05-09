@@ -33,7 +33,7 @@ async fn integration_add_get_delete_vertex(
 
     assert_eq!(vertex.unwrap(), Vertex {});
 
-    // graph.delete_vertex(uuid).await?;
+    graph.delete_vertex(uuid).await?;
     //
     // sleep(Duration::from_millis(1000)).await;
     //

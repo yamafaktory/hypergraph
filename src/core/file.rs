@@ -90,9 +90,7 @@ impl ChunkManager {
         }
 
         // Otherwise write the default database to disk.
-        write_to_file(&*self.database.read().await, db_path).await?;
-
-        Ok(())
+        write_to_file(&*self.database.read().await, db_path).await
     }
 
     async fn insert_new_chunk(&mut self) -> Result<Uuid, HypergraphError> {
@@ -105,6 +103,19 @@ impl ChunkManager {
             .insert(uuid, u16::MAX);
 
         Ok(uuid)
+    }
+
+    async fn get_chunk_uuid_from_entity_uuid(
+        &self,
+        uuid: &Uuid,
+    ) -> Result<Option<Uuid>, HypergraphError> {
+        Ok(self
+            .database
+            .read()
+            .await
+            .entity_to_chunk_map
+            .get(uuid)
+            .cloned())
     }
 
     async fn find_free_slot(&mut self) -> Result<Uuid, HypergraphError> {
@@ -121,7 +132,7 @@ impl ChunkManager {
                     .write()
                     .await
                     .chunk_free_slots_map
-                    .insert(chunk_uuid, 234);
+                    .insert(chunk_uuid, capacity - 1);
 
                 return Ok(chunk_uuid);
             }
@@ -155,8 +166,8 @@ impl ChunkManager {
         self.init(entity_kind, paths.clone()).await?;
 
         // Try to retrieve the chunk UUID, its path and finally the entity from disk.
-        if let Some(chunk_uuid) = self.database.read().await.entity_to_chunk_map.get(uuid) {
-            let chunk_path = self.get_chunk_path(paths, chunk_uuid);
+        if let Some(chunk_uuid) = self.get_chunk_uuid_from_entity_uuid(uuid).await? {
+            let chunk_path = self.get_chunk_path(paths, &chunk_uuid);
             let data: Option<HashMap<Uuid, Entity<V, HE>>> = read_from_file(chunk_path).await?;
 
             let entity = data.and_then(|map| map.get(uuid).cloned());
@@ -228,9 +239,7 @@ impl ChunkManager {
         updater(&mut entities);
 
         // Write to chunk file.
-        write_to_file(&entities, chunk_path).await?;
-
-        Ok(())
+        write_to_file(&entities, chunk_path).await
     }
 
     async fn update_op(
@@ -241,6 +250,7 @@ impl ChunkManager {
         // Ensure to init the database.
         self.init(entity_kind, paths.clone()).await?;
 
+        // TODO
         Ok(())
     }
 
@@ -258,38 +268,79 @@ impl ChunkManager {
         self.init(entity_kind, paths.clone()).await?;
 
         // Try to retrieve the chunk UUID, its path and finally the entity from disk.
-        if let Some(chunk_uuid) = self.database.read().await.entity_to_chunk_map.get(uuid) {
-            let chunk_path = self.get_chunk_path(paths.clone(), chunk_uuid);
-            let data: Option<HashMap<Uuid, Entity<V, HE>>> =
+        if let Some(chunk_uuid) = self.get_chunk_uuid_from_entity_uuid(uuid).await? {
+            let chunk_path = self.get_chunk_path(paths.clone(), &chunk_uuid);
+            let chunk_data: Option<HashMap<Uuid, Entity<V, HE>>> =
                 read_from_file(chunk_path.clone()).await?;
 
-            match data {
-                Some(data) => {
-                    // Two cases: either the chunk contains solely this entity, or multiple ones.
-                    // In the first case, remove the chunk from the file system and the database.
-                    if data.is_empty() {
-                        remove_file(chunk_path)
-                            .await
-                            .map_err(HypergraphError::File)?;
+            if let Some(mut chunk_data) = chunk_data {
+                // Two cases: either the chunk contains solely this entity,
+                // or multiple ones.
+                // Note: it's not possible to have an empty map here since we
+                // drop the chunk at length one.
+                if chunk_data.len() == 1 {
+                    // Remove the chunk from the file system.
+                    remove_file(chunk_path)
+                        .await
+                        .map_err(HypergraphError::File)?;
 
-                        self.database.write().await.entity_to_chunk_map.remove(uuid);
+                    // Remove the entity from the entity to chunk map.
+                    self.database.write().await.entity_to_chunk_map.remove(uuid);
 
-                        self.database
-                            .write()
-                            .await
-                            .chunk_to_entities_map
-                            .remove(chunk_uuid);
-                        // TODO: free slot
-                        self.sync_to_disk(entity_kind, paths).await?;
-                    }
+                    dbg!(self.database.clone());
+                    // Remove the chunk from the chunk to entity map.
+                    self.database
+                        .write()
+                        .await
+                        .chunk_to_entities_map
+                        .remove(&chunk_uuid);
+
+                    // Remove the chunk from the slots map.
+                    self.database
+                        .write()
+                        .await
+                        .chunk_free_slots_map
+                        .remove(&chunk_uuid);
+
+                    // Write the database to disk.
+                    return self.sync_to_disk(entity_kind, paths).await;
+                } else {
+                    // Remove the chunk from the chunk to entity map.
+                    self.database
+                        .write()
+                        .await
+                        .chunk_to_entities_map
+                        .get_mut(&chunk_uuid)
+                        .ok_or(HypergraphError::EntityUpdate)?
+                        .remove(uuid);
+
+                    // Update the free slots map.
+                    *self
+                        .database
+                        .write()
+                        .await
+                        .chunk_free_slots_map
+                        .get_mut(&chunk_uuid)
+                        .ok_or(HypergraphError::EntityUpdate)? += 1;
+
+                    // Remove the entity from the entity to chunk map.
+                    self.database.write().await.entity_to_chunk_map.remove(uuid);
+
+                    // Write the database to disk.
+                    self.sync_to_disk(entity_kind, paths).await?;
+
+                    // Remove the entity from the chunk.
+                    chunk_data.remove(uuid);
+
+                    // Write the chunk to disk.
+                    write_to_file(&chunk_data, chunk_path).await?;
                 }
-                None => return Err(HypergraphError::EntityNotFound),
-            };
-        } else {
-            //
-        }
+            }
 
-        Ok(())
+            Err(HypergraphError::EntityNotFound)
+        } else {
+            Err(HypergraphError::EntityNotFound)
+        }
     }
 }
 
@@ -406,6 +457,7 @@ where
     let entity_kind: EntityKind = entity_weight.into();
 
     let mut chunk_manager = ChunkManager::new();
+
     chunk_manager
         .create_op(
             &entity_kind,

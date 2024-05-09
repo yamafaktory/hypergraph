@@ -19,7 +19,7 @@ futures = "0.3.30"
 itertools = "0.12.0"
 quick_cache = "0.4.0"
 rayon = "1.8.0"
-serde = { version = "1.0.193", features = ["derive"] }
+serde = { version = "1.0.193", features = ["derive", "rc"] }
 thiserror = "1.0.51"
 tokio = { version = "1.35.0", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1.40"
@@ -42,4 +42,4 @@ unreachable_pub = "warn"
 unsafe_code = "deny"
 
 [lints.clippy]
-clippy_pedantic = "deny"
+all = "deny"

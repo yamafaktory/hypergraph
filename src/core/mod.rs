@@ -53,6 +53,7 @@ where
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[derive(Debug)]
 struct MemoryCache<V, HE>
 where
@@ -89,6 +90,7 @@ where
         })
     }
 
+    #[allow(clippy::type_complexity)]
     #[tracing::instrument]
     async fn get_reader(
         state: Arc<MemoryCacheState<V, HE>>,
@@ -119,6 +121,7 @@ where
         })
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument]
     async fn get_writer(
         state: Arc<MemoryCacheState<V, HE>>,
@@ -168,7 +171,7 @@ where
                         }
                         EntityRelation::Vertex(hyperedges) => {
                             if let Some(mut vertex) = state.vertices.get(uuid) {
-                                vertex.hyperedges = hyperedges.to_owned();
+                                hyperedges.clone_into(&mut vertex.hyperedges);
 
                                 return state
                                     .vertices
@@ -183,7 +186,7 @@ where
                     WriteOp::UpdateWeight(uuid, weight) => match weight {
                         EntityWeight::Hyperedge(weight) => {
                             if let Some(mut hyperedge) = state.hyperedges.get(uuid) {
-                                hyperedge.weight = weight.to_owned();
+                                weight.clone_into(&mut hyperedge.weight);
 
                                 return state
                                     .hyperedges
@@ -196,7 +199,7 @@ where
                         }
                         EntityWeight::Vertex(weight) => {
                             if let Some(mut vertex) = state.vertices.get(uuid) {
-                                vertex.weight = weight.to_owned();
+                                weight.clone_into(&mut vertex.weight);
 
                                 return state
                                     .vertices
@@ -215,6 +218,7 @@ where
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[derive(Debug)]
 struct IOManager<V, HE>
 where
@@ -324,6 +328,7 @@ where
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[derive(Clone, Debug)]
 struct Handles<V, HE>
 where
@@ -336,6 +341,7 @@ where
     memory_cache_writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Arc<WriteOp<V, HE>>, Uuid>,
 }
 
+#[allow(clippy::type_complexity)]
 impl<V, HE> Handles<V, HE>
 where
     V: Clone + Debug + Send + Sync,

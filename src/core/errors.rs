@@ -32,12 +32,4 @@ pub enum HypergraphError {
     /// Processing error.
     #[error("Processing failed")]
     Processing,
-
-    /// Chunk error.
-    #[error("Chunk error")]
-    Chunk,
-
-    /// EntityDatabase.
-    #[error("EntityDatabase error")]
-    EntityDatabase,
 }

@@ -19,7 +19,7 @@ futures = "0.3.30"
 itertools = "0.12.0"
 quick_cache = "0.5.1"
 rayon = "1.10.0"
-serde = { version = "1.0.201", features = ["derive", "rc"] }
+serde = { version = "1.0.201", features = ["derive"] }
 thiserror = "1.0.60"
 tokio = { version = "1.37.0", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1.40"

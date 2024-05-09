@@ -149,6 +149,23 @@ impl ChunkManager {
     ) -> Result<(), HypergraphError> {
         let db_path = &self.get_db_path(entity_kind, paths);
 
+        // Ensure to write minimum data to disk.
+        self.database
+            .write()
+            .await
+            .chunk_to_entities_map
+            .shrink_to_fit();
+        self.database
+            .write()
+            .await
+            .chunk_free_slots_map
+            .shrink_to_fit();
+        self.database
+            .write()
+            .await
+            .entity_to_chunk_map
+            .shrink_to_fit();
+
         write_to_file(&*self.database.read().await, db_path).await
     }
 

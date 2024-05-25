@@ -13,13 +13,14 @@ rust-version = "1.74"
 version = "2.1.2"
 
 [dependencies]
-ahash = "0.8.7"
+ahash = "0.8.11"
 bincode = "1.3.3"
 futures = "0.3.30"
-itertools = "0.12.0"
+itertools = "0.13.0"
+parking_lot = "0.12.2"
 quick_cache = "0.5.1"
 rayon = "1.10.0"
-serde = { version = "1.0.201", features = ["derive"] }
+serde = { version = "1.0.202", features = ["derive"] }
 thiserror = "1.0.60"
 tokio = { version = "1.37.0", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1.40"

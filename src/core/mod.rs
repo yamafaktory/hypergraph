@@ -282,7 +282,7 @@ where
                 info!("Reading from disk {}", read_op);
 
                 let ReadOp(uuid, entity_kind) = read_op;
-                let entity = read_entity_from_file(&entity_kind, &uuid, paths).await?;
+                let entity = read_entity_from_file(entity_kind, uuid, paths).await?;
 
                 info!(
                     "{} {}",
@@ -305,8 +305,7 @@ where
         ActorHandle::new(self.paths.clone(), &|paths, write_op| {
             async move {
                 debug!("Writing to disk {}.", write_op);
-
-                match write_op.borrow() {
+                match (*write_op).clone() {
                     WriteOp::Create(uuid, entity_weight) => {
                         write_weight_to_file(uuid, entity_weight, paths, false).await?;
                     }

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{remove_file, write, OpenOptions},
     io::AsyncReadExt,
+    spawn,
     sync::RwLock,
 };
 use uuid::Uuid;
@@ -378,33 +379,57 @@ where
 }
 
 pub(crate) async fn read_entity_from_file<V, HE>(
-    entity_kind: &EntityKind,
-    uuid: &Uuid,
+    entity_kind: EntityKind,
+    uuid: Uuid,
     paths: Arc<Paths>,
 ) -> Result<Option<Entity<V, HE>>, HypergraphError>
 where
-    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
-    let mut chunk_manager = ChunkManager::new();
+    let handle = spawn(async move {
+        let mut chunk_manager = ChunkManager::new();
 
-    let entity = chunk_manager
-        .read_op::<V, HE>(entity_kind, paths, uuid)
-        .await?;
+        let entity = chunk_manager
+            .read_op::<V, HE>(&entity_kind, paths, &uuid)
+            .await?;
 
-    Ok(entity)
+        Ok(entity)
+
+        //Ok::<(), HypergraphError>(())
+    });
+
+    if let Ok(result) = handle.await {
+        result
+    } else {
+        Err(HypergraphError::Processing)
+    }
 }
 
 pub(crate) async fn write_relation_to_file<V, HE>(
-    uuid: &Uuid,
-    entity_relation: &EntityRelation,
+    uuid: Uuid,
+    entity_relation: EntityRelation,
     paths: Arc<Paths>,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let entity_kind = &entity_relation.into();
+    spawn(async move {
+        let entity_kind: EntityKind = entity_relation.into();
+        let mut chunk_manager = ChunkManager::new();
+
+        chunk_manager
+            .create_op(
+                &entity_kind,
+                paths,
+                &uuid,
+                |data: &mut HashMap<Uuid, Entity<V, HE>>| {},
+            )
+            .await?;
+
+        Ok::<(), HypergraphError>(())
+    });
     // let mut data = read_data_from_file::<V, HE>(entity_kind, uuid, paths.clone()).await?;
     // let entity = data.get_mut(uuid).ok_or(HypergraphError::EntityUpdate)?;
     //
@@ -424,65 +449,65 @@ where
     // };
     //
     // write_data_to_file(entity_kind, uuid, data, paths, true).await
-    let mut chunk_manager = ChunkManager::new();
-    chunk_manager
-        .create_op(
-            entity_kind,
-            paths,
-            uuid,
-            |data: &mut HashMap<Uuid, Entity<V, HE>>| {},
-        )
-        .await?;
     Ok(())
 }
 
 pub(crate) async fn write_weight_to_file<V, HE>(
-    uuid: &Uuid,
-    entity_weight: &EntityWeight<V, HE>,
+    uuid: Uuid,
+    entity_weight: EntityWeight<V, HE>,
     paths: Arc<Paths>,
     update: bool,
 ) -> Result<(), HypergraphError>
 where
-    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
-    let entity_kind: EntityKind = entity_weight.into();
+    spawn(async move {
+        let mut chunk_manager = ChunkManager::new();
+        let entity_kind = (&entity_weight).into();
 
-    let mut chunk_manager = ChunkManager::new();
+        chunk_manager
+            .create_op(
+                &entity_kind,
+                paths,
+                &uuid,
+                |data: &mut HashMap<Uuid, Entity<V, HE>>| {
+                    match entity_weight {
+                        EntityWeight::Hyperedge(weight) => {
+                            data.insert(uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
+                        }
+                        EntityWeight::Vertex(weight) => {
+                            data.insert(uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
+                        }
+                    };
+                },
+            )
+            .await?;
 
-    chunk_manager
-        .create_op(
-            &entity_kind,
-            paths,
-            uuid,
-            |data: &mut HashMap<Uuid, Entity<V, HE>>| {
-                match entity_weight {
-                    EntityWeight::Hyperedge(weight) => {
-                        data.insert(*uuid, Entity::Hyperedge(Hyperedge::new(weight.to_owned())));
-                    }
-                    EntityWeight::Vertex(weight) => {
-                        data.insert(*uuid, Entity::Vertex(Vertex::new(weight.to_owned())));
-                    }
-                };
-            },
-        )
-        .await?;
+        Ok::<(), HypergraphError>(())
+    });
 
     Ok(())
 }
 
 pub(crate) async fn remove_entity_from_file<V, HE>(
-    uuid: &Uuid,
-    entity_kind: &EntityKind,
+    uuid: Uuid,
+    entity_kind: EntityKind,
     paths: Arc<Paths>,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
 {
-    let mut chunk_manager = ChunkManager::new();
+    spawn(async move {
+        let mut chunk_manager = ChunkManager::new();
 
-    chunk_manager
-        .delete_op::<V, HE>(entity_kind, paths, uuid)
-        .await
+        chunk_manager
+            .delete_op::<V, HE>(&entity_kind, paths, &uuid)
+            .await?;
+
+        Ok::<(), HypergraphError>(())
+    });
+
+    Ok(())
 }

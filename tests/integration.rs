@@ -52,7 +52,7 @@ async fn integration_add_get_delete_vertex(
 async fn batch(bypass_memory_cache: bool) -> Result<(), HypergraphError> {
     let (graph, clear, wait) = prepare(bypass_memory_cache).await?;
 
-    for n in 1..=1_000 {
+    for n in 1..=100_000 {
         let uuid = graph.create_vertex(Vertex {}).await?;
     }
     //// We should get two database files: `vertices` and `Uuid`.

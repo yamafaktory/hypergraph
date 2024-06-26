@@ -1,17 +1,14 @@
 use std::{
     fmt::Debug,
+    fs::{write, OpenOptions},
+    io::Read,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
-use tokio::{
-    fs::{remove_file, write, OpenOptions},
-    io::AsyncReadExt,
-    spawn,
-    sync::RwLock,
-};
+use tokio::{fs::remove_file, spawn, sync::RwLock, task::spawn_blocking};
 use uuid::Uuid;
 
 use crate::{
@@ -83,10 +80,10 @@ impl ChunkManager {
         paths: Arc<Paths>,
     ) -> Result<(), HypergraphError> {
         // Get the database path.
-        let db_path = &self.get_db_path(entity_kind, paths);
+        let db_path = self.get_db_path(entity_kind, paths);
 
         // Try to read from disk and update the struct if available.
-        let data: Option<ChunkManagerDatabase> = read_from_file(db_path).await?;
+        let data: Option<ChunkManagerDatabase> = read_from_file(db_path.clone()).await?;
         if let Some(chunk_manager_database) = data {
             self.database = Arc::new(RwLock::new(chunk_manager_database));
 
@@ -148,7 +145,7 @@ impl ChunkManager {
         entity_kind: &EntityKind,
         paths: Arc<Paths>,
     ) -> Result<(), HypergraphError> {
-        let db_path = &self.get_db_path(entity_kind, paths);
+        let db_path = self.get_db_path(entity_kind, paths);
 
         {
             let mut w = self.database.write().await;
@@ -169,8 +166,8 @@ impl ChunkManager {
         uuid: &Uuid,
     ) -> Result<Option<Entity<V, HE>>, HypergraphError>
     where
-        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     {
         // Ensure to init the database.
         self.init(entity_kind, paths.clone()).await?;
@@ -196,8 +193,8 @@ impl ChunkManager {
         updater: U,
     ) -> Result<(), HypergraphError>
     where
-        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
         U: FnOnce(&mut HashMap<Uuid, Entity<V, HE>>),
     {
         // Ensure to init the database.
@@ -266,8 +263,8 @@ impl ChunkManager {
         uuid: &Uuid,
     ) -> Result<(), HypergraphError>
     where
-        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+        V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+        HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     {
         // Ensure to init the database.
         self.init(entity_kind, paths.clone()).await?;
@@ -339,43 +336,51 @@ impl ChunkManager {
 
 async fn read_from_file<D, P>(path: P) -> Result<Option<D>, HypergraphError>
 where
-    D: Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-    P: AsRef<Path>,
+    D: Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+    P: AsRef<Path> + Send + 'static,
 {
     let path_buf = path.as_ref().to_path_buf();
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(path)
-        .await
-        .map_err(|error| HypergraphError::PathNotAccessible(error, path_buf))?;
-    let metadata = file.metadata().await.map_err(HypergraphError::File)?;
 
-    if metadata.len() != 0 {
-        let mut contents = vec![];
+    spawn_blocking(move || {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)
+            .map_err(|error| HypergraphError::PathNotAccessible(error, path_buf))?;
+        let metadata = file.metadata().map_err(HypergraphError::File)?;
 
-        file.read_to_end(&mut contents)
-            .await
-            .map_err(HypergraphError::File)?;
+        if metadata.len() != 0 {
+            let mut contents = vec![];
 
-        return deserialize(&contents)
-            .map_err(|_| HypergraphError::Deserialization)
-            .map(Some);
-    }
+            file.read_to_end(&mut contents)
+                .map_err(HypergraphError::File)?;
 
-    Ok(None)
+            return deserialize(&contents)
+                .map_err(|_| HypergraphError::Deserialization)
+                .map(Some);
+        }
+
+        Ok(None)
+    })
+    .await
+    .map_err(|_| HypergraphError::Processing)?
 }
 
 async fn write_to_file<D, P>(data: &D, path: P) -> Result<(), HypergraphError>
 where
     D: Serialize,
-    P: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static,
 {
     let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
 
-    write(path, bytes).await.map_err(HypergraphError::File)
+    spawn_blocking(move || {
+        write(path, bytes).map_err(|_| HypergraphError::File);
+        Ok(())
+    })
+    .await
+    .map_err(|_| HypergraphError::Processing)?
 }
 
 pub(crate) async fn read_entity_from_file<V, HE>(
@@ -412,8 +417,8 @@ pub(crate) async fn write_relation_to_file<V, HE>(
     paths: Arc<Paths>,
 ) -> Result<(), HypergraphError>
 where
-    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
     spawn(async move {
         let entity_kind: EntityKind = entity_relation.into();
@@ -496,8 +501,8 @@ pub(crate) async fn remove_entity_from_file<V, HE>(
     paths: Arc<Paths>,
 ) -> Result<(), HypergraphError>
 where
-    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
-    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize,
+    V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
+    HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
     spawn(async move {
         let mut chunk_manager = ChunkManager::new();

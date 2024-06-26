@@ -7,9 +7,9 @@ use uuid::Uuid;
 async fn sequential_tests() -> Result<(), HypergraphError> {
     get_tracing_subscriber();
 
-    // integration_add_get_delete_vertex(false).await?;
-    //integration_add_get_delete_vertex(true).await?;
-    batch(true).await?;
+    //integration_add_get_delete_vertex(false).await?;
+    integration_add_get_delete_vertex(true).await?;
+    //batch(true).await?;
 
     Ok(())
 }

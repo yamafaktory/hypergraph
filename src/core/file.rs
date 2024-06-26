@@ -375,12 +375,9 @@ where
 {
     let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
 
-    spawn_blocking(move || {
-        write(path, bytes).map_err(|_| HypergraphError::File);
-        Ok(())
-    })
-    .await
-    .map_err(|_| HypergraphError::Processing)?
+    spawn_blocking(move || write(path, bytes).map_err(|_| HypergraphError::Processing))
+        .await
+        .map_err(|_| HypergraphError::Processing)?
 }
 
 pub(crate) async fn read_entity_from_file<V, HE>(

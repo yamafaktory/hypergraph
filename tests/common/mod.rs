@@ -27,7 +27,7 @@ type Handler<'a, A, R, E> = dyn Fn(A) -> BoxFuture<'a, Result<R, E>> + Send + Sy
 pub(crate) fn get_tracing_subscriber() {
     tracing_subscriber::fmt::fmt()
         .pretty()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::WARN)
         .with_thread_ids(true)
         .init();
 }
@@ -63,7 +63,7 @@ where
 
         sleep(Duration::from_millis(SLEEP_INTERVAL)).await;
     }
-    dbg!(234, files.clone());
+
     Ok(files.into_iter())
 }
 

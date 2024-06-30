@@ -43,3 +43,6 @@ unsafe_code = "deny"
 
 [lints.clippy]
 all = "deny"
+
+[profile.test]
+inherits = "release"

@@ -1,6 +1,8 @@
 #[doc(hidden)]
 pub mod actors;
 #[doc(hidden)]
+pub mod chunk;
+#[doc(hidden)]
 pub mod collections;
 #[doc(hidden)]
 pub mod defaults;

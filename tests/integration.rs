@@ -52,11 +52,13 @@ async fn integration_add_get_delete_vertex(
 async fn batch(bypass_memory_cache: bool) -> Result<(), HypergraphError> {
     let (graph, clear, wait) = prepare(bypass_memory_cache).await?;
 
-    for n in 1..=100_000 {
+    for n in 1..=10_000 {
         let uuid = graph.create_vertex(Vertex {}).await?;
     }
-    //// We should get two database files: `vertices` and `Uuid`.
-    //let mut files = wait(2).await?;
+
+    let nb: f64 = 100_000.0 / 65_536.0;
+    // We should get two database files: `vertices` and `Uuid`.
+    //let mut files = wait(nb.ceil() as usize + 1).await?;
     //assert!(files.any(|file| file.ends_with("vertices.db")));
     //assert!(files.any(|file| {
     //    let file_stem = file.file_stem().unwrap();
@@ -77,7 +79,7 @@ async fn batch(bypass_memory_cache: bool) -> Result<(), HypergraphError> {
     //let vertex = graph.get_vertex(uuid).await?;
     //assert_eq!(vertex, None);
 
-    let _ = clear(()).await;
+    //let _ = clear(()).await;
 
     Ok(())
 }

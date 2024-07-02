@@ -17,11 +17,12 @@ pub mod operations;
 
 use std::{borrow::Borrow, fmt::Debug, path::Path, sync::Arc};
 
+use chunk::ChunkManager;
 use errors::HypergraphError;
 use futures::FutureExt;
 use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
-use tokio::{fs::create_dir_all, try_join};
+use tokio::{fs::create_dir_all, sync::Mutex, try_join};
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
@@ -227,9 +228,11 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
+    chunk_manager: Arc<Mutex<ChunkManager>>,
     paths: Arc<Paths>,
-    reader: Option<ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>>>,
-    writer: Option<ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()>>,
+    reader:
+        Option<ActorHandle<(Arc<Mutex<ChunkManager>>, Arc<Paths>), ReadOp, Option<Entity<V, HE>>>>,
+    writer: Option<ActorHandle<(Arc<Mutex<ChunkManager>>, Arc<Paths>), Arc<WriteOp<V, HE>>, ()>>,
 }
 
 impl<V, HE> IOManager<V, HE>
@@ -253,6 +256,7 @@ where
         vertices.set_extension(DB_EXT);
 
         Ok(Self {
+            chunk_manager: Arc::new(Mutex::new(ChunkManager::new())),
             paths: Arc::new(Paths {
                 hyperedges,
                 vertices,
@@ -277,55 +281,70 @@ where
         Ok(())
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument]
-    async fn get_reader(&self) -> ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>> {
-        ActorHandle::new(self.paths.clone(), &|paths, read_op| {
-            async move {
-                info!("Reading from disk {}", read_op);
+    async fn get_reader(
+        &self,
+    ) -> ActorHandle<(Arc<Mutex<ChunkManager>>, Arc<Paths>), ReadOp, Option<Entity<V, HE>>> {
+        ActorHandle::new(
+            (self.chunk_manager.clone(), self.paths.clone()),
+            &|(chunk_manager, paths), read_op| {
+                async move {
+                    info!("Reading from disk {}", read_op);
 
-                let ReadOp(uuid, entity_kind) = read_op;
-                let entity = read_entity_from_file(entity_kind, uuid, paths).await?;
+                    let ReadOp(uuid, entity_kind) = read_op;
+                    let entity =
+                        read_entity_from_file(entity_kind, uuid, paths, chunk_manager).await?;
 
-                info!(
-                    "{} {}",
-                    read_op,
-                    if entity.is_some() {
-                        "found"
-                    } else {
-                        "not found"
-                    }
-                );
+                    info!(
+                        "{} {}",
+                        read_op,
+                        if entity.is_some() {
+                            "found"
+                        } else {
+                            "not found"
+                        }
+                    );
 
-                Ok(entity)
-            }
-            .boxed()
-        })
+                    Ok(entity)
+                }
+                .boxed()
+            },
+        )
     }
 
+    #[allow(clippy::type_complexity)]
     #[instrument]
-    async fn get_writer(&self) -> ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()> {
-        ActorHandle::new(self.paths.clone(), &|paths, write_op| {
-            async move {
-                debug!("Writing to disk {}.", write_op);
-                match (*write_op).clone() {
-                    WriteOp::Create(uuid, entity_weight) => {
-                        write_weight_to_file(uuid, entity_weight, paths, false).await?;
-                    }
-                    WriteOp::UpdateWeight(uuid, entity_weight) => {
-                        write_weight_to_file(uuid, entity_weight, paths, true).await?;
-                    }
-                    WriteOp::Delete(uuid, entity_kind) => {
-                        remove_entity_from_file::<V, HE>(uuid, entity_kind, paths).await?
-                    }
-                    WriteOp::UpdateRelation(uuid, entity_relation) => {
-                        write_relation_to_file::<V, HE>(uuid, entity_relation, paths).await?;
-                    }
-                };
+    async fn get_writer(
+        &self,
+    ) -> ActorHandle<(Arc<Mutex<ChunkManager>>, Arc<Paths>), Arc<WriteOp<V, HE>>, ()> {
+        ActorHandle::new(
+            (self.chunk_manager.clone(), self.paths.clone()),
+            &|(chunk_manager, paths), write_op| {
+                async move {
+                    debug!("Writing to disk {}.", write_op);
+                    match (*write_op).clone() {
+                        WriteOp::Create(uuid, entity_weight) => {
+                            write_weight_to_file(uuid, entity_weight, paths, false, chunk_manager)
+                                .await?;
+                        }
+                        WriteOp::UpdateWeight(uuid, entity_weight) => {
+                            write_weight_to_file(uuid, entity_weight, paths, true, chunk_manager)
+                                .await?;
+                        }
+                        WriteOp::Delete(uuid, entity_kind) => {
+                            remove_entity_from_file::<V, HE>(uuid, entity_kind, paths).await?
+                        }
+                        WriteOp::UpdateRelation(uuid, entity_relation) => {
+                            write_relation_to_file::<V, HE>(uuid, entity_relation, paths).await?;
+                        }
+                    };
 
-                Ok(())
-            }
-            .boxed()
-        })
+                    Ok(())
+                }
+                .boxed()
+            },
+        )
     }
 }
 
@@ -336,8 +355,9 @@ where
     V: Clone + Debug + Send + Sync,
     HE: Clone + Debug + Send + Sync,
 {
-    io_manager_reader: ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>>,
-    io_manager_writer: ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()>,
+    io_manager_reader:
+        ActorHandle<(Arc<Mutex<ChunkManager>>, Arc<Paths>), ReadOp, Option<Entity<V, HE>>>,
+    io_manager_writer: ActorHandle<(Arc<Mutex<ChunkManager>>, Arc<Paths>), Arc<WriteOp<V, HE>>, ()>,
     memory_cache_reader: ActorHandle<Arc<MemoryCacheState<V, HE>>, ReadOp, Option<Entity<V, HE>>>,
     memory_cache_writer: ActorHandle<Arc<MemoryCacheState<V, HE>>, Arc<WriteOp<V, HE>>, Uuid>,
 }
@@ -349,8 +369,16 @@ where
     HE: Clone + Debug + Send + Sync,
 {
     fn new(
-        io_manager_reader: ActorHandle<Arc<Paths>, ReadOp, Option<Entity<V, HE>>>,
-        io_manager_writer: ActorHandle<Arc<Paths>, Arc<WriteOp<V, HE>>, ()>,
+        io_manager_reader: ActorHandle<
+            (Arc<Mutex<ChunkManager>>, Arc<Paths>),
+            ReadOp,
+            Option<Entity<V, HE>>,
+        >,
+        io_manager_writer: ActorHandle<
+            (Arc<Mutex<ChunkManager>>, Arc<Paths>),
+            Arc<WriteOp<V, HE>>,
+            (),
+        >,
         memory_cache_reader: ActorHandle<
             Arc<MemoryCacheState<V, HE>>,
             ReadOp,

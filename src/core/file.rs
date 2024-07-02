@@ -8,8 +8,7 @@ use std::{
 
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
-use tokio::{spawn, task::spawn_blocking};
-use tracing::{instrument, warn};
+use tokio::{spawn, sync::Mutex, task::spawn_blocking};
 use uuid::Uuid;
 
 use crate::{
@@ -60,37 +59,31 @@ where
     .map_err(|_| HypergraphError::Processing)?
 }
 
-#[instrument]
 pub(crate) async fn write_to_file<D, P>(data: &D, path: P) -> Result<(), HypergraphError>
 where
-    D: Serialize + Debug,
-    P: AsRef<Path> + Debug + Send + 'static,
+    D: Serialize,
+    P: AsRef<Path> + Send + 'static,
 {
-    warn!("Writing to file: {:?}", path.as_ref());
     let bytes = serialize(&data).map_err(|_| HypergraphError::Serialization)?;
 
-    let r = spawn_blocking(move || write(path, bytes).map_err(|_| HypergraphError::Processing))
+    spawn_blocking(move || write(path, bytes).map_err(|_| HypergraphError::Processing))
         .await
-        .map_err(|_| HypergraphError::Processing)?;
-    warn!("Wrote to file");
-    r
+        .map_err(|_| HypergraphError::Processing)?
 }
 
 pub(crate) async fn read_entity_from_file<V, HE>(
     entity_kind: EntityKind,
     uuid: Uuid,
     paths: Arc<Paths>,
+    chunk_manager: Arc<Mutex<ChunkManager>>,
 ) -> Result<Option<Entity<V, HE>>, HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
     let handle = spawn(async move {
-        let mut chunk_manager = ChunkManager::new();
-
-        let entity = chunk_manager
-            .read_op::<V, HE>(&entity_kind, paths, &uuid)
-            .await?;
+        let mut lock = chunk_manager.lock().await;
+        let entity = lock.read_op::<V, HE>(&entity_kind, paths, &uuid).await?;
 
         Ok(entity)
 
@@ -155,16 +148,17 @@ pub(crate) async fn write_weight_to_file<V, HE>(
     entity_weight: EntityWeight<V, HE>,
     paths: Arc<Paths>,
     update: bool,
+    chunk_manager: Arc<Mutex<ChunkManager>>,
 ) -> Result<(), HypergraphError>
 where
     V: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
     HE: Clone + Debug + for<'a> Deserialize<'a> + Send + Sync + Serialize + 'static,
 {
-    let mut chunk_manager = ChunkManager::new();
-    let entity_kind = (&entity_weight).into();
+    spawn(async move {
+        let mut lock = chunk_manager.lock().await;
+        let entity_kind = (&entity_weight).into();
 
-    chunk_manager
-        .create_op(
+        lock.create_op(
             &entity_kind,
             paths,
             &uuid,
@@ -179,7 +173,12 @@ where
                 };
             },
         )
-        .await
+        .await?;
+
+        Ok::<(), HypergraphError>(())
+    });
+
+    Ok(())
 }
 
 pub(crate) async fn remove_entity_from_file<V, HE>(

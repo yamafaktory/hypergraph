@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use rayon::prelude::*;
 
 use crate::{
     HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,

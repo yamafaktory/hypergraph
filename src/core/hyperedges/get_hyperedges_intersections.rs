@@ -26,7 +26,7 @@ where
 
         // Get the internal vertices of the hyperedges and keep the eventual error.
         let vertices = hyperedges
-            .into_par_iter()
+            .into_iter()
             .map(|hyperedge_index| {
                 self.get_internal_hyperedge(hyperedge_index)
                     .and_then(|internal_index| {

@@ -4,7 +4,7 @@
 mod common;
 
 use common::{Hyperedge, Vertex};
-use hypergraph::{errors::HypergraphError, Hypergraph};
+use hypergraph::{Hypergraph, errors::HypergraphError};
 
 #[test]
 fn integration_contration() {

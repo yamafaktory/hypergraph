@@ -1,9 +1,9 @@
 use indexmap::IndexMap;
-use itertools::{fold, Itertools};
+use itertools::{Itertools, fold};
 
 use crate::{
-    core::shared::Connection, errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph,
-    VertexIndex, VertexTrait,
+    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, core::shared::Connection,
+    errors::HypergraphError,
 };
 
 #[allow(clippy::type_complexity)]

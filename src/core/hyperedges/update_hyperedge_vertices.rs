@@ -1,8 +1,8 @@
 use rayon::prelude::*;
 
 use crate::{
-    core::utils::are_slices_equal, errors::HypergraphError, HyperedgeIndex, HyperedgeKey,
-    HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+    HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+    core::utils::are_slices_equal, errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>

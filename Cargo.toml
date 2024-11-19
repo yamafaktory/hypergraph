@@ -13,11 +13,11 @@ rust-version = "1.56"
 version = "2.1.2"
 
 [dependencies]
-ahash = "0.8.3"
-indexmap = { version = "2.0.0", features = ["rayon"] }
-itertools = "0.11.0"
+ahash = "0.8.11"
+indexmap = { version = "2.6.0", features = ["rayon"] }
+itertools = "0.13.0"
 rayon = "1.7.0"
-thiserror = "1.0.47"
+thiserror = "2.0.3"
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -25,3 +25,14 @@ criterion = "0.5.1"
 [[bench]]
 name = "performance"
 harness = false
+
+[lints.rust]
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+nonstandard_style = { level = "deny", priority= -1 }
+rust_2021_compatibility = { level = "forbid", priority= -1 }
+unreachable_pub = "warn"
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "deny"

@@ -1,5 +1,9 @@
 use crate::{
-    HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, core::shared::Connection,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    core::shared::Connection,
     errors::HypergraphError,
 };
 

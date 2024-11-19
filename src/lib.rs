@@ -1,9 +1,3 @@
-#![deny(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
-#![deny(unsafe_code, nonstandard_style)]
-#![forbid(rust_2021_compatibility)]
-#![warn(missing_debug_implementations, missing_docs, unreachable_pub)]
-
 //! Hypergraph is data structure library to generate directed [hypergraphs](https://en.wikipedia.org/wiki/Hypergraph).
 //!
 //! > A hypergraph is a generalization of a graph in which a hyperedge can join any number of vertices.

@@ -1,9 +1,21 @@
 #![deny(unsafe_code, nonstandard_style)]
 
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{
+    Display,
+    Formatter,
+    Result,
+};
 
-use criterion::{Criterion, criterion_group, criterion_main};
-use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
+use criterion::{
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use hypergraph::{
+    HyperedgeIndex,
+    Hypergraph,
+    VertexIndex,
+};
 use itertools::Itertools;
 
 static HYPEREDGES: usize = 10_000;

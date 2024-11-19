@@ -1,6 +1,12 @@
 use rayon::prelude::*;
 
-use crate::{HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where

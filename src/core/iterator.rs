@@ -1,6 +1,12 @@
 use rayon::prelude::*;
 
-use crate::{HyperedgeKey, HyperedgeTrait, Hypergraph, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeKey,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> IntoIterator for Hypergraph<V, HE>
 where

@@ -1,21 +1,25 @@
 #![deny(unsafe_code, nonstandard_style)]
 
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{
+    Display,
+    Formatter,
+    Result,
+};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub struct Vertex<'a> {
+pub(crate) struct Vertex<'a> {
     name: &'a str,
 }
 
 impl<'a> Vertex<'a> {
-    pub fn new(name: &'a str) -> Self {
+    pub(crate) fn new(name: &'a str) -> Self {
         Vertex { name }
     }
 }
 
-impl<'a> Display for Vertex<'a> {
+impl Display for Vertex<'_> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
-        write!(formatter, "{}", self)
+        write!(formatter, "{}", self.name)
     }
 }
 
@@ -31,9 +35,9 @@ impl<'a> Hyperedge<'a> {
     }
 }
 
-impl<'a> Display for Hyperedge<'a> {
+impl Display for Hyperedge<'_> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
-        write!(formatter, "{}", self)
+        write!(formatter, "{}", self.name)
     }
 }
 

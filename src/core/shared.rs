@@ -2,7 +2,12 @@ use itertools::Itertools;
 use rayon::prelude::*;
 
 use crate::{
-    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
 };
 
 /// Enumeration of the different types of connection.

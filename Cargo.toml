@@ -10,7 +10,7 @@ name = "hypergraph"
 readme = "README.md"
 repository = "https://github.com/yamafaktory/hypergraph"
 rust-version = "1.56"
-version = "2.1.2"
+version = "2.2.0"
 
 [dependencies]
 ahash = "0.8.11"

@@ -1,6 +1,10 @@
 use crate::{
-    core::shared::Connection, errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
     VertexTrait,
+    core::shared::Connection,
+    errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>

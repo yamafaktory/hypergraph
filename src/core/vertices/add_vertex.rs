@@ -1,7 +1,13 @@
 use crate::{
-    core::types::{AIndexSet, ARandomState},
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    core::types::{
+        AIndexSet,
+        ARandomState,
+    },
     errors::HypergraphError,
-    HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
 };
 
 impl<V, HE> Hypergraph<V, HE>

@@ -1,4 +1,8 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{
+    Display,
+    Formatter,
+    Result,
+};
 
 /// Vertex stable index representation as usize.
 /// Uses the newtype index pattern.

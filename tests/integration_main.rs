@@ -1,10 +1,17 @@
-#![deny(unsafe_code, nonstandard_style)]
-#![forbid(rust_2021_compatibility)]
+//! Integration tests.
 
 mod common;
 
-use common::{Hyperedge, Vertex};
-use hypergraph::{errors::HypergraphError, HyperedgeIndex, Hypergraph, VertexIndex};
+use common::{
+    Hyperedge,
+    Vertex,
+};
+use hypergraph::{
+    HyperedgeIndex,
+    Hypergraph,
+    VertexIndex,
+    errors::HypergraphError,
+};
 
 #[test]
 fn integration_main() {

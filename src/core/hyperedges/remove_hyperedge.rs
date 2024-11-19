@@ -1,5 +1,10 @@
 use crate::{
-    errors::HypergraphError, HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexTrait,
+    HyperedgeIndex,
+    HyperedgeKey,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexTrait,
+    errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>
@@ -33,7 +38,7 @@ where
         for vertex in vertices {
             match self.vertices.get_index_mut(vertex) {
                 Some((_, index_set)) => {
-                    index_set.remove(&internal_index);
+                    index_set.swap_remove(&internal_index);
                 }
                 None => return Err(HypergraphError::InternalVertexIndexNotFound(vertex)),
             }
@@ -113,7 +118,7 @@ where
                         // Perform an insertion of the current hyperedge and a
                         // removal of the swapped one.
                         index_set.insert(internal_index);
-                        index_set.remove(&last_index);
+                        index_set.swap_remove(&last_index);
                     }
                     None => return Err(HypergraphError::InternalVertexIndexNotFound(vertex)),
                 }

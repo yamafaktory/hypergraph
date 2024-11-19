@@ -1,7 +1,11 @@
 use rayon::prelude::*;
 
 use crate::{
-    bi_hash_map::BiHashMap, errors::HypergraphError, HyperedgeTrait, Hypergraph, VertexTrait,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexTrait,
+    bi_hash_map::BiHashMap,
+    errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>

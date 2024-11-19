@@ -1,13 +1,21 @@
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
+    collections::{
+        BinaryHeap,
+        HashMap,
+    },
     fmt::Debug,
 };
 
 use rayon::prelude::*;
 
 use crate::{
-    errors::HypergraphError, HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

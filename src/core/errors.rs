@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-use crate::{HyperedgeIndex, VertexIndex};
+use crate::{
+    HyperedgeIndex,
+    VertexIndex,
+};
 
 /// Enumeration of all the possible errors.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -9,7 +12,7 @@ where
     V: Copy + Eq,
     HE: Copy + Eq,
 {
-    /// Error when a HyperedgeIndex was not found.
+    /// Error when a `HyperedgeIndex` was not found.
     #[error("HyperedgeIndex {0} was not found")]
     HyperedgeIndexNotFound(HyperedgeIndex),
 
@@ -66,7 +69,7 @@ where
     #[error("At least two hyperedges must be provided to be joined")]
     HyperedgesInvalidJoin,
 
-    /// Error when a VertexIndex was not found.
+    /// Error when a `VertexIndex` was not found.
     #[error("VertexIndex {0} was not found")]
     VertexIndexNotFound(VertexIndex),
 

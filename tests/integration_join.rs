@@ -1,10 +1,15 @@
-#![deny(unsafe_code, nonstandard_style)]
-#![forbid(rust_2021_compatibility)]
+//! Integration tests.
 
 mod common;
 
-use common::{Hyperedge, Vertex};
-use hypergraph::{errors::HypergraphError, Hypergraph};
+use common::{
+    Hyperedge,
+    Vertex,
+};
+use hypergraph::{
+    Hypergraph,
+    errors::HypergraphError,
+};
 
 #[test]
 fn integration_contration() {

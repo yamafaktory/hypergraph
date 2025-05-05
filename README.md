@@ -34,7 +34,7 @@ Add this to your `Cargo.toml` (replace _current_version_ with the [latest versio
 
 ```toml
 [dependencies]
-hypergraph = "curent_version"
+hypergraph = "current_version"
 ```
 
 ## ⚡️ Usage

@@ -1,12 +1,7 @@
 use rayon::prelude::*;
 
 use crate::{
-    HyperedgeIndex,
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
-    core::shared::Connection,
+    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, core::shared::Connection,
     errors::HypergraphError,
 };
 

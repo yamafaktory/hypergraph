@@ -1,10 +1,6 @@
 #![deny(unsafe_code, nonstandard_style)]
 
-use std::fmt::{
-    Display,
-    Formatter,
-    Result,
-};
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub(crate) struct Vertex<'a> {

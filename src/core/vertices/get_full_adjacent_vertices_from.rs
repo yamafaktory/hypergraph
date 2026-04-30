@@ -1,16 +1,8 @@
 use indexmap::IndexMap;
-use itertools::{
-    Itertools,
-    fold,
-};
+use itertools::{Itertools, fold};
 
 use crate::{
-    HyperedgeIndex,
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
-    core::shared::Connection,
+    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, core::shared::Connection,
     errors::HypergraphError,
 };
 
@@ -21,7 +13,7 @@ where
     HE: HyperedgeTrait,
 {
     /// Gets the list of all vertices connected from a given vertex as tuples
-    /// of the form (`VertexIndex`, Vec<HyperedgeIndex>).
+    /// of the form (`VertexIndex`, `Vec<HyperedgeIndex>`).
     pub fn get_full_adjacent_vertices_from(
         &self,
         from: VertexIndex,

@@ -1,12 +1,6 @@
 use crate::{
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
-    core::types::{
-        AIndexSet,
-        ARandomState,
-    },
+    HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+    core::types::{AIndexSet, ARandomState},
     errors::HypergraphError,
 };
 

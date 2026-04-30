@@ -1,12 +1,7 @@
 use itertools::Itertools;
 
 use crate::{
-    HyperedgeIndex,
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
-    errors::HypergraphError,
+    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>
@@ -26,6 +21,6 @@ where
             .get_index(internal_index)
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
-        self.get_hyperedges(&hyperedges_index_set.clone().into_iter().collect_vec())
+        self.get_hyperedges(&hyperedges_index_set.iter().copied().collect_vec())
     }
 }

@@ -19,7 +19,7 @@
 //! ## Example
 //!
 //! Please notice that the hyperedges and the vertices must implement the
-//! [`HyperedgeTrait`](crate::HyperedgeTrait) and the [`VertexTrait`](crate::VertexTrait) respectively.
+//! [`HyperedgeTrait`] and the [`VertexTrait`] respectively.
 //!
 //! ```
 //! use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
@@ -62,9 +62,9 @@
 //!     }
 //! }
 //!
-//! impl<'a> Into<usize> for Relation<'a> {
-//!     fn into(self) -> usize {
-//!         self.cost
+//! impl<'a> From<Relation<'a>> for usize {
+//!     fn from(relation: Relation<'a>) -> usize {
+//!         relation.cost
 //!     }
 //! }
 //!

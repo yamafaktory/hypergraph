@@ -1,8 +1,5 @@
 use ahash::RandomState;
-use indexmap::{
-    IndexMap,
-    IndexSet,
-};
+use indexmap::{IndexMap, IndexSet};
 
 /// Type alias to use `AHash` as a faster hasher for `IndexMap`.
 pub(crate) type AIndexMap<K, V> = IndexMap<K, V, RandomState>;

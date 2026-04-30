@@ -1,21 +1,13 @@
 use std::{
     cmp::Ordering,
-    collections::{
-        BinaryHeap,
-        HashMap,
-    },
+    collections::{BinaryHeap, HashMap},
     fmt::Debug,
 };
 
 use rayon::prelude::*;
 
 use crate::{
-    HyperedgeIndex,
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
-    errors::HypergraphError,
+    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,7 +137,7 @@ where
                 // Check if this is the shorter distance.
                 let is_shorter = distances
                     .get(&next.index)
-                    .map_or(true, |&current| next.distance < current);
+                    .is_none_or(|&current| next.distance < current);
 
                 // If so, add it to the frontier and continue.
                 if is_shorter {

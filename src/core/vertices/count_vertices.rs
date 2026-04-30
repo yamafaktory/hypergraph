@@ -1,8 +1,4 @@
-use crate::{
-    HyperedgeTrait,
-    Hypergraph,
-    VertexTrait,
-};
+use crate::{HyperedgeTrait, Hypergraph, VertexTrait};
 
 impl<V, HE> Hypergraph<V, HE>
 where

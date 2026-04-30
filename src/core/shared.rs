@@ -2,12 +2,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 
 use crate::{
-    HyperedgeIndex,
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
-    errors::HypergraphError,
+    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
 };
 
 /// Enumeration of the different types of connection.
@@ -46,7 +41,7 @@ where
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
         let hyperedges =
-            self.get_hyperedges(&hyperedges_index_set.clone().into_iter().collect_vec())?;
+            self.get_hyperedges(&hyperedges_index_set.iter().copied().collect_vec())?;
 
         let hyperedges_with_vertices = hyperedges
             .into_par_iter()

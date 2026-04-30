@@ -1,12 +1,7 @@
 use itertools::Itertools;
 
 use crate::{
-    HyperedgeIndex,
-    HyperedgeKey,
-    HyperedgeTrait,
-    Hypergraph,
-    VertexIndex,
-    VertexTrait,
+    HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
     errors::HypergraphError,
 };
 

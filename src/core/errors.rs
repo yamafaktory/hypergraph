@@ -85,4 +85,8 @@ where
     /// Error when a vertex weight is updated with the weight of another one.
     #[error("Vertex weight {0} was already assigned")]
     VertexWeightAlreadyAssigned(V),
+
+    /// Error when the hypergraph contains a cycle and a topological sort is requested.
+    #[error("Hypergraph contains a cycle and cannot be topologically sorted")]
+    HypergraphContainsCycle,
 }

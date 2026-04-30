@@ -34,25 +34,18 @@ impl PartialOrd for Visitor {
     }
 }
 
+type DijkstraResult<V, HE> = Result<
+    (usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>),
+    HypergraphError<V, HE>,
+>;
+
 #[allow(clippy::type_complexity)]
 impl<V, HE> Hypergraph<V, HE>
 where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets a list of the cheapest path of vertices between two vertices as a
-    /// vector of tuples of the form `(VertexIndex, Option<HyperedgeIndex>)`
-    /// where the second member is the hyperedge that has been traversed to
-    /// reach the vertex.
-    /// Please note that the initial tuple holds `None` as hyperedge since none
-    /// has been traversed yet.
-    /// The implementation of the algorithm is partially based on:
-    /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
-    pub fn get_dijkstra_connections(
-        &self,
-        from: VertexIndex,
-        to: VertexIndex,
-    ) -> Result<Vec<(VertexIndex, Option<HyperedgeIndex>)>, HypergraphError<V, HE>> {
+    fn dijkstra_impl(&self, from: VertexIndex, to: VertexIndex) -> DijkstraResult<V, HE> {
         let internal_from = self.get_internal_vertex(from)?;
         let internal_to = self.get_internal_vertex(to)?;
 
@@ -68,7 +61,7 @@ where
             if index == internal_to {
                 // Walk the predecessor chain from destination back to source,
                 // then reverse to get source-to-destination order.
-                return successors(Some(internal_to), |&current| {
+                let path = successors(Some(internal_to), |&current| {
                     (current != internal_from).then(|| predecessors[&current].0)
                 })
                 .collect::<Vec<_>>()
@@ -80,7 +73,9 @@ where
                         predecessors.get(&internal).and_then(|&(_, he)| he),
                     ))
                 })
-                .collect();
+                .collect::<Result<Vec<_>, HypergraphError<V, HE>>>()?;
+
+                return Ok((distance, path));
             }
 
             // Skip stale heap entries.
@@ -121,6 +116,34 @@ where
             }
         }
 
-        Ok(vec![])
+        Ok((0, vec![]))
+    }
+
+    /// Gets the cheapest path between two vertices as a vector of
+    /// `(VertexIndex, Option<HyperedgeIndex>)` tuples.
+    ///
+    /// The first element always carries `None` as no hyperedge has been
+    /// traversed to reach the starting vertex.
+    /// The implementation is based on:
+    /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
+    pub fn get_dijkstra_connections(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Result<Vec<(VertexIndex, Option<HyperedgeIndex>)>, HypergraphError<V, HE>> {
+        self.dijkstra_impl(from, to).map(|(_, path)| path)
+    }
+
+    /// Gets the cheapest path between two vertices together with the total cost.
+    ///
+    /// Returns `(total_cost, path)` where `path` is the same format as
+    /// [`get_dijkstra_connections`](Self::get_dijkstra_connections).
+    /// When no path exists, returns `(0, [])`.
+    pub fn get_dijkstra_connections_with_cost(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>> {
+        self.dijkstra_impl(from, to)
     }
 }

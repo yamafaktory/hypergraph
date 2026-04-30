@@ -277,6 +277,8 @@ dependencies = [
  "indexmap",
  "itertools 0.14.0",
  "rayon",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 
@@ -289,6 +291,8 @@ dependencies = [
  "equivalent",
  "hashbrown",
  "rayon",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]

@@ -15,6 +15,9 @@
 //! - Safe Rust implementation
 //! - Proper error handling
 //! - Stable indexes assigned for each hyperedge and each vertex
+//! - Graph traversal: BFS, DFS, Dijkstra shortest path, topological sort, reachability check
+//! - Optional **`serde`** feature for serialization/deserialization support
+//!   (enable with `features = ["serde"]` in `Cargo.toml`)
 //!
 //! ## Example
 //!

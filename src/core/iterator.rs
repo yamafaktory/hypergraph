@@ -1,4 +1,9 @@
-use crate::{HyperedgeKey, HyperedgeTrait, Hypergraph, VertexTrait, errors::HypergraphError};
+use std::ops::Deref;
+
+use crate::{
+    HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> IntoIterator for Hypergraph<V, HE>
 where
@@ -16,6 +21,19 @@ where
     }
 }
 
+impl<'a, V, HE> IntoIterator for &'a Hypergraph<V, HE>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+{
+    type Item = (&'a HE, Vec<&'a V>);
+    type IntoIter = HypergraphBorrowingIterator<'a, V, HE>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<V, HE> Hypergraph<V, HE>
 where
     V: VertexTrait,
@@ -27,6 +45,34 @@ where
             hypergraph: self,
             index: 0,
         }
+    }
+
+    /// Returns an iterator over all vertices as `(VertexIndex, &V)` pairs, in insertion order.
+    pub fn vertices_iter(&self) -> impl Iterator<Item = (VertexIndex, &V)> + '_ {
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter_map(|(internal, (weight, _))| {
+                self.vertices_mapping
+                    .left
+                    .get(&internal)
+                    .copied()
+                    .map(|stable| (stable, weight))
+            })
+    }
+
+    /// Returns an iterator over all hyperedges as `(HyperedgeIndex, &HE)` pairs, in insertion order.
+    pub fn hyperedges_iter(&self) -> impl Iterator<Item = (HyperedgeIndex, &HE)> + '_ {
+        self.hyperedges
+            .iter()
+            .enumerate()
+            .filter_map(|(internal, key)| {
+                self.hyperedges_mapping
+                    .left
+                    .get(&internal)
+                    .copied()
+                    .map(|stable| (stable, key.deref()))
+            })
     }
 }
 

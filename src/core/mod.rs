@@ -44,6 +44,7 @@ impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 /// different hyperedges, the weight is also included in the key to keep
 /// it unique.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub(crate) struct HyperedgeKey<HE> {
     vertices: Vec<usize>,
     weight: HE,
@@ -65,6 +66,16 @@ impl<HE> Deref for HyperedgeKey<HE> {
 }
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
+#[derive(Clone)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(
+        serialize = "V: serde::Serialize, HE: serde::Serialize",
+        deserialize = "V: serde::Deserialize<'de> + Eq + std::hash::Hash, \
+                       HE: serde::Deserialize<'de> + Eq + std::hash::Hash"
+    ))
+)]
 pub struct Hypergraph<V, HE> {
     /// Vertices are stored as a map whose unique keys are the weights
     /// and the values are a set of the hyperedges indexes which include
@@ -102,6 +113,49 @@ where
     }
 }
 
+impl<V, HE> Display for Hypergraph<V, HE>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let mut vertices: Vec<(VertexIndex, &V)> = self.vertices_iter().collect();
+        vertices.sort_by_key(|(idx, _)| *idx);
+
+        write!(f, "Hypergraph {{ vertices: [")?;
+        for (i, (idx, weight)) in vertices.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", idx.0, weight)?;
+        }
+
+        write!(f, "], hyperedges: [")?;
+        let mut hyperedges: Vec<(HyperedgeIndex, &HE)> = self.hyperedges_iter().collect();
+        hyperedges.sort_by_key(|(idx, _)| *idx);
+
+        for (i, (idx, weight)) in hyperedges.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {} [", idx.0, weight)?;
+            if let Ok(vertex_indexes) = self.get_hyperedge_vertices(*idx) {
+                for (j, v_idx) in vertex_indexes.iter().enumerate() {
+                    if j > 0 {
+                        write!(f, " → ")?;
+                    }
+                    if let Ok(v_weight) = self.get_vertex_weight(*v_idx) {
+                        write!(f, "{}", v_weight)?;
+                    }
+                }
+            }
+            write!(f, "]")?;
+        }
+
+        write!(f, "] }}")
+    }
+}
+
 impl<V, HE> Default for Hypergraph<V, HE>
 where
     V: VertexTrait,
@@ -118,6 +172,14 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
+    /// Returns `true` if the hypergraph contains no vertices.
+    ///
+    /// Because hyperedges require at least one vertex to exist, an empty vertex
+    /// set implies an empty hyperedge set as well.
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
+    }
+
     /// Clears the hypergraph.
     pub fn clear(&mut self) {
         // Clear the hyperedges and vertices sets while keeping their capacities.

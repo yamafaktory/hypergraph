@@ -5,9 +5,17 @@
 
 #[cfg(feature = "serde")]
 mod serde_tests {
-    use std::fmt::{Display, Formatter, Result};
+    use std::fmt::{
+        Display,
+        Formatter,
+        Result,
+    };
 
-    use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
+    use hypergraph::{
+        HyperedgeIndex,
+        Hypergraph,
+        VertexIndex,
+    };
 
     // Owned types that can derive serde traits.
 
@@ -55,10 +63,7 @@ mod serde_tests {
         assert_eq!(g2.get_vertex_weight(a).unwrap(), &V(0));
         assert_eq!(g2.get_vertex_weight(b).unwrap(), &V(1));
         assert_eq!(g2.get_hyperedge_weight(ab).unwrap(), &HE(10));
-        assert_eq!(
-            g2.get_hyperedge_vertices(ab).unwrap(),
-            vec![a, b]
-        );
+        assert_eq!(g2.get_hyperedge_vertices(ab).unwrap(), vec![a, b]);
     }
 
     #[test]

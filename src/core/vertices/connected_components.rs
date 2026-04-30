@@ -2,7 +2,13 @@ use std::collections::VecDeque;
 
 use ahash::AHashSet;
 
-use crate::{HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -17,9 +23,7 @@ where
     /// the smallest index in each component, giving a deterministic result.
     ///
     /// Returns an empty `Vec` for an empty hypergraph.
-    pub fn connected_components(
-        &self,
-    ) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
+    pub fn connected_components(&self) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
         let mut all_vertices: Vec<VertexIndex> =
             self.vertices_mapping.left.values().copied().collect();
         all_vertices.sort();

@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-use crate::{HyperedgeIndex, VertexIndex};
+use crate::{
+    HyperedgeIndex,
+    VertexIndex,
+};
 
 /// Enumeration of all the possible errors.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

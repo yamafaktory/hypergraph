@@ -2,7 +2,13 @@ use std::collections::VecDeque;
 
 use ahash::AHashSet;
 
-use crate::{HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -15,10 +21,7 @@ where
     /// Only vertices reachable via directed hyperedges are included.
     ///
     /// Returns [`HypergraphError::VertexIndexNotFound`] if `from` does not exist.
-    pub fn get_bfs(
-        &self,
-        from: VertexIndex,
-    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+    pub fn get_bfs(&self, from: VertexIndex) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
         self.get_internal_vertex(from)?;
 
         let mut visited: AHashSet<VertexIndex> = AHashSet::new();

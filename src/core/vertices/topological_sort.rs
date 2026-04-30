@@ -1,8 +1,17 @@
-use std::{cmp::Reverse, collections::BinaryHeap};
+use std::{
+    cmp::Reverse,
+    collections::BinaryHeap,
+};
 
 use ahash::AHashMap;
 
-use crate::{HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -18,8 +27,7 @@ where
     /// contains a cycle.
     pub fn topological_sort(&self) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
         // Collect all stable vertex indexes.
-        let all_vertices: Vec<VertexIndex> =
-            self.vertices_mapping.left.values().copied().collect();
+        let all_vertices: Vec<VertexIndex> = self.vertices_mapping.left.values().copied().collect();
 
         let vertex_count = all_vertices.len();
 

@@ -2,7 +2,10 @@
 
 mod common;
 
-use common::{Hyperedge, Vertex};
+use common::{
+    Hyperedge,
+    Vertex,
+};
 use hypergraph::Hypergraph;
 
 #[test]

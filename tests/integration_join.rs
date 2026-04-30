@@ -2,8 +2,14 @@
 
 mod common;
 
-use common::{Hyperedge, Vertex};
-use hypergraph::{Hypergraph, errors::HypergraphError};
+use common::{
+    Hyperedge,
+    Vertex,
+};
+use hypergraph::{
+    Hypergraph,
+    errors::HypergraphError,
+};
 
 #[test]
 fn integration_contration() {

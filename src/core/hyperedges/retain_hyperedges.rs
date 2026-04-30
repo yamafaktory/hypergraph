@@ -1,4 +1,10 @@
-use crate::{HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -9,10 +15,7 @@ where
     ///
     /// Vertices are unaffected. The predicate receives the stable index and a
     /// reference to the weight of each hyperedge.
-    pub fn retain_hyperedges<F>(
-        &mut self,
-        mut predicate: F,
-    ) -> Result<(), HypergraphError<V, HE>>
+    pub fn retain_hyperedges<F>(&mut self, mut predicate: F) -> Result<(), HypergraphError<V, HE>>
     where
         F: FnMut(HyperedgeIndex, &HE) -> bool,
     {

@@ -1,8 +1,17 @@
-use std::{cmp::Ordering, collections::BinaryHeap};
+use std::{
+    cmp::Ordering,
+    collections::BinaryHeap,
+};
 
 use ahash::AHashMap;
 
-use crate::{HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Visitor {
@@ -68,8 +77,10 @@ where
 
                 let mut min_cost = usize::MAX;
                 for hyperedge_index in hyperedge_indexes {
-                    let cost: usize =
-                        self.get_hyperedge_weight(hyperedge_index)?.to_owned().into();
+                    let cost: usize = self
+                        .get_hyperedge_weight(hyperedge_index)?
+                        .to_owned()
+                        .into();
                     if cost < min_cost {
                         min_cost = cost;
                     }

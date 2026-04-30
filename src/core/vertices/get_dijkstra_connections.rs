@@ -1,9 +1,18 @@
-use std::{cmp::Ordering, collections::BinaryHeap, iter::successors};
+use std::{
+    cmp::Ordering,
+    collections::BinaryHeap,
+    iter::successors,
+};
 
 use ahash::AHashMap;
 
 use crate::{
-    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,10 +43,8 @@ impl PartialOrd for Visitor {
     }
 }
 
-type DijkstraResult<V, HE> = Result<
-    (usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>),
-    HypergraphError<V, HE>,
->;
+type DijkstraResult<V, HE> =
+    Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>>;
 
 #[allow(clippy::type_complexity)]
 impl<V, HE> Hypergraph<V, HE>
@@ -94,8 +101,10 @@ where
                 let mut best_hyperedge: Option<HyperedgeIndex> = None;
 
                 for hyperedge_index in hyperedge_indexes {
-                    let cost: usize =
-                        self.get_hyperedge_weight(hyperedge_index)?.to_owned().into();
+                    let cost: usize = self
+                        .get_hyperedge_weight(hyperedge_index)?
+                        .to_owned()
+                        .into();
 
                     if cost < min_cost {
                         min_cost = cost;

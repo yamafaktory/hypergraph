@@ -1,10 +1,23 @@
 #![deny(unsafe_code, nonstandard_style)]
 #![allow(missing_docs)]
 
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{
+    Display,
+    Formatter,
+    Result,
+};
 
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
+use criterion::{
+    BatchSize,
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use hypergraph::{
+    HyperedgeIndex,
+    Hypergraph,
+    VertexIndex,
+};
 use itertools::Itertools;
 
 const VERTICES: usize = 1_000;
@@ -60,23 +73,18 @@ fn criterion_benchmark(criterion: &mut Criterion) {
 
     criterion.bench_function("get-hyperedges-connecting", |bencher| {
         bencher.iter(|| {
-            graph.get_hyperedges_connecting(
-                VertexIndex(VERTICES / 2),
-                VertexIndex(VERTICES / 2 + 1),
-            )
+            graph
+                .get_hyperedges_connecting(VertexIndex(VERTICES / 2), VertexIndex(VERTICES / 2 + 1))
         })
     });
 
     criterion.bench_function("get-hyperedges-intersections", |bencher| {
-        bencher.iter(|| {
-            graph.get_hyperedges_intersections((0..10).map(HyperedgeIndex).collect_vec())
-        })
+        bencher
+            .iter(|| graph.get_hyperedges_intersections((0..10).map(HyperedgeIndex).collect_vec()))
     });
 
     criterion.bench_function("dijkstra", |bencher| {
-        bencher.iter(|| {
-            graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(VERTICES - 1))
-        })
+        bencher.iter(|| graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(VERTICES - 1)))
     });
 
     criterion.bench_function("remove-vertex", |bencher| {

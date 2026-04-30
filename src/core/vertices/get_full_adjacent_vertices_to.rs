@@ -1,8 +1,16 @@
 use indexmap::IndexMap;
-use itertools::{Itertools, fold};
+use itertools::{
+    Itertools,
+    fold,
+};
 
 use crate::{
-    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, core::shared::Connection,
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    core::shared::Connection,
     errors::HypergraphError,
 };
 

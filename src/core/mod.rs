@@ -14,17 +14,31 @@ mod utils;
 pub mod vertices;
 
 use std::{
-    fmt::{Debug, Display, Formatter, Result},
+    fmt::{
+        Debug,
+        Display,
+        Formatter,
+        Result,
+    },
     hash::Hash,
     ops::Deref,
 };
 
 use bi_hash_map::BiHashMap;
-use types::{AIndexSet, ARandomState};
+use types::{
+    AIndexSet,
+    ARandomState,
+};
 
 // Reexport indexes at this level.
-pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
-pub use crate::core::iterator::{HypergraphBorrowingIterator, HypergraphIterator};
+pub use crate::core::indexes::{
+    HyperedgeIndex,
+    VertexIndex,
+};
+pub use crate::core::iterator::{
+    HypergraphBorrowingIterator,
+    HypergraphIterator,
+};
 
 /// Shared Trait for the vertices.
 /// Must be implemented to use the library.

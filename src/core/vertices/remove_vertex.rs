@@ -1,5 +1,10 @@
 use crate::{
-    HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
+    HyperedgeKey,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>

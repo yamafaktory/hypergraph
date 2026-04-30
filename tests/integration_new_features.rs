@@ -9,8 +9,15 @@
 
 mod common;
 
-use common::{Hyperedge, Vertex};
-use hypergraph::{HyperedgeIndex, Hypergraph, VertexIndex};
+use common::{
+    Hyperedge,
+    Vertex,
+};
+use hypergraph::{
+    HyperedgeIndex,
+    Hypergraph,
+    VertexIndex,
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -233,8 +240,10 @@ fn topological_sort_cyclic() {
     let mut g = Hypergraph::<Vertex, Hyperedge>::new();
     let a = g.add_vertex(Vertex::new("a")).unwrap();
     let b = g.add_vertex(Vertex::new("b")).unwrap();
-    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
-    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1)).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1))
+        .unwrap();
+    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1))
+        .unwrap();
 
     assert!(g.topological_sort().is_err());
 }
@@ -249,10 +258,7 @@ fn dijkstra_with_cost_finds_shortest() {
     // Shortest a→c is via a→b→c with cost 3, not direct a→c with cost 5.
     let (cost, path) = g.get_dijkstra_connections_with_cost(a, c).unwrap();
     assert_eq!(cost, 3);
-    assert_eq!(
-        path,
-        vec![(a, None), (b, Some(ab)), (c, Some(bc))]
-    );
+    assert_eq!(path, vec![(a, None), (b, Some(ab)), (c, Some(bc))]);
 }
 
 #[test]
@@ -339,8 +345,10 @@ fn is_acyclic_with_cycle() {
     let mut g = Hypergraph::<Vertex, Hyperedge>::new();
     let a = g.add_vertex(Vertex::new("a")).unwrap();
     let b = g.add_vertex(Vertex::new("b")).unwrap();
-    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
-    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1)).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1))
+        .unwrap();
+    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1))
+        .unwrap();
     assert!(!g.is_acyclic());
 }
 
@@ -418,7 +426,10 @@ fn connected_components_all_isolated() {
 #[test]
 fn connected_components_empty_graph() {
     let g = Hypergraph::<Vertex, Hyperedge>::new();
-    assert_eq!(g.connected_components().unwrap(), Vec::<Vec<VertexIndex>>::new());
+    assert_eq!(
+        g.connected_components().unwrap(),
+        Vec::<Vec<VertexIndex>>::new()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -472,13 +483,19 @@ fn dijkstra_from_invalid_vertex() {
 #[test]
 fn find_hyperedges_by_weight_single_match() {
     let (g, _, _, _, _, ab, _, _) = build_graph();
-    assert_eq!(g.find_hyperedges_by_weight(Hyperedge::new("a-b", 1)), vec![ab]);
+    assert_eq!(
+        g.find_hyperedges_by_weight(Hyperedge::new("a-b", 1)),
+        vec![ab]
+    );
 }
 
 #[test]
 fn find_hyperedges_by_weight_no_match() {
     let (g, ..) = build_graph();
-    assert!(g.find_hyperedges_by_weight(Hyperedge::new("zzz", 99)).is_empty());
+    assert!(
+        g.find_hyperedges_by_weight(Hyperedge::new("zzz", 99))
+            .is_empty()
+    );
 }
 
 #[test]
@@ -524,9 +541,12 @@ fn scc_cycle_single_component() {
     let a = g.add_vertex(Vertex::new("a")).unwrap();
     let b = g.add_vertex(Vertex::new("b")).unwrap();
     let c = g.add_vertex(Vertex::new("c")).unwrap();
-    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
-    g.add_hyperedge(vec![b, c], Hyperedge::new("b-c", 1)).unwrap();
-    g.add_hyperedge(vec![c, a], Hyperedge::new("c-a", 1)).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1))
+        .unwrap();
+    g.add_hyperedge(vec![b, c], Hyperedge::new("b-c", 1))
+        .unwrap();
+    g.add_hyperedge(vec![c, a], Hyperedge::new("c-a", 1))
+        .unwrap();
 
     let sccs = g.strongly_connected_components().unwrap();
     assert_eq!(sccs.len(), 1);
@@ -542,13 +562,19 @@ fn scc_mixed_structure() {
     let a = g.add_vertex(Vertex::new("a")).unwrap();
     let b = g.add_vertex(Vertex::new("b")).unwrap();
     let c = g.add_vertex(Vertex::new("c")).unwrap();
-    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
-    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1)).unwrap();
-    g.add_hyperedge(vec![c, a], Hyperedge::new("c-a", 1)).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1))
+        .unwrap();
+    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1))
+        .unwrap();
+    g.add_hyperedge(vec![c, a], Hyperedge::new("c-a", 1))
+        .unwrap();
 
     let sccs = g.strongly_connected_components().unwrap();
     assert_eq!(sccs.len(), 2);
-    assert!(sccs.iter().any(|s| s == &vec![c]), "c should be a singleton SCC");
+    assert!(
+        sccs.iter().any(|s| s == &vec![c]),
+        "c should be a singleton SCC"
+    );
     assert!(
         sccs.iter().any(|s| {
             let mut s = s.clone();
@@ -562,7 +588,10 @@ fn scc_mixed_structure() {
 #[test]
 fn scc_empty_graph() {
     let g = Hypergraph::<Vertex, Hyperedge>::new();
-    assert_eq!(g.strongly_connected_components().unwrap(), Vec::<Vec<VertexIndex>>::new());
+    assert_eq!(
+        g.strongly_connected_components().unwrap(),
+        Vec::<Vec<VertexIndex>>::new()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -651,7 +680,11 @@ fn retain_vertices_by_index() {
     // them: ab=[a,b] is unchanged, bc=[b] and ac=[a] shrink to unary.
     assert_eq!(g.count_hyperedges(), 3);
     // The a→b hyperedge still contains both a and b.
-    let ab_idx = g.find_hyperedges_by_weight(Hyperedge::new("a-b", 1)).into_iter().next().unwrap();
+    let ab_idx = g
+        .find_hyperedges_by_weight(Hyperedge::new("a-b", 1))
+        .into_iter()
+        .next()
+        .unwrap();
     let ab_verts = g.get_hyperedge_vertices(ab_idx).unwrap();
     assert!(ab_verts.contains(&a));
     assert!(ab_verts.contains(&b));
@@ -728,7 +761,10 @@ fn all_paths_multiple_routes() {
 fn all_paths_no_route() {
     // d has no outgoing edges.
     let (g, a, _, _, d, ..) = build_graph();
-    assert_eq!(g.get_all_paths(d, a).unwrap(), Vec::<Vec<VertexIndex>>::new());
+    assert_eq!(
+        g.get_all_paths(d, a).unwrap(),
+        Vec::<Vec<VertexIndex>>::new()
+    );
 }
 
 #[test]
@@ -745,9 +781,12 @@ fn all_paths_no_cycle_infinite_loop() {
     let a = g.add_vertex(Vertex::new("a")).unwrap();
     let b = g.add_vertex(Vertex::new("b")).unwrap();
     let c = g.add_vertex(Vertex::new("c")).unwrap();
-    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
-    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1)).unwrap();
-    g.add_hyperedge(vec![b, c], Hyperedge::new("b-c", 1)).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1))
+        .unwrap();
+    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1))
+        .unwrap();
+    g.add_hyperedge(vec![b, c], Hyperedge::new("b-c", 1))
+        .unwrap();
 
     // Only simple path from a to c is a→b→c.
     let paths = g.get_all_paths(a, c).unwrap();

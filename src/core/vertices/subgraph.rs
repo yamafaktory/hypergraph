@@ -1,6 +1,16 @@
-use ahash::{AHashMap, AHashSet};
+use ahash::{
+    AHashMap,
+    AHashSet,
+};
 
-use crate::{HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError};
+use crate::{
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> Hypergraph<V, HE>
 where

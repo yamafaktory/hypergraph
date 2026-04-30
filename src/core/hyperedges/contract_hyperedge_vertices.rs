@@ -1,8 +1,13 @@
 use itertools::Itertools;
 
 use crate::{
-    HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
-    core::utils::are_slices_equal, errors::HypergraphError,
+    HyperedgeIndex,
+    HyperedgeTrait,
+    Hypergraph,
+    VertexIndex,
+    VertexTrait,
+    core::utils::are_slices_equal,
+    errors::HypergraphError,
 };
 
 impl<V, HE> Hypergraph<V, HE>

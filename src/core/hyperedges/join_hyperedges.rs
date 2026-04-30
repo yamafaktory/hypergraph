@@ -1,5 +1,3 @@
-use rayon::prelude::*;
-
 use crate::{
     HyperedgeIndex,
     HyperedgeTrait,
@@ -27,7 +25,7 @@ where
 
         // Try to collect all the vertices from the provided hyperedges.
         match hyperedges
-            .par_iter()
+            .iter()
             .map(|hyperedge_index| self.get_hyperedge_vertices(*hyperedge_index))
             .collect::<Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>>>()
         {
@@ -37,7 +35,7 @@ where
                 // hyperedges to the first one.
                 self.update_hyperedge_vertices(
                     hyperedges[0],
-                    joined_vertices.into_par_iter().flatten().collect(),
+                    joined_vertices.into_iter().flatten().collect(),
                 )?;
 
                 // Get the tail.

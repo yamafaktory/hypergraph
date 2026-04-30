@@ -13,8 +13,13 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Adds a hyperedge as an array of vertices indexes and a custom weight in the hypergraph.
-    /// Returns the weighted index of the hyperedge.
+    /// Adds a hyperedge connecting `vertices` with the given `weight`.
+    /// Returns the stable index of the hyperedge.
+    ///
+    /// Duplicate weights are allowed — multiple hyperedges may carry the same
+    /// weight value. The unique key is the `(vertices, weight)` combination: if
+    /// an identical pair already exists the existing [`HyperedgeIndex`] is
+    /// returned without creating a duplicate entry.
     pub fn add_hyperedge(
         &mut self,
         vertices: Vec<VertexIndex>,
@@ -27,19 +32,6 @@ where
 
         let internal_vertices = self.get_internal_vertices(vertices)?;
 
-        // Return an error if the weight is already assigned to another
-        // hyperedge.
-        // We can't use the contains method here since the key is a combination
-        // of the weight and the vertices.
-        if self.hyperedges.iter().any(
-            |HyperedgeKey {
-                 weight: current_weight,
-                 ..
-             }| { *current_weight == weight },
-        ) {
-            return Err(HypergraphError::HyperedgeWeightAlreadyAssigned(weight));
-        }
-
         // We don't care about the second member of the tuple returned from
         // the insertion since this is an infallible operation.
         let (internal_index, _) = self
@@ -50,7 +42,7 @@ where
         for vertex in internal_vertices {
             let (_, index_set) = self
                 .vertices
-                .get_index_mut(vertex)
+                .get_mut(vertex)
                 .ok_or(HypergraphError::InternalVertexIndexNotFound(vertex))?;
 
             index_set.insert(internal_index);

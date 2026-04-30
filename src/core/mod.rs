@@ -26,7 +26,6 @@ use std::{
 
 use bi_hash_map::BiHashMap;
 use types::{
-    AIndexMap,
     AIndexSet,
     ARandomState,
 };
@@ -35,6 +34,10 @@ use types::{
 pub use crate::core::indexes::{
     HyperedgeIndex,
     VertexIndex,
+};
+pub use crate::core::iterator::{
+    HypergraphBorrowingIterator,
+    HypergraphIterator,
 };
 
 /// Shared Trait for the vertices.
@@ -55,6 +58,7 @@ impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
 /// different hyperedges, the weight is also included in the key to keep
 /// it unique.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub(crate) struct HyperedgeKey<HE> {
     vertices: Vec<usize>,
     weight: HE,
@@ -76,11 +80,20 @@ impl<HE> Deref for HyperedgeKey<HE> {
 }
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
+#[derive(Clone)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(bound(
+        serialize = "V: serde::Serialize, HE: serde::Serialize",
+        deserialize = "V: serde::Deserialize<'de>, HE: serde::Deserialize<'de> + Eq + std::hash::Hash"
+    ))
+)]
 pub struct Hypergraph<V, HE> {
-    /// Vertices are stored as a map whose unique keys are the weights
-    /// and the values are a set of the hyperedges indexes which include
-    /// the current vertex.
-    vertices: AIndexMap<V, AIndexSet<usize>>,
+    /// Vertices are stored as a vec of `(weight, hyperedge-index-set)` pairs.
+    /// Position in the vec is the internal index. Weights are not required to
+    /// be unique — identity is the stable `VertexIndex`, not the weight.
+    vertices: Vec<(V, AIndexSet<usize>)>,
 
     /// Hyperedges are stored as a set whose unique keys are a combination of
     /// vertices indexes and a weight. Two or more hyperedges can contain
@@ -102,7 +115,7 @@ pub struct Hypergraph<V, HE> {
 
 impl<V, HE> Debug for Hypergraph<V, HE>
 where
-    V: Eq + Hash + Debug,
+    V: Debug,
     HE: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
@@ -110,6 +123,49 @@ where
             .field("vertices", &self.vertices)
             .field("hyperedges", &self.hyperedges)
             .finish_non_exhaustive()
+    }
+}
+
+impl<V, HE> Display for Hypergraph<V, HE>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let mut vertices: Vec<(VertexIndex, &V)> = self.vertices_iter().collect();
+        vertices.sort_by_key(|(idx, _)| *idx);
+
+        write!(f, "Hypergraph {{ vertices: [")?;
+        for (i, (idx, weight)) in vertices.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", idx.0, weight)?;
+        }
+
+        write!(f, "], hyperedges: [")?;
+        let mut hyperedges: Vec<(HyperedgeIndex, &HE)> = self.hyperedges_iter().collect();
+        hyperedges.sort_by_key(|(idx, _)| *idx);
+
+        for (i, (idx, weight)) in hyperedges.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {} [", idx.0, weight)?;
+            if let Ok(vertex_indexes) = self.get_hyperedge_vertices(*idx) {
+                for (j, v_idx) in vertex_indexes.iter().enumerate() {
+                    if j > 0 {
+                        write!(f, " → ")?;
+                    }
+                    if let Ok(v_weight) = self.get_vertex_weight(*v_idx) {
+                        write!(f, "{v_weight}")?;
+                    }
+                }
+            }
+            write!(f, "]")?;
+        }
+
+        write!(f, "] }}")
     }
 }
 
@@ -129,6 +185,15 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
+    /// Returns `true` if the hypergraph contains no vertices.
+    ///
+    /// Because hyperedges require at least one vertex to exist, an empty vertex
+    /// set implies an empty hyperedge set as well.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
+    }
+
     /// Clears the hypergraph.
     pub fn clear(&mut self) {
         // Clear the hyperedges and vertices sets while keeping their capacities.
@@ -145,11 +210,13 @@ where
     }
 
     /// Creates a new hypergraph with no allocation.
+    #[must_use]
     pub fn new() -> Self {
         Hypergraph::with_capacity(0, 0)
     }
 
     /// Creates a new hypergraph with the specified capacity.
+    #[must_use]
     pub fn with_capacity(vertices: usize, hyperedges: usize) -> Self {
         Hypergraph {
             hyperedges_count: 0,
@@ -157,7 +224,7 @@ where
             hyperedges: AIndexSet::with_capacity_and_hasher(hyperedges, ARandomState::default()),
             vertices_count: 0,
             vertices_mapping: BiHashMap::default(),
-            vertices: AIndexMap::with_capacity_and_hasher(vertices, ARandomState::default()),
+            vertices: Vec::with_capacity(vertices),
         }
     }
 }

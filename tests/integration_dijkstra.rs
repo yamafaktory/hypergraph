@@ -71,3 +71,62 @@ fn integration_dijkstra() {
         "should follow a, b, c, e, d with their matching traversed hyperedges"
     );
 }
+
+#[test]
+fn integration_dijkstra_parallel_hyperedges() {
+    // Regression test: with multiple hyperedges between the same two vertices,
+    // Dijkstra must pick the cheapest one, not merely the first.
+    let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
+
+    let s = graph.add_vertex(Vertex::new("s")).unwrap();
+    let t = graph.add_vertex(Vertex::new("t")).unwrap();
+
+    // Insert the expensive hyperedge first so it appears first in iteration order.
+    let _expensive = graph
+        .add_hyperedge(vec![s, t], Hyperedge::new("expensive", 10))
+        .unwrap();
+    let cheap = graph
+        .add_hyperedge(vec![s, t], Hyperedge::new("cheap", 1))
+        .unwrap();
+
+    assert_eq!(
+        graph.get_dijkstra_connections(s, t),
+        Ok(vec![(s, None), (t, Some(cheap))]),
+        "should use the cheaper parallel hyperedge"
+    );
+}
+
+#[test]
+fn integration_dijkstra_dead_end_branch() {
+    // Regression test: vertices explored in dead-end branches must not appear
+    // in the returned path.
+    let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
+
+    let s = graph.add_vertex(Vertex::new("s")).unwrap();
+    let a = graph.add_vertex(Vertex::new("a")).unwrap(); // dead-end branch
+    let b = graph.add_vertex(Vertex::new("b")).unwrap();
+    let c = graph.add_vertex(Vertex::new("c")).unwrap(); // unreachable from b to t
+    let t = graph.add_vertex(Vertex::new("t")).unwrap();
+
+    // s→a is cheap but a only leads to c, which is a dead end.
+    let _he_sa = graph
+        .add_hyperedge(vec![s, a], Hyperedge::new("s-a", 1))
+        .unwrap();
+    let _he_ac = graph
+        .add_hyperedge(vec![a, c], Hyperedge::new("a-c", 1))
+        .unwrap();
+
+    // s→b→t is the only route to t.
+    let he_sb = graph
+        .add_hyperedge(vec![s, b], Hyperedge::new("s-b", 2))
+        .unwrap();
+    let he_bt = graph
+        .add_hyperedge(vec![b, t], Hyperedge::new("b-t", 1))
+        .unwrap();
+
+    assert_eq!(
+        graph.get_dijkstra_connections(s, t),
+        Ok(vec![(s, None), (b, Some(he_sb)), (t, Some(he_bt))]),
+        "dead-end vertex a should not appear in the path"
+    );
+}

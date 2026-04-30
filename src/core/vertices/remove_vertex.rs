@@ -1,5 +1,3 @@
-use rayon::prelude::*;
-
 use crate::{
     HyperedgeKey,
     HyperedgeTrait,
@@ -38,10 +36,7 @@ where
             // Get the unique vertices, i.e. check for self-loops.
             let mut unique_vertices = vertices.clone();
 
-            // We use `par_sort_unstable` here which means that the order of
-            // equal elements is not preserved but this is fine since we dedupe
-            // them afterwards.
-            unique_vertices.par_sort_unstable();
+            unique_vertices.sort_unstable();
             unique_vertices.dedup();
 
             // Remove the hyperedge if the vertex is the only one present.
@@ -51,7 +46,7 @@ where
                 // Otherwise update the hyperedge with the updated vertices.
                 let updated_vertices = self.get_vertices(
                     &vertices
-                        .into_par_iter()
+                        .into_iter()
                         .filter(|vertex| *vertex != internal_index)
                         .collect::<Vec<usize>>(),
                 )?;
@@ -64,7 +59,7 @@ where
         let last_index = self.vertices.len() - 1;
 
         // Swap and remove by index.
-        self.vertices.swap_remove_index(internal_index);
+        self.vertices.swap_remove(internal_index);
 
         // Update the mapping for the removed vertex.
         self.vertices_mapping.left.remove(&internal_index);
@@ -97,10 +92,10 @@ where
                     .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(hyperedge))?;
 
                 let updated_vertices = vertices
-                    .into_par_iter()
+                    .iter()
                     .map(|vertex| {
                         // Remap the vertex if this is the swapped one.
-                        if vertex == &last_index {
+                        if *vertex == last_index {
                             internal_index
                         } else {
                             *vertex

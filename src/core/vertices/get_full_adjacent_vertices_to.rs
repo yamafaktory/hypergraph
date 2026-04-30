@@ -21,7 +21,7 @@ where
     HE: HyperedgeTrait,
 {
     /// Gets the list of all vertices connected to a given vertex as tuples of
-    /// the form (`VertexIndex`, Vec<HyperedgeIndex>).
+    /// the form (`VertexIndex`, `Vec<HyperedgeIndex>`).
     pub fn get_full_adjacent_vertices_to(
         &self,
         to: VertexIndex,

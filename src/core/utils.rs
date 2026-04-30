@@ -1,12 +1,5 @@
-use itertools::Itertools;
-
 pub(crate) fn are_slices_equal(a: &[usize], b: &[usize]) -> bool {
-    // Early guard if lengths are different.
-    if a.len() != b.len() {
-        return false;
-    }
-
-    a.iter().zip_eq(b).fold(true, |acc, (a, b)| acc && a == b)
+    a == b
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@ use std::fmt::{
 /// Uses the newtype index pattern.
 /// <https://matklad.github.io/2018/06/04/newtype-index-pattern.html>
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VertexIndex(pub usize);
 
 impl Display for VertexIndex {
@@ -26,6 +27,7 @@ impl From<usize> for VertexIndex {
 /// Uses the newtype index pattern.
 /// <https://matklad.github.io/2018/06/04/newtype-index-pattern.html>
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HyperedgeIndex(pub usize);
 
 impl Display for HyperedgeIndex {

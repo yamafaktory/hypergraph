@@ -17,16 +17,24 @@ One of the main advantages of using a hypergraph model over a graph one is to pr
 
 This library enables you to represent:
 
-- **non-simple** hypergraphs with two or more hyperedges - with different weights - containing the exact same set of vertices
-- **self-loops** - i.e., hyperedges containing vertices directed to themselves one or more times
-- **unaries** - i.e., hyperedges containing a unique vertex
+- **non-simple** hypergraphs with two or more hyperedges containing the exact same set of vertices
+- **self-loops** — i.e., hyperedges containing vertices directed to themselves one or more times
+- **unaries** — i.e., hyperedges containing a unique vertex
+
+And to compute:
+
+- Graph traversal: **BFS**, **DFS**, reachability, topological sort
+- Shortest paths: **Dijkstra** point-to-point and single-source
+- Structural analysis: strongly connected components, weakly connected components, all simple paths, subgraph extraction, cycle detection
+- Filtered views: `retain_vertices`, `retain_hyperedges`
 
 ## ⚗️ Implementation
 
 - 100% safe Rust
 - Proper error handling
-- Stable indexes assigned for each hyperedge and each vertex
+- Stable indexes for each hyperedge and each vertex — identity is the index, not the weight; duplicate weights are allowed on both sides
 - Parallelism (with Rayon)
+- Optional `serde` support (`features = ["serde"]` in `Cargo.toml`)
 
 ## 🛠️ Installation
 

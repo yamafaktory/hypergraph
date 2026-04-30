@@ -51,12 +51,6 @@ fn integration_main() {
         Ok(VertexIndex(4)),
         "should add the fifth vertex"
     );
-    assert_eq!(
-        graph.add_vertex(enola),
-        Err(HypergraphError::VertexWeightAlreadyAssigned(enola)),
-        "should return an explicit error since this weight is already in use"
-    );
-
     // Count the vertices.
     assert_eq!(graph.count_vertices(), 5, "should have 5 vertices");
 
@@ -118,10 +112,8 @@ fn integration_main() {
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], fourth_hyperedge,),
-        Err(HypergraphError::HyperedgeWeightAlreadyAssigned(
-            fourth_hyperedge
-        )),
-        "should return an explicit error since this weight is already in use"
+        Ok(HyperedgeIndex(3)),
+        "should return the existing index since the (vertices, weight) key is identical"
     );
     assert_eq!(
         graph.add_hyperedge(vec![VertexIndex(3)], fifth_hyperedge),
@@ -586,10 +578,8 @@ fn integration_main() {
     );
     assert_eq!(
         graph.update_hyperedge_weight(HyperedgeIndex(0), fourth_hyperedge),
-        Err(HypergraphError::HyperedgeWeightAlreadyAssigned(
-            fourth_hyperedge
-        )),
-        "should return an explicit error since this weight is already assigned"
+        Ok(()),
+        "should update the weight to fourth_hyperedge even though another hyperedge uses it"
     );
 
     // Update the vertices of some hyperedges.

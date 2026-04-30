@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use rayon::prelude::*;
 
 use crate::{
     HyperedgeIndex,
@@ -28,20 +27,13 @@ where
         // Get all the vertices of the hyperedge.
         let hyperedge_vertices = self.get_hyperedge_vertices(hyperedge_index)?;
 
-        // Get the deduped vertices.
-        // We use `par_sort_unstable` here which means that the order of equal
-        // elements is not preserved but this is fine since we dedupe them
-        // afterwards.
         let mut deduped_vertices = vertices;
 
-        deduped_vertices.par_sort_unstable();
+        deduped_vertices.sort_unstable();
         deduped_vertices.dedup();
 
         // Check that the target is included in the deduped vertices.
-        if !deduped_vertices
-            .par_iter()
-            .any(|&current_index| current_index == target)
-        {
+        if !deduped_vertices.contains(&target) {
             return Err(HypergraphError::HyperedgeInvalidContraction {
                 index: hyperedge_index,
                 target,
@@ -51,18 +43,9 @@ where
 
         // Get the vertices not found in the hyperedge.
         let vertices_not_found = deduped_vertices
-            .par_iter()
-            .fold_with(vec![], |mut acc: Vec<VertexIndex>, &index| {
-                if !hyperedge_vertices
-                    .par_iter()
-                    .any(|&current_index| current_index == index)
-                {
-                    acc.push(index);
-                }
-
-                acc
-            })
-            .flatten()
+            .iter()
+            .filter(|index| !hyperedge_vertices.contains(index))
+            .copied()
             .collect::<Vec<VertexIndex>>();
 
         // Check that all the vertices - target included - are a subset of
@@ -95,10 +78,7 @@ where
                 .iter()
                 // First remap each vertex to itself or to the target.
                 .map(|vertex| {
-                    if deduped_vertices
-                        .par_iter()
-                        .any(|&current_index| current_index == *vertex)
-                    {
+                    if deduped_vertices.contains(vertex) {
                         target
                     } else {
                         *vertex

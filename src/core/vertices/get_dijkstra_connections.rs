@@ -1,13 +1,10 @@
 use std::{
     cmp::Ordering,
-    collections::{
-        BinaryHeap,
-        HashMap,
-    },
-    fmt::Debug,
+    collections::BinaryHeap,
+    iter::successors,
 };
 
-use rayon::prelude::*;
+use ahash::AHashMap;
 
 use crate::{
     HyperedgeIndex,
@@ -36,7 +33,7 @@ impl Ord for Visitor {
         other
             .distance
             .cmp(&self.distance)
-            .then_with(|| self.distance.cmp(&other.distance))
+            .then_with(|| self.index.cmp(&other.index))
     }
 }
 
@@ -46,131 +43,116 @@ impl PartialOrd for Visitor {
     }
 }
 
+type DijkstraResult<V, HE> =
+    Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>>;
+
 #[allow(clippy::type_complexity)]
 impl<V, HE> Hypergraph<V, HE>
 where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets a list of the cheapest path of vertices between two vertices as a
-    /// vector of tuples of the form `(VertexIndex, Option<HyperedgeIndex>)`
-    /// where the second member is the hyperedge that has been traversed to
-    /// reach the vertex.
-    /// Please note that the initial tuple holds `None` as hyperedge since none
-    /// has been traversed yet.
-    /// The implementation of the algorithm is partially based on:
+    fn dijkstra_impl(&self, from: VertexIndex, to: VertexIndex) -> DijkstraResult<V, HE> {
+        let internal_from = self.get_internal_vertex(from)?;
+        let internal_to = self.get_internal_vertex(to)?;
+
+        let mut distances: AHashMap<usize, usize> = AHashMap::new();
+        // Maps each internal vertex index to its (predecessor, hyperedge used to arrive).
+        let mut predecessors: AHashMap<usize, (usize, Option<HyperedgeIndex>)> = AHashMap::new();
+        let mut to_traverse = BinaryHeap::new();
+
+        distances.insert(internal_from, 0);
+        to_traverse.push(Visitor::new(0, internal_from));
+
+        while let Some(Visitor { distance, index }) = to_traverse.pop() {
+            if index == internal_to {
+                // Walk the predecessor chain from destination back to source,
+                // then reverse to get source-to-destination order.
+                let path = successors(Some(internal_to), |&current| {
+                    (current != internal_from).then(|| predecessors[&current].0)
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .map(|internal| {
+                    Ok((
+                        self.get_vertex(internal)?,
+                        predecessors.get(&internal).and_then(|&(_, he)| he),
+                    ))
+                })
+                .collect::<Result<Vec<_>, HypergraphError<V, HE>>>()?;
+
+                return Ok((distance, path));
+            }
+
+            // Skip stale heap entries.
+            if distance > distances[&index] {
+                continue;
+            }
+
+            let mapped_index = self.get_vertex(index)?;
+            let neighbors = self.get_full_adjacent_vertices_from(mapped_index)?;
+
+            for (vertex_index, hyperedge_indexes) in neighbors {
+                let internal_neighbor = self.get_internal_vertex(vertex_index)?;
+
+                // Find the minimum-cost hyperedge to this neighbor.
+                let mut min_cost = usize::MAX;
+                let mut best_hyperedge: Option<HyperedgeIndex> = None;
+
+                for hyperedge_index in hyperedge_indexes {
+                    let cost: usize = self
+                        .get_hyperedge_weight(hyperedge_index)?
+                        .to_owned()
+                        .into();
+
+                    if cost < min_cost {
+                        min_cost = cost;
+                        best_hyperedge = Some(hyperedge_index);
+                    }
+                }
+
+                let next_distance = distance + min_cost;
+                let is_shorter = distances
+                    .get(&internal_neighbor)
+                    .is_none_or(|&current| next_distance < current);
+
+                if is_shorter {
+                    distances.insert(internal_neighbor, next_distance);
+                    predecessors.insert(internal_neighbor, (index, best_hyperedge));
+                    to_traverse.push(Visitor::new(next_distance, internal_neighbor));
+                }
+            }
+        }
+
+        Ok((0, vec![]))
+    }
+
+    /// Gets the cheapest path between two vertices as a vector of
+    /// `(VertexIndex, Option<HyperedgeIndex>)` tuples.
+    ///
+    /// The first element always carries `None` as no hyperedge has been
+    /// traversed to reach the starting vertex.
+    /// The implementation is based on:
     /// <https://doc.rust-lang.org/std/collections/binary_heap/#examples>
     pub fn get_dijkstra_connections(
         &self,
         from: VertexIndex,
         to: VertexIndex,
     ) -> Result<Vec<(VertexIndex, Option<HyperedgeIndex>)>, HypergraphError<V, HE>> {
-        // Get the internal indexes of the vertices.
-        let internal_from = self.get_internal_vertex(from)?;
-        let internal_to = self.get_internal_vertex(to)?;
+        self.dijkstra_impl(from, to).map(|(_, path)| path)
+    }
 
-        // Keep track of the distances.
-        let mut distances = HashMap::new();
-
-        let mut maybe_traversed_hyperedge_by_vertex = HashMap::new();
-
-        // Create an empty binary heap.
-        let mut to_traverse = BinaryHeap::new();
-
-        // Initialize the first vertex to zero.
-        distances.insert(internal_from, 0);
-
-        // Push the first cursor to the heap.
-        to_traverse.push(Visitor::new(0, internal_from));
-
-        // Keep track of the traversal path.
-        let mut path = Vec::<VertexIndex>::new();
-
-        while let Some(Visitor { distance, index }) = to_traverse.pop() {
-            // End of the traversal.
-            if index == internal_to {
-                // Inject the target vertex.
-                path.push(self.get_vertex(internal_to)?);
-
-                return Ok(path
-                    .into_par_iter()
-                    .map(|vertex_index| {
-                        (
-                            vertex_index,
-                            maybe_traversed_hyperedge_by_vertex
-                                .get(&vertex_index)
-                                .and_then(|&current| current),
-                        )
-                    })
-                    .collect());
-            }
-
-            // Skip if a better path has already been found.
-            if distance > distances[&index] {
-                continue;
-            }
-
-            // Get the VertexIndex associated with the internal index.
-            // Proceed by finding all the adjacent vertices as a hashmap whose
-            // keys are VertexIndex and values are a vector of HyperedgeIndex.
-            let mapped_index = self.get_vertex(index)?;
-            let indexes = self.get_full_adjacent_vertices_from(mapped_index)?;
-
-            // For every connected vertex, try to find the lowest distance.
-            for (vertex_index, hyperedge_indexes) in indexes {
-                let internal_vertex_index = self.get_internal_vertex(vertex_index)?;
-
-                let mut min_cost = usize::MAX;
-                let mut best_hyperedge: Option<HyperedgeIndex> = None;
-
-                // Get the lower cost out of all the hyperedges.
-                for hyperedge_index in hyperedge_indexes {
-                    let hyperedge_weight = self.get_hyperedge_weight(hyperedge_index)?;
-
-                    // Use the trait implementation to get the associated cost
-                    // of the hyperedge.
-                    let cost = hyperedge_weight.to_owned().into();
-
-                    if cost < min_cost {
-                        min_cost = cost;
-                        best_hyperedge = Some(hyperedge_index);
-
-                        break;
-                    }
-                }
-
-                // Prepare the next visitor.
-                let next = Visitor::new(distance + min_cost, internal_vertex_index);
-
-                // Check if this is the shorter distance.
-                let is_shorter = distances
-                    .get(&next.index)
-                    .map_or(true, |&current| next.distance < current);
-
-                // If so, add it to the frontier and continue.
-                if is_shorter {
-                    maybe_traversed_hyperedge_by_vertex.insert(vertex_index, best_hyperedge);
-
-                    // Update the path traversal accordingly.
-                    // Keep vertex indexes unique.
-                    if !path
-                        .par_iter()
-                        .any(|current_index| mapped_index == *current_index)
-                    {
-                        path.push(mapped_index);
-                    }
-
-                    // Push it to the heap.
-                    to_traverse.push(next);
-
-                    // Relaxation, we have now found a better way
-                    distances.insert(internal_vertex_index, next.distance);
-                }
-            }
-        }
-
-        // If we reach this point, this means that there's no solution.
-        // Return an empty vector.
-        Ok(vec![])
+    /// Gets the cheapest path between two vertices together with the total cost.
+    ///
+    /// Returns `(total_cost, path)` where `path` is the same format as
+    /// [`get_dijkstra_connections`](Self::get_dijkstra_connections).
+    /// When no path exists, returns `(0, [])`.
+    pub fn get_dijkstra_connections_with_cost(
+        &self,
+        from: VertexIndex,
+        to: VertexIndex,
+    ) -> Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>> {
+        self.dijkstra_impl(from, to)
     }
 }

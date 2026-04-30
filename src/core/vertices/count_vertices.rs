@@ -10,6 +10,7 @@ where
     HE: HyperedgeTrait,
 {
     /// Returns the number of vertices in the hypergraph.
+    #[must_use]
     pub fn count_vertices(&self) -> usize {
         self.vertices.len()
     }

@@ -42,11 +42,11 @@ where
 
         let (_, hyperedges_index_set) = self
             .vertices
-            .get_index(internal_index)
+            .get(internal_index)
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
         let hyperedges =
-            self.get_hyperedges(&hyperedges_index_set.clone().into_iter().collect_vec())?;
+            self.get_hyperedges(&hyperedges_index_set.iter().copied().collect_vec())?;
 
         let hyperedges_with_vertices = hyperedges
             .into_par_iter()
@@ -65,43 +65,25 @@ where
                 |acc, (hyperedge_index, vertices)| {
                     vertices.iter().tuple_windows::<(_, _)>().fold(
                         acc,
-                        |index_acc, (window_from, window_to)| {
+                        |mut acc, (window_from, window_to)| {
                             match connections {
                                 Connection::In(from) => {
-                                    // Inject the index of the hyperedge and the
-                                    // vertex index if the current window is a
-                                    // match.
                                     if *window_from == *from {
-                                        return index_acc
-                                            .into_iter()
-                                            .chain(vec![(hyperedge_index, Some(*window_to))])
-                                            .collect_vec();
+                                        acc.push((hyperedge_index, Some(*window_to)));
                                     }
                                 }
                                 Connection::Out(to) => {
-                                    // Inject the index of the hyperedge and the
-                                    // vertex index if the current window is a
-                                    // match.
                                     if *window_to == *to {
-                                        return index_acc
-                                            .into_iter()
-                                            .chain(vec![(hyperedge_index, Some(*window_from))])
-                                            .collect_vec();
+                                        acc.push((hyperedge_index, Some(*window_from)));
                                     }
                                 }
                                 Connection::InAndOut(from, to) => {
-                                    // Inject only the index of the hyperedge
-                                    // if the current window is a match.
                                     if *window_from == *from && *window_to == *to {
-                                        return index_acc
-                                            .into_iter()
-                                            .chain(vec![(hyperedge_index, None)])
-                                            .collect_vec();
+                                        acc.push((hyperedge_index, None));
                                     }
                                 }
                             }
-
-                            index_acc
+                            acc
                         },
                     )
                 },

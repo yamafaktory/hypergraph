@@ -24,6 +24,7 @@ use types::{AIndexMap, AIndexSet, ARandomState};
 
 // Reexport indexes at this level.
 pub use crate::core::indexes::{HyperedgeIndex, VertexIndex};
+pub use crate::core::iterator::{HypergraphBorrowingIterator, HypergraphIterator};
 
 /// Shared Trait for the vertices.
 /// Must be implemented to use the library.

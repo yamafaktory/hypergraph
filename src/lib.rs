@@ -39,7 +39,7 @@
 //!
 //! impl<'a> Display for Person<'a> {
 //!     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-//!         write!(f, "{}", self)
+//!         write!(f, "{}", self.name)
 //!     }
 //! }
 //!
@@ -58,7 +58,7 @@
 //!
 //! impl<'a> Display for Relation<'a> {
 //!     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-//!         write!(f, "{}", self)
+//!         write!(f, "{}", self.name)
 //!     }
 //! }
 //!

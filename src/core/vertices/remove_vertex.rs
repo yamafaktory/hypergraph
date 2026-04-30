@@ -54,7 +54,7 @@ where
         let last_index = self.vertices.len() - 1;
 
         // Swap and remove by index.
-        self.vertices.swap_remove_index(internal_index);
+        self.vertices.swap_remove(internal_index);
 
         // Update the mapping for the removed vertex.
         self.vertices_mapping.left.remove(&internal_index);

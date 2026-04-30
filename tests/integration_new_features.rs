@@ -293,23 +293,35 @@ fn contains_vertex_absent() {
 #[test]
 fn get_vertex_index_roundtrip() {
     let (g, a, b, c, d, ..) = build_graph();
-    assert_eq!(g.get_vertex_index(Vertex::new("a")), Some(a));
-    assert_eq!(g.get_vertex_index(Vertex::new("b")), Some(b));
-    assert_eq!(g.get_vertex_index(Vertex::new("c")), Some(c));
-    assert_eq!(g.get_vertex_index(Vertex::new("d")), Some(d));
+    assert_eq!(g.get_vertex_index(Vertex::new("a")), vec![a]);
+    assert_eq!(g.get_vertex_index(Vertex::new("b")), vec![b]);
+    assert_eq!(g.get_vertex_index(Vertex::new("c")), vec![c]);
+    assert_eq!(g.get_vertex_index(Vertex::new("d")), vec![d]);
 }
 
 #[test]
 fn get_vertex_index_absent() {
     let (g, ..) = build_graph();
-    assert_eq!(g.get_vertex_index(Vertex::new("z")), None);
+    assert!(g.get_vertex_index(Vertex::new("z")).is_empty());
 }
 
 #[test]
 fn get_vertex_index_after_remove() {
     let (mut g, a, ..) = build_graph();
     g.remove_vertex(a).unwrap();
-    assert_eq!(g.get_vertex_index(Vertex::new("a")), None);
+    assert!(g.get_vertex_index(Vertex::new("a")).is_empty());
+}
+
+#[test]
+fn get_vertex_index_duplicate_weights() {
+    // Two vertices with the same weight are now permitted.
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let x1 = g.add_vertex(Vertex::new("x")).unwrap();
+    let x2 = g.add_vertex(Vertex::new("x")).unwrap();
+    assert_ne!(x1, x2);
+    let mut found = g.get_vertex_index(Vertex::new("x"));
+    found.sort();
+    assert_eq!(found, vec![x1, x2]);
 }
 
 // ---------------------------------------------------------------------------
@@ -451,4 +463,300 @@ fn dijkstra_from_consistent_with_point_to_point() {
 fn dijkstra_from_invalid_vertex() {
     let (g, ..) = build_graph();
     assert!(g.get_dijkstra_from(VertexIndex(999)).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// find_hyperedges_by_weight
+// ---------------------------------------------------------------------------
+
+#[test]
+fn find_hyperedges_by_weight_single_match() {
+    let (g, _, _, _, _, ab, _, _) = build_graph();
+    assert_eq!(g.find_hyperedges_by_weight(Hyperedge::new("a-b", 1)), vec![ab]);
+}
+
+#[test]
+fn find_hyperedges_by_weight_no_match() {
+    let (g, ..) = build_graph();
+    assert!(g.find_hyperedges_by_weight(Hyperedge::new("zzz", 99)).is_empty());
+}
+
+#[test]
+fn find_hyperedges_by_weight_duplicate_weights() {
+    // Two hyperedges with the same weight on different vertex sets.
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    let c = g.add_vertex(Vertex::new("c")).unwrap();
+
+    let shared = Hyperedge::new("shared", 7);
+    let he1 = g.add_hyperedge(vec![a, b], shared).unwrap();
+    let he2 = g.add_hyperedge(vec![b, c], shared).unwrap();
+
+    let mut found = g.find_hyperedges_by_weight(shared);
+    found.sort();
+    assert_eq!(found, vec![he1, he2]);
+}
+
+// ---------------------------------------------------------------------------
+// strongly_connected_components
+// ---------------------------------------------------------------------------
+
+#[test]
+fn scc_dag_all_singletons() {
+    // In a DAG every vertex is its own SCC.
+    let (g, a, b, c, d, ..) = build_graph();
+    let sccs = g.strongly_connected_components().unwrap();
+    assert_eq!(sccs.len(), 4);
+    // Each vertex appears in exactly one singleton SCC.
+    for v in [a, b, c, d] {
+        assert!(
+            sccs.iter().any(|s| s == &vec![v]),
+            "expected singleton SCC for {:?}",
+            v
+        );
+    }
+}
+
+#[test]
+fn scc_cycle_single_component() {
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    let c = g.add_vertex(Vertex::new("c")).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
+    g.add_hyperedge(vec![b, c], Hyperedge::new("b-c", 1)).unwrap();
+    g.add_hyperedge(vec![c, a], Hyperedge::new("c-a", 1)).unwrap();
+
+    let sccs = g.strongly_connected_components().unwrap();
+    assert_eq!(sccs.len(), 1);
+    let mut scc = sccs.into_iter().next().unwrap();
+    scc.sort();
+    assert_eq!(scc, vec![a, b, c]);
+}
+
+#[test]
+fn scc_mixed_structure() {
+    // a ⇄ b (mutual cycle), c → a (c reaches the cycle but is not in it).
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    let c = g.add_vertex(Vertex::new("c")).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
+    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1)).unwrap();
+    g.add_hyperedge(vec![c, a], Hyperedge::new("c-a", 1)).unwrap();
+
+    let sccs = g.strongly_connected_components().unwrap();
+    assert_eq!(sccs.len(), 2);
+    assert!(sccs.iter().any(|s| s == &vec![c]), "c should be a singleton SCC");
+    assert!(
+        sccs.iter().any(|s| {
+            let mut s = s.clone();
+            s.sort();
+            s == vec![a, b]
+        }),
+        "a and b should form one SCC"
+    );
+}
+
+#[test]
+fn scc_empty_graph() {
+    let g = Hypergraph::<Vertex, Hyperedge>::new();
+    assert_eq!(g.strongly_connected_components().unwrap(), Vec::<Vec<VertexIndex>>::new());
+}
+
+// ---------------------------------------------------------------------------
+// subgraph
+// ---------------------------------------------------------------------------
+
+#[test]
+fn subgraph_preserves_internal_edges() {
+    let (g, a, b, _, _, ab, _, _) = build_graph();
+    // Subgraph on {a, b}: should include the a→b hyperedge.
+    let sub = g.subgraph(&[a, b]).unwrap();
+    assert_eq!(sub.count_vertices(), 2);
+    assert_eq!(sub.count_hyperedges(), 1);
+    // The only hyperedge should have weight "a-b".
+    let (he_idx, he_weight) = sub.hyperedges_iter().next().unwrap();
+    assert_eq!(*he_weight, Hyperedge::new("a-b", 1));
+    let _ = (he_idx, ab); // suppress unused warning
+}
+
+#[test]
+fn subgraph_drops_crossing_edges() {
+    // Subgraph on {b, d}: neither b→c (c not in set) nor a→b (a not in set)
+    // should appear; a→c is also excluded.
+    let (g, _, b, _, d, ..) = build_graph();
+    let sub = g.subgraph(&[b, d]).unwrap();
+    assert_eq!(sub.count_vertices(), 2);
+    assert_eq!(sub.count_hyperedges(), 0);
+}
+
+#[test]
+fn subgraph_empty_vertex_list() {
+    let (g, ..) = build_graph();
+    let sub = g.subgraph(&[]).unwrap();
+    assert!(sub.is_empty());
+}
+
+#[test]
+fn subgraph_full_vertex_set() {
+    let (g, a, b, c, d, ..) = build_graph();
+    let sub = g.subgraph(&[a, b, c, d]).unwrap();
+    assert_eq!(sub.count_vertices(), g.count_vertices());
+    assert_eq!(sub.count_hyperedges(), g.count_hyperedges());
+}
+
+#[test]
+fn subgraph_deduplicates_vertices() {
+    let (g, a, b, ..) = build_graph();
+    let sub = g.subgraph(&[a, b, a, b]).unwrap();
+    assert_eq!(sub.count_vertices(), 2);
+}
+
+#[test]
+fn subgraph_invalid_vertex() {
+    let (g, ..) = build_graph();
+    assert!(g.subgraph(&[VertexIndex(999)]).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// retain_vertices
+// ---------------------------------------------------------------------------
+
+#[test]
+fn retain_vertices_keep_all() {
+    let (mut g, ..) = build_graph();
+    g.retain_vertices(|_, _| true).unwrap();
+    assert_eq!(g.count_vertices(), 4);
+    assert_eq!(g.count_hyperedges(), 3);
+}
+
+#[test]
+fn retain_vertices_remove_all() {
+    let (mut g, ..) = build_graph();
+    g.retain_vertices(|_, _| false).unwrap();
+    assert!(g.is_empty());
+}
+
+#[test]
+fn retain_vertices_by_index() {
+    // Keep only vertices with index < 2 (i.e. a and b); removing c and d.
+    let (mut g, a, b, ..) = build_graph();
+    g.retain_vertices(|idx, _| idx.0 < 2).unwrap();
+    assert_eq!(g.count_vertices(), 2);
+    assert!(g.contains_vertex(Vertex::new("a")));
+    assert!(g.contains_vertex(Vertex::new("b")));
+    // remove_vertex strips c from multi-vertex hyperedges rather than deleting
+    // them: ab=[a,b] is unchanged, bc=[b] and ac=[a] shrink to unary.
+    assert_eq!(g.count_hyperedges(), 3);
+    // The a→b hyperedge still contains both a and b.
+    let ab_idx = g.find_hyperedges_by_weight(Hyperedge::new("a-b", 1)).into_iter().next().unwrap();
+    let ab_verts = g.get_hyperedge_vertices(ab_idx).unwrap();
+    assert!(ab_verts.contains(&a));
+    assert!(ab_verts.contains(&b));
+}
+
+#[test]
+fn retain_vertices_strips_vertex_from_hyperedges() {
+    // Removing vertex c strips it from bc and ac rather than deleting them.
+    let (mut g, ..) = build_graph();
+    g.retain_vertices(|_, weight| *weight != Vertex::new("c"))
+        .unwrap();
+    assert_eq!(g.count_vertices(), 3);
+    // bc=[b], ac=[a], ab=[a,b] — all three hyperedges survive.
+    assert_eq!(g.count_hyperedges(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// retain_hyperedges
+// ---------------------------------------------------------------------------
+
+#[test]
+fn retain_hyperedges_keep_all() {
+    let (mut g, ..) = build_graph();
+    g.retain_hyperedges(|_, _| true).unwrap();
+    assert_eq!(g.count_hyperedges(), 3);
+    assert_eq!(g.count_vertices(), 4);
+}
+
+#[test]
+fn retain_hyperedges_remove_all() {
+    let (mut g, ..) = build_graph();
+    g.retain_hyperedges(|_, _| false).unwrap();
+    assert_eq!(g.count_hyperedges(), 0);
+    assert_eq!(g.count_vertices(), 4); // vertices unaffected
+}
+
+#[test]
+fn retain_hyperedges_by_cost() {
+    // Keep only hyperedges with cost <= 2 (a→b cost 1, b→c cost 2; drop a→c cost 5).
+    let (mut g, _, _, _, _, ab, bc, _) = build_graph();
+    g.retain_hyperedges(|_, w| usize::from(*w) <= 2).unwrap();
+    assert_eq!(g.count_hyperedges(), 2);
+    let mut remaining: Vec<_> = g.hyperedges_iter().map(|(idx, _)| idx).collect();
+    remaining.sort();
+    assert!(remaining.contains(&ab));
+    assert!(remaining.contains(&bc));
+}
+
+// ---------------------------------------------------------------------------
+// get_all_paths
+// ---------------------------------------------------------------------------
+
+#[test]
+fn all_paths_single_route() {
+    // Only path from b to c is b→c directly.
+    let (g, _, b, c, ..) = build_graph();
+    let paths = g.get_all_paths(b, c).unwrap();
+    assert_eq!(paths.len(), 1);
+    assert_eq!(paths[0], vec![b, c]);
+}
+
+#[test]
+fn all_paths_multiple_routes() {
+    // From a to c: a→b→c (cost 3) and a→c directly.
+    let (g, a, b, c, ..) = build_graph();
+    let mut paths = g.get_all_paths(a, c).unwrap();
+    paths.sort();
+    assert_eq!(paths.len(), 2);
+    assert!(paths.contains(&vec![a, b, c]));
+    assert!(paths.contains(&vec![a, c]));
+}
+
+#[test]
+fn all_paths_no_route() {
+    // d has no outgoing edges.
+    let (g, a, _, _, d, ..) = build_graph();
+    assert_eq!(g.get_all_paths(d, a).unwrap(), Vec::<Vec<VertexIndex>>::new());
+}
+
+#[test]
+fn all_paths_from_equals_to() {
+    let (g, a, ..) = build_graph();
+    assert_eq!(g.get_all_paths(a, a).unwrap(), vec![vec![a]]);
+}
+
+#[test]
+fn all_paths_no_cycle_infinite_loop() {
+    // Graph with a cycle should not loop forever; paths that revisit a node
+    // are pruned (simple paths only).
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    let c = g.add_vertex(Vertex::new("c")).unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("a-b", 1)).unwrap();
+    g.add_hyperedge(vec![b, a], Hyperedge::new("b-a", 1)).unwrap();
+    g.add_hyperedge(vec![b, c], Hyperedge::new("b-c", 1)).unwrap();
+
+    // Only simple path from a to c is a→b→c.
+    let paths = g.get_all_paths(a, c).unwrap();
+    assert_eq!(paths, vec![vec![a, b, c]]);
+}
+
+#[test]
+fn all_paths_invalid_vertex() {
+    let (g, a, ..) = build_graph();
+    assert!(g.get_all_paths(VertexIndex(999), a).is_err());
+    assert!(g.get_all_paths(a, VertexIndex(999)).is_err());
 }

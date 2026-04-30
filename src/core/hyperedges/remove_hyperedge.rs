@@ -31,7 +31,7 @@ where
 
         // Remove the hyperedge from the vertices.
         for vertex in vertices {
-            match self.vertices.get_index_mut(vertex) {
+            match self.vertices.get_mut(vertex) {
                 Some((_, index_set)) => {
                     index_set.swap_remove(&internal_index);
                 }
@@ -108,7 +108,7 @@ where
 
             // Update the impacted vertices accordingly.
             for vertex in swapped_vertices {
-                match self.vertices.get_index_mut(vertex) {
+                match self.vertices.get_mut(vertex) {
                     Some((_, index_set)) => {
                         // Perform an insertion of the current hyperedge and a
                         // removal of the swapped one.

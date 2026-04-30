@@ -54,7 +54,12 @@ where
         vertices: Vec<VertexIndex>,
     },
 
-    /// Error when a hyperedge is updated with the weight of another one.
+    /// Kept for API compatibility.
+    ///
+    /// Previously returned when a hyperedge was added or updated with a weight
+    /// already used by another hyperedge. The library no longer enforces
+    /// hyperedge-weight uniqueness, so this variant is never produced by any
+    /// public method.
     #[error("Hyperedge weight {0} was already assigned")]
     HyperedgeWeightAlreadyAssigned(HE),
 
@@ -74,7 +79,10 @@ where
     #[error("Internal vertex index {0} was not found")]
     InternalVertexIndexNotFound(usize),
 
-    /// Error when a vertex weight was not found.
+    /// Kept for API compatibility.
+    ///
+    /// Previously used as an internal safe-check during vertex insertion.
+    /// No longer produced by any public method.
     #[error("Vertex weight {0} was not found")]
     VertexWeightNotFound(V),
 
@@ -82,7 +90,12 @@ where
     #[error("VertexIndex {index:?} weight {weight:?} unchanged (no-op)")]
     VertexWeightUnchanged { index: VertexIndex, weight: V },
 
-    /// Error when a vertex weight is updated with the weight of another one.
+    /// Kept for API compatibility.
+    ///
+    /// Previously returned when a vertex was added or updated with a weight
+    /// already used by another vertex. The library no longer enforces
+    /// vertex-weight uniqueness, so this variant is never produced by any
+    /// public method.
     #[error("Vertex weight {0} was already assigned")]
     VertexWeightAlreadyAssigned(V),
 

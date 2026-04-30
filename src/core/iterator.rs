@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{
     HyperedgeIndex, HyperedgeKey, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait,
     errors::HypergraphError,
@@ -40,6 +38,7 @@ where
     HE: HyperedgeTrait,
 {
     /// Returns a borrowing iterator over the hyperedges as `(&HE, Vec<&V>)` tuples.
+    #[must_use]
     pub fn iter(&self) -> HypergraphBorrowingIterator<'_, V, HE> {
         HypergraphBorrowingIterator {
             hypergraph: self,
@@ -48,6 +47,7 @@ where
     }
 
     /// Returns an iterator over all vertices as `(VertexIndex, &V)` pairs, in insertion order.
+    #[must_use = "the iterator is lazy and must be consumed"]
     pub fn vertices_iter(&self) -> impl Iterator<Item = (VertexIndex, &V)> + '_ {
         self.vertices
             .iter()
@@ -62,6 +62,7 @@ where
     }
 
     /// Returns an iterator over all hyperedges as `(HyperedgeIndex, &HE)` pairs, in insertion order.
+    #[must_use = "the iterator is lazy and must be consumed"]
     pub fn hyperedges_iter(&self) -> impl Iterator<Item = (HyperedgeIndex, &HE)> + '_ {
         self.hyperedges
             .iter()
@@ -71,7 +72,7 @@ where
                     .left
                     .get(&internal)
                     .copied()
-                    .map(|stable| (stable, key.deref()))
+                    .map(|stable| (stable, &**key))
             })
     }
 }
@@ -105,7 +106,7 @@ where
                         .ok()
                         .map(|vertices_weights| {
                             self.index += 1;
-                            (*weight, vertices_weights.into_iter().cloned().collect())
+                            (*weight, vertices_weights.into_iter().copied().collect())
                         })
                 } else {
                     None

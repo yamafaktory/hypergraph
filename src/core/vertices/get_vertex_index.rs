@@ -5,12 +5,20 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Returns the stable index of the vertex with the given weight, or `None`
-    /// if no such vertex exists.
+    /// Returns the stable indexes of all vertices whose weight equals `weight`.
+    ///
+    /// Because vertex weights are not required to be unique, multiple indexes
+    /// may be returned. Returns an empty `Vec` if no match is found.
     ///
     /// This is the reverse of [`get_vertex_weight`](Self::get_vertex_weight).
-    pub fn get_vertex_index(&self, weight: V) -> Option<VertexIndex> {
-        let internal = self.vertices.get_index_of(&weight)?;
-        self.vertices_mapping.left.get(&internal).copied()
+    #[must_use]
+    pub fn get_vertex_index(&self, weight: V) -> Vec<VertexIndex> {
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter_map(|(internal, (w, _))| {
+                (*w == weight).then(|| self.vertices_mapping.left.get(&internal).copied())?
+            })
+            .collect()
     }
 }

@@ -41,3 +41,4 @@ unsafe_code = "deny"
 
 [lints.clippy]
 all = "deny"
+pedantic = "deny"

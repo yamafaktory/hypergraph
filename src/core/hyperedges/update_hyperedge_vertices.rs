@@ -76,7 +76,7 @@ where
 
         // Update the added vertices.
         for index in added {
-            match self.vertices.get_index_mut(index) {
+            match self.vertices.get_mut(index) {
                 Some((_, index_set)) => {
                     index_set.insert(internal_index);
                 }
@@ -86,7 +86,7 @@ where
 
         // Update the removed vertices.
         for index in removed {
-            match self.vertices.get_index_mut(index) {
+            match self.vertices.get_mut(index) {
                 Some((_, index_set)) => {
                     // This has an impact on the internal indexing for the set.
                     // However since this is not exposed to the user - i.e. no

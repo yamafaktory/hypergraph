@@ -6,6 +6,10 @@ where
     HE: HyperedgeTrait,
 {
     /// Updates the weight of a vertex by index.
+    ///
+    /// The new weight need not be unique — multiple vertices may carry the same
+    /// weight value. Returns [`HypergraphError::VertexWeightUnchanged`] if
+    /// `weight` equals the current weight (no-op guard).
     pub fn update_vertex_weight(
         &mut self,
         vertex_index: VertexIndex,
@@ -15,11 +19,10 @@ where
 
         let (previous_weight, index_set) = self
             .vertices
-            .get_index(internal_index)
-            .map(|(previous_weight, index_set)| (previous_weight.to_owned(), index_set.clone()))
+            .get(internal_index)
+            .map(|(w, s)| (*w, s.clone()))
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
-        // Return an error if the new weight is the same as the previous one.
         if weight == previous_weight {
             return Err(HypergraphError::VertexWeightUnchanged {
                 index: vertex_index,
@@ -27,28 +30,12 @@ where
             });
         }
 
-        // Return an error if the new weight is already assigned to another
-        // vertex.
-        if self.vertices.contains_key(&weight) {
-            return Err(HypergraphError::VertexWeightAlreadyAssigned(weight));
-        }
+        // Append the new entry at the end, then swap-remove the old position so
+        // that the new entry lands at `internal_index`. The BiHashMap mapping is
+        // unchanged — `internal_index` still maps to `vertex_index`.
+        self.vertices.push((weight, index_set));
+        self.vertices.swap_remove(internal_index);
 
-        // We can't directly replace the value in the map.
-        // First, we need to insert the new weight, it will end up
-        // being at the last position.
-        // Since we have already checked that the new weight is not in the
-        // map, we can safely perform the operation without checking its output.
-        self.vertices.insert(weight, index_set);
-
-        // Then we use swap and remove. This will remove the previous weight
-        // and insert the new one at the index position of the former.
-        // This doesn't alter the indexing.
-        // See the update_hyperedge_weight method for more detailed explanation.
-        // Since we know that the internal index is correct, we can safely
-        // perform the operation without checking its output.
-        self.vertices.swap_remove_index(internal_index);
-
-        // Return a unit.
         Ok(())
     }
 }

@@ -18,7 +18,7 @@ where
 
         let (_, hyperedges_index_set) = self
             .vertices
-            .get_index(internal_index)
+            .get(internal_index)
             .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
 
         self.get_hyperedges(&hyperedges_index_set.iter().copied().collect_vec())

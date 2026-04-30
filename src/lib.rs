@@ -6,16 +6,19 @@
 //!
 //! This library enables you to:
 //!
-//! - represent **non-simple** hypergraphs with two or more hyperedges - with different weights - containing the exact same set of vertices
-//! - represent **self-loops** - i.e., hyperedges containing vertices directed to themselves one or more times
-//! - represent **unaries** - i.e., hyperedges containing a unique vertex
+//! - represent **non-simple** hypergraphs with two or more hyperedges containing the exact same set of vertices
+//! - represent **self-loops** — i.e., hyperedges containing vertices directed to themselves one or more times
+//! - represent **unaries** — i.e., hyperedges containing a unique vertex
 //!
 //! Additional features:
 //!
 //! - Safe Rust implementation
 //! - Proper error handling
-//! - Stable indexes assigned for each hyperedge and each vertex
-//! - Graph traversal: BFS, DFS, Dijkstra shortest path, topological sort, reachability check
+//! - Stable indexes for each hyperedge and each vertex — identity is the index, not the weight; duplicate weights are permitted on both sides
+//! - Graph traversal: BFS, DFS, topological sort, reachability check, all simple paths
+//! - Shortest paths: Dijkstra point-to-point and single-source
+//! - Structural analysis: strongly connected components, weakly connected components, subgraph extraction, cycle detection
+//! - Filtered views: `retain_vertices`, `retain_hyperedges`
 //! - Optional **`serde`** feature for serialization/deserialization support
 //!   (enable with `features = ["serde"]` in `Cargo.toml`)
 //!

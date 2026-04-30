@@ -8,6 +8,10 @@ where
     HE: HyperedgeTrait,
 {
     /// Updates the weight of a hyperedge by index.
+    ///
+    /// The new weight need not be unique — multiple hyperedges may carry the
+    /// same weight value. Returns [`HypergraphError::HyperedgeWeightUnchanged`]
+    /// if `weight` equals the current weight (no-op guard).
     pub fn update_hyperedge_weight(
         &mut self,
         hyperedge_index: HyperedgeIndex,
@@ -28,19 +32,6 @@ where
                 index: hyperedge_index,
                 weight,
             });
-        }
-
-        // Return an error if the new weight is already assigned to another
-        // hyperedge.
-        // We can't use the contains method here since the key is a combination
-        // of the weight and the vertices.
-        if self.hyperedges.iter().any(
-            |HyperedgeKey {
-                 weight: current_weight,
-                 ..
-             }| { *current_weight == weight },
-        ) {
-            return Err(HypergraphError::HyperedgeWeightAlreadyAssigned(weight));
         }
 
         // IndexMap doesn't allow holes by design, see:
@@ -81,9 +72,6 @@ where
         //                                     +--+
         //                         2.Swap and remove
         //
-        // Insert the new entry.
-        // Since we have already checked that the new weight is not in the
-        // map, we can safely perform the operation without checking its output.
         self.hyperedges
             .insert(HyperedgeKey::new(vertices.clone(), weight));
 

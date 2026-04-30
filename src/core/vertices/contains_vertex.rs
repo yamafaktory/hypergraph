@@ -5,8 +5,9 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Returns `true` if a vertex with the given weight exists in the hypergraph.
+    /// Returns `true` if at least one vertex with the given weight exists.
+    #[must_use]
     pub fn contains_vertex(&self, weight: V) -> bool {
-        self.vertices.contains_key(&weight)
+        self.vertices.iter().any(|(w, _)| *w == weight)
     }
 }

@@ -1,5 +1,3 @@
-use rayon::prelude::*;
-
 use crate::{HyperedgeKey, HyperedgeTrait, Hypergraph, VertexTrait, errors::HypergraphError};
 
 impl<V, HE> IntoIterator for Hypergraph<V, HE>
@@ -51,24 +49,22 @@ where
     type Item = (HE, Vec<V>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.hypergraph.hyperedges.iter().nth(self.index) {
+        match self.hypergraph.hyperedges.get_index(self.index) {
             Some(HyperedgeKey { vertices, weight }) => {
                 if let Ok(indexes) = self.hypergraph.get_vertices(&vertices.clone()) {
                     indexes
-                        .par_iter()
+                        .iter()
                         .map(|index| self.hypergraph.get_vertex_weight(*index))
                         .collect::<Result<Vec<&V>, HypergraphError<V, HE>>>()
                         .ok()
                         .map(|vertices_weights| {
                             self.index += 1;
-
-                            (*weight, vertices_weights.into_par_iter().cloned().collect())
+                            (*weight, vertices_weights.into_iter().cloned().collect())
                         })
                 } else {
                     None
                 }
             }
-
             None => None,
         }
     }
@@ -93,26 +89,24 @@ where
     type Item = (&'s HE, Vec<&'s V>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.hypergraph.hyperedges.iter().nth(self.index) {
+        match self.hypergraph.hyperedges.get_index(self.index) {
             Some(HyperedgeKey { vertices, weight }) => {
                 let hypergraph = self.hypergraph;
 
                 if let Ok(indexes) = hypergraph.get_vertices(vertices) {
                     indexes
-                        .par_iter()
+                        .iter()
                         .map(|index| hypergraph.get_vertex_weight(*index))
                         .collect::<Result<Vec<&'s V>, HypergraphError<V, HE>>>()
                         .ok()
                         .map(|vertex_weights| {
                             self.index += 1;
-
                             (weight, vertex_weights)
                         })
                 } else {
                     None
                 }
             }
-
             None => None,
         }
     }

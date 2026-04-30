@@ -1,10 +1,6 @@
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
-    fmt::Debug,
-};
+use std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug};
 
-use rayon::prelude::*;
+use ahash::AHashMap;
 
 use crate::{
     HyperedgeIndex, HyperedgeTrait, Hypergraph, VertexIndex, VertexTrait, errors::HypergraphError,
@@ -62,9 +58,9 @@ where
         let internal_to = self.get_internal_vertex(to)?;
 
         // Keep track of the distances.
-        let mut distances = HashMap::new();
+        let mut distances = AHashMap::new();
 
-        let mut maybe_traversed_hyperedge_by_vertex = HashMap::new();
+        let mut maybe_traversed_hyperedge_by_vertex = AHashMap::new();
 
         // Create an empty binary heap.
         let mut to_traverse = BinaryHeap::new();
@@ -85,7 +81,7 @@ where
                 path.push(self.get_vertex(internal_to)?);
 
                 return Ok(path
-                    .into_par_iter()
+                    .into_iter()
                     .map(|vertex_index| {
                         (
                             vertex_index,
@@ -145,9 +141,7 @@ where
 
                     // Update the path traversal accordingly.
                     // Keep vertex indexes unique.
-                    if !path
-                        .par_iter()
-                        .any(|current_index| mapped_index == *current_index)
+                    if !path.contains(&mapped_index)
                     {
                         path.push(mapped_index);
                     }

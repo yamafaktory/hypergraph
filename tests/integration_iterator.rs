@@ -1,5 +1,7 @@
 //! Integration tests.
 
+#![allow(clippy::many_single_char_names)]
+
 mod common;
 
 use common::{

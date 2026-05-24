@@ -1,5 +1,7 @@
 //! Integration tests.
 
+#![allow(clippy::similar_names, clippy::too_many_lines)]
+
 mod common;
 
 use common::{

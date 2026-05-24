@@ -1,13 +1,13 @@
 //! Integration tests for the `persistence` feature and `PersistentHypergraph`.
 
-#![deny(unsafe_code, nonstandard_style)]
-#![allow(missing_docs)]
-
 #[cfg(feature = "persistence")]
 mod disk_tests {
-    use std::fmt::{Display, Formatter, Result};
+    use std::{
+        fmt::{Display, Formatter, Result},
+        sync::Arc,
+    };
 
-    use hypergraph::{PersistentHypergraph, HyperedgeIndex, VertexIndex};
+    use hypergraph::{HyperedgeIndex, PersistentHypergraph, VertexIndex};
 
     // ──────────────────────────────────────────────────────────────────────
     // Minimal vertex / hyperedge types
@@ -61,7 +61,7 @@ mod disk_tests {
 
     #[test]
     fn add_and_get_vertices() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(10)).expect("add v0");
         let v1 = g.add_vertex(V(20)).expect("add v1");
@@ -79,7 +79,7 @@ mod disk_tests {
 
     #[test]
     fn update_vertex_weight() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
         let v0 = g.add_vertex(V(1)).expect("add");
 
         g.update_vertex_weight(v0, V(99)).expect("update");
@@ -88,14 +88,14 @@ mod disk_tests {
 
     #[test]
     fn update_vertex_weight_unchanged_returns_error() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
         let v0 = g.add_vertex(V(42)).expect("add");
         assert!(g.update_vertex_weight(v0, V(42)).is_err());
     }
 
     #[test]
     fn add_and_get_hyperedges() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(0)).expect("v0");
         let v1 = g.add_vertex(V(1)).expect("v1");
@@ -121,7 +121,7 @@ mod disk_tests {
 
     #[test]
     fn vertex_hyperedge_refs_are_maintained() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(0)).expect("v0");
         let v1 = g.add_vertex(V(1)).expect("v1");
@@ -140,7 +140,7 @@ mod disk_tests {
 
     #[test]
     fn remove_hyperedge_cleans_vertex_refs() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(0)).expect("v0");
         let v1 = g.add_vertex(V(1)).expect("v1");
@@ -155,7 +155,7 @@ mod disk_tests {
 
     #[test]
     fn remove_vertex_also_removes_solo_hyperedges() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(0)).expect("v0");
         let v1 = g.add_vertex(V(1)).expect("v1");
@@ -174,7 +174,7 @@ mod disk_tests {
 
     #[test]
     fn update_hyperedge_vertices() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(0)).expect("v0");
         let v1 = g.add_vertex(V(1)).expect("v1");
@@ -195,7 +195,7 @@ mod disk_tests {
 
     #[test]
     fn update_hyperedge_weight() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
         let v0 = g.add_vertex(V(0)).expect("v0");
         let he0 = g.add_hyperedge(&[v0], HE(1)).expect("he0");
 
@@ -205,7 +205,7 @@ mod disk_tests {
 
     #[test]
     fn clear_empties_graph() {
-        let (mut g, _dir) = open_temp();
+        let (g, _dir) = open_temp();
 
         let v0 = g.add_vertex(V(0)).expect("v0");
         g.add_hyperedge(&[v0], HE(1)).expect("he");
@@ -223,7 +223,7 @@ mod disk_tests {
 
         // Write data.
         {
-            let mut g: PersistentHypergraph<V, HE> =
+            let g: PersistentHypergraph<V, HE> =
                 PersistentHypergraph::open(dir.path()).expect("open");
             let v0 = g.add_vertex(V(7)).expect("v0");
             let v1 = g.add_vertex(V(8)).expect("v1");
@@ -262,23 +262,18 @@ mod disk_tests {
 
     #[test]
     fn concurrent_vertex_adds_produce_unique_indices() {
-        use std::sync::Arc;
+        const THREADS: u32 = 8;
+        const PER_THREAD: u32 = 25;
 
         let dir = tempfile::tempdir().expect("temp dir");
         let g = Arc::new(PersistentHypergraph::<V, HE>::open(dir.path()).expect("open"));
-
-        const THREADS: usize = 8;
-        const PER_THREAD: usize = 25;
 
         let handles: Vec<_> = (0..THREADS)
             .map(|t| {
                 let g = Arc::clone(&g);
                 std::thread::spawn(move || {
                     (0..PER_THREAD)
-                        .map(|i| {
-                            g.add_vertex(V((t * PER_THREAD + i) as u32))
-                                .expect("add_vertex")
-                        })
+                        .map(|i| g.add_vertex(V(t * PER_THREAD + i)).expect("add_vertex"))
                         .collect::<Vec<_>>()
                 })
             })
@@ -289,7 +284,7 @@ mod disk_tests {
             .flat_map(|h| h.join().expect("thread panicked"))
             .collect();
 
-        let total = THREADS * PER_THREAD;
+        let total = (THREADS * PER_THREAD) as usize;
         assert_eq!(all_indices.len(), total);
         all_indices.sort_unstable();
         all_indices.dedup();
@@ -299,7 +294,8 @@ mod disk_tests {
 
     #[test]
     fn concurrent_hyperedge_adds_produce_unique_indices() {
-        use std::sync::Arc;
+        const THREADS: u32 = 8;
+        const PER_THREAD: u32 = 25;
 
         let dir = tempfile::tempdir().expect("temp dir");
         let g = Arc::new(PersistentHypergraph::<V, HE>::open(dir.path()).expect("open"));
@@ -307,16 +303,13 @@ mod disk_tests {
         let v0 = g.add_vertex(V(0)).expect("v0");
         let v1 = g.add_vertex(V(1)).expect("v1");
 
-        const THREADS: usize = 8;
-        const PER_THREAD: usize = 25;
-
         let handles: Vec<_> = (0..THREADS)
             .map(|t| {
                 let g = Arc::clone(&g);
                 std::thread::spawn(move || {
                     (0..PER_THREAD)
                         .map(|i| {
-                            g.add_hyperedge(&[v0, v1], HE((t * PER_THREAD + i) as u32))
+                            g.add_hyperedge(&[v0, v1], HE(t * PER_THREAD + i))
                                 .expect("add_hyperedge")
                         })
                         .collect::<Vec<_>>()
@@ -329,7 +322,7 @@ mod disk_tests {
             .flat_map(|h| h.join().expect("thread panicked"))
             .collect();
 
-        let total = THREADS * PER_THREAD;
+        let total = (THREADS * PER_THREAD) as usize;
         assert_eq!(all_indices.len(), total);
         all_indices.sort_unstable();
         all_indices.dedup();

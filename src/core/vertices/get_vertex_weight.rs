@@ -11,16 +11,19 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the weight of a vertex from its index.
+    /// Returns a reference to the weight of the vertex at `vertex_index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `vertex_index` does
+    /// not exist.
     pub fn get_vertex_weight(
         &self,
         vertex_index: VertexIndex,
     ) -> Result<&V, HypergraphError<V, HE>> {
-        let internal_index = self.get_internal_vertex(vertex_index)?;
-
         self.vertices
-            .get(internal_index)
+            .get(&vertex_index)
             .map(|(weight, _)| weight)
-            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))
+            .ok_or(HypergraphError::VertexIndexNotFound(vertex_index))
     }
 }

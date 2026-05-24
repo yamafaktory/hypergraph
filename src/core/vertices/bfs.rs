@@ -22,7 +22,9 @@ where
     ///
     /// Returns [`HypergraphError::VertexIndexNotFound`] if `from` does not exist.
     pub fn get_bfs(&self, from: VertexIndex) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        self.get_internal_vertex(from)?;
+        if !self.vertices.contains_key(&from) {
+            return Err(HypergraphError::VertexIndexNotFound(from));
+        }
 
         let mut visited: AHashSet<VertexIndex> = AHashSet::new();
         let mut queue: VecDeque<VertexIndex> = VecDeque::new();

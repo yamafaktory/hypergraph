@@ -105,4 +105,8 @@ where
     /// Error when the hypergraph contains a cycle and a topological sort is requested.
     #[error("Hypergraph contains a cycle and cannot be topologically sorted")]
     HypergraphContainsCycle,
+
+    /// Error from the persistent storage backend.
+    #[error("Storage error: {0}")]
+    StorageError(String),
 }

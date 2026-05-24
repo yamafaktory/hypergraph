@@ -12,6 +12,6 @@ where
     /// Returns `true` if at least one vertex with the given weight exists.
     #[must_use]
     pub fn contains_vertex(&self, weight: V) -> bool {
-        self.vertices.iter().any(|(w, _)| *w == weight)
+        self.vertices.values().any(|(w, _)| *w == weight)
     }
 }

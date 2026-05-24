@@ -325,12 +325,12 @@ fn integration_main() {
 
     // Check hyperedges intersections.
     assert_eq!(
-        graph.get_hyperedges_intersections(vec![HyperedgeIndex(0), HyperedgeIndex(2)]),
+        graph.get_hyperedges_intersections(&[HyperedgeIndex(0), HyperedgeIndex(2)]),
         Ok(vec![VertexIndex(0), VertexIndex(3)]),
         "should get two intersections"
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(vec![
+        graph.get_hyperedges_intersections(&[
             HyperedgeIndex(0),
             HyperedgeIndex(2),
             HyperedgeIndex(3)
@@ -339,22 +339,22 @@ fn integration_main() {
         "should get one intersection"
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(vec![HyperedgeIndex(0), HyperedgeIndex(0),]),
+        graph.get_hyperedges_intersections(&[HyperedgeIndex(0), HyperedgeIndex(0),]),
         Ok(vec![VertexIndex(0), VertexIndex(1), VertexIndex(3)]),
         "should return all the vertices of a hyperedge intersecting itself"
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(vec![]),
+        graph.get_hyperedges_intersections(&[]),
         Err(HypergraphError::HyperedgesInvalidIntersections),
         "should fail since computing the intersections of less than two hyperedges is not possible"
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(vec![HyperedgeIndex(0)]),
+        graph.get_hyperedges_intersections(&[HyperedgeIndex(0)]),
         Err(HypergraphError::HyperedgesInvalidIntersections),
         "should fail since computing the intersections of less than two hyperedges is not possible"
     );
     assert_eq!(
-        graph.get_hyperedges_intersections(vec![HyperedgeIndex(5), HyperedgeIndex(6)]),
+        graph.get_hyperedges_intersections(&[HyperedgeIndex(5), HyperedgeIndex(6)]),
         Err(HypergraphError::HyperedgeIndexNotFound(HyperedgeIndex(5))),
         "should be out-of-bound and return an explicit error"
     );

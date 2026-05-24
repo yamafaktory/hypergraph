@@ -12,8 +12,15 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the out-degree of a vertex.
-    /// <https://en.wikipedia.org/wiki/Directed_graph#Indegree_and_outdegree>
+    /// Returns the out-degree of the vertex at `from`.
+    ///
+    /// The out-degree is the number of directed connections that leave `from`
+    /// across all hyperedges (counting each `from → successor` pair once per
+    /// hyperedge). See <https://en.wikipedia.org/wiki/Directed_graph#Indegree_and_outdegree>.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `from` does not exist.
     pub fn get_vertex_degree_out(
         &self,
         from: VertexIndex,

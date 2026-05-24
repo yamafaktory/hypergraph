@@ -20,7 +20,9 @@ where
     ///
     /// Returns [`HypergraphError::VertexIndexNotFound`] if `from` does not exist.
     pub fn get_dfs(&self, from: VertexIndex) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        self.get_internal_vertex(from)?;
+        if !self.vertices.contains_key(&from) {
+            return Err(HypergraphError::VertexIndexNotFound(from));
+        }
 
         let mut visited: AHashSet<VertexIndex> = AHashSet::new();
         let mut stack: Vec<VertexIndex> = vec![from];

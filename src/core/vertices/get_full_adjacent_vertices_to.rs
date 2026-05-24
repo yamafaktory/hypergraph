@@ -20,8 +20,17 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the list of all vertices connected to a given vertex as tuples of
-    /// the form (`VertexIndex`, `Vec<HyperedgeIndex>`).
+    /// Returns all vertices that have a directed connection into `to`, grouped
+    /// with the hyperedges through which they reach it.
+    ///
+    /// Each element of the result is `(predecessor, hyperedges)` where
+    /// `hyperedges` lists every hyperedge that connects `predecessor` to `to`.
+    /// This is the incoming-edge counterpart of
+    /// [`get_full_adjacent_vertices_from`](Self::get_full_adjacent_vertices_from).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `to` does not exist.
     pub fn get_full_adjacent_vertices_to(
         &self,
         to: VertexIndex,

@@ -14,7 +14,15 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the list of all vertices connected from a given vertex.
+    /// Returns the unique set of vertices directly reachable from `from` via a
+    /// directed hyperedge (i.e. vertices that follow `from` in some hyperedge's
+    /// vertex list).
+    ///
+    /// The result is sorted by [`VertexIndex`] and deduplicated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `from` does not exist.
     pub fn get_adjacent_vertices_from(
         &self,
         from: VertexIndex,

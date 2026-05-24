@@ -20,10 +20,7 @@ where
     pub fn get_vertex_index(&self, weight: V) -> Vec<VertexIndex> {
         self.vertices
             .iter()
-            .enumerate()
-            .filter_map(|(internal, (w, _))| {
-                (*w == weight).then(|| self.vertices_mapping.left.get(&internal).copied())?
-            })
+            .filter_map(|(&idx, (w, _))| (*w == weight).then_some(idx))
             .collect()
     }
 }

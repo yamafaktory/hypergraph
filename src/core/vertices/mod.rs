@@ -1,9 +1,3 @@
-pub(crate) mod add_vertex_index;
-pub(crate) mod get_internal_vertex;
-pub(crate) mod get_internal_vertices;
-pub(crate) mod get_vertex;
-pub(crate) mod get_vertices;
-
 pub mod add_vertex;
 pub mod bfs;
 pub mod connected_components;

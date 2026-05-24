@@ -1,6 +1,5 @@
 use crate::{
     HyperedgeIndex,
-    HyperedgeKey,
     HyperedgeTrait,
     Hypergraph,
     VertexIndex,
@@ -13,17 +12,22 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the vertices of a hyperedge.
+    /// Returns the ordered vertex list of the hyperedge at `hyperedge_index`.
+    ///
+    /// The order reflects the direction of the hyperedge — i.e. the sequence in
+    /// which vertices were provided when the hyperedge was created or last updated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::HyperedgeIndexNotFound`] if `hyperedge_index`
+    /// does not exist.
     pub fn get_hyperedge_vertices(
         &self,
         hyperedge_index: HyperedgeIndex,
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        let internal_index = self.get_internal_hyperedge(hyperedge_index)?;
-
-        let HyperedgeKey { vertices, .. } = self.hyperedges.get_index(internal_index).ok_or(
-            HypergraphError::InternalHyperedgeIndexNotFound(internal_index),
-        )?;
-
-        self.get_vertices(vertices)
+        self.hyperedges
+            .get(&hyperedge_index)
+            .map(|(vertices, _)| vertices.clone())
+            .ok_or(HypergraphError::HyperedgeIndexNotFound(hyperedge_index))
     }
 }

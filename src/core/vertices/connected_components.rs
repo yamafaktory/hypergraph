@@ -24,8 +24,7 @@ where
     ///
     /// Returns an empty `Vec` for an empty hypergraph.
     pub fn connected_components(&self) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
-        let mut all_vertices: Vec<VertexIndex> =
-            self.vertices_mapping.left.values().copied().collect();
+        let mut all_vertices: Vec<VertexIndex> = self.vertices.keys().copied().collect();
         all_vertices.sort();
 
         let mut visited: AHashSet<VertexIndex> = AHashSet::new();
@@ -45,7 +44,6 @@ where
             while let Some(current) = queue.pop_front() {
                 component.push(current);
 
-                // Treat edges as undirected: follow both outgoing and incoming.
                 for neighbor in self.get_adjacent_vertices_from(current)? {
                     if visited.insert(neighbor) {
                         queue.push_back(neighbor);

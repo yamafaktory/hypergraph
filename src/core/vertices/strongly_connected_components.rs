@@ -25,8 +25,7 @@ where
     pub fn strongly_connected_components(
         &self,
     ) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
-        let mut all_vertices: Vec<VertexIndex> =
-            self.vertices_mapping.left.values().copied().collect();
+        let mut all_vertices: Vec<VertexIndex> = self.vertices.keys().copied().collect();
         all_vertices.sort();
 
         // Phase 1 — iterative DFS on the original graph; record finish order.
@@ -38,8 +37,6 @@ where
                 continue;
             }
 
-            // Each stack entry: (vertex, exiting).
-            // Push (v, false) to enter v, then (v, true) to record finish.
             let mut stack: Vec<(VertexIndex, bool)> = vec![(start, false)];
 
             while let Some((v, exiting)) = stack.pop() {
@@ -60,8 +57,6 @@ where
         }
 
         // Phase 2 — iterative DFS on the transposed graph in reverse finish order.
-        // The transposed graph is traversed by following incoming edges via
-        // `get_adjacent_vertices_to`.
         let mut visited2: AHashSet<VertexIndex> = AHashSet::new();
         let mut sccs: Vec<Vec<VertexIndex>> = Vec::new();
 

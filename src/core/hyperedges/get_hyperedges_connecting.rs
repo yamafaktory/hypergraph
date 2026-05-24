@@ -15,7 +15,16 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the hyperedges directly connecting a vertex to another.
+    /// Returns the indices of all hyperedges that contain a direct `from → to`
+    /// consecutive connection.
+    ///
+    /// A hyperedge qualifies when `from` and `to` appear as adjacent entries in
+    /// its vertex list (in that order). Supports self-loops when `from == to`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if either `from` or `to`
+    /// does not exist.
     pub fn get_hyperedges_connecting(
         &self,
         from: VertexIndex,

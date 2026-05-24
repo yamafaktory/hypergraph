@@ -26,12 +26,9 @@ where
     /// Returns [`HypergraphError::HypergraphContainsCycle`] if the hypergraph
     /// contains a cycle.
     pub fn topological_sort(&self) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        // Collect all stable vertex indexes.
-        let all_vertices: Vec<VertexIndex> = self.vertices_mapping.left.values().copied().collect();
-
+        let all_vertices: Vec<VertexIndex> = self.vertices.keys().copied().collect();
         let vertex_count = all_vertices.len();
 
-        // Compute in-degree for each vertex (number of directed edges arriving at it).
         let mut in_degree: AHashMap<VertexIndex, usize> =
             all_vertices.iter().map(|&v| (v, 0)).collect();
 
@@ -41,7 +38,6 @@ where
             }
         }
 
-        // Seed the min-heap with all zero-in-degree vertices.
         let mut heap: BinaryHeap<Reverse<VertexIndex>> = in_degree
             .iter()
             .filter_map(|(&v, &deg)| (deg == 0).then_some(Reverse(v)))

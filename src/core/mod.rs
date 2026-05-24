@@ -1,4 +1,6 @@
-pub(crate) mod bi_hash_map;
+#[cfg(feature = "persistence")]
+#[doc(hidden)]
+pub mod disk;
 #[doc(hidden)]
 pub mod errors;
 #[doc(hidden)]
@@ -9,7 +11,6 @@ pub mod iterator;
 mod shared;
 #[doc(hidden)]
 mod types;
-mod utils;
 #[doc(hidden)]
 pub mod vertices;
 
@@ -21,11 +22,10 @@ use std::{
         Result,
     },
     hash::Hash,
-    ops::Deref,
 };
 
-use bi_hash_map::BiHashMap;
 use types::{
+    AIndexMap,
     AIndexSet,
     ARandomState,
 };
@@ -39,45 +39,27 @@ pub use crate::core::iterator::{
     HypergraphBorrowingIterator,
     HypergraphIterator,
 };
+#[cfg(feature = "persistence")]
+pub use crate::core::disk::PersistentHypergraph;
 
-/// Shared Trait for the vertices.
-/// Must be implemented to use the library.
+/// Trait bound required for vertex weights.
+///
+/// Any type that implements `Copy + Debug + Display + Eq + Hash + Send + Sync`
+/// satisfies this trait automatically via the blanket impl. You do not need to
+/// implement it manually.
 pub trait VertexTrait: Copy + Debug + Display + Eq + Hash + Send + Sync {}
 
 impl<T> VertexTrait for T where T: Copy + Debug + Display + Eq + Hash + Send + Sync {}
 
-/// Shared Trait for the hyperedges.
-/// Must be implemented to use the library.
+/// Trait bound required for hyperedge weights.
+///
+/// In addition to [`VertexTrait`], a hyperedge weight must implement
+/// `Into<usize>` so that its value can be used as a numeric cost in
+/// shortest-path algorithms. The blanket impl covers any type that already
+/// satisfies both constraints.
 pub trait HyperedgeTrait: VertexTrait + Into<usize> {}
 
 impl<T> HyperedgeTrait for T where T: VertexTrait + Into<usize> {}
-
-/// A `HyperedgeKey` is a representation of both the vertices and the weight
-/// of a hyperedge, used as a key in the hyperedges set.
-/// In a non-simple hypergraph, since the same vertices can be shared by
-/// different hyperedges, the weight is also included in the key to keep
-/// it unique.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) struct HyperedgeKey<HE> {
-    vertices: Vec<usize>,
-    weight: HE,
-}
-
-impl<HE> HyperedgeKey<HE> {
-    /// Creates a new `HyperedgeKey` from the given vertices and weight.
-    pub(crate) fn new(vertices: Vec<usize>, weight: HE) -> HyperedgeKey<HE> {
-        Self { vertices, weight }
-    }
-}
-
-impl<HE> Deref for HyperedgeKey<HE> {
-    type Target = HE;
-
-    fn deref(&self) -> &HE {
-        &self.weight
-    }
-}
 
 /// A directed hypergraph composed of generic vertices and hyperedges.
 #[derive(Clone)]
@@ -86,31 +68,23 @@ impl<HE> Deref for HyperedgeKey<HE> {
     derive(serde::Serialize, serde::Deserialize),
     serde(bound(
         serialize = "V: serde::Serialize, HE: serde::Serialize",
-        deserialize = "V: serde::Deserialize<'de>, HE: serde::Deserialize<'de> + Eq + std::hash::Hash"
+        deserialize = "V: serde::Deserialize<'de>, HE: serde::Deserialize<'de>"
     ))
 )]
 pub struct Hypergraph<V, HE> {
-    /// Vertices are stored as a vec of `(weight, hyperedge-index-set)` pairs.
-    /// Position in the vec is the internal index. Weights are not required to
-    /// be unique — identity is the stable `VertexIndex`, not the weight.
-    vertices: Vec<(V, AIndexSet<usize>)>,
+    /// Vertices keyed by their stable index.
+    /// Each entry holds the weight and the set of hyperedge indices that include this vertex.
+    pub(crate) vertices: AIndexMap<VertexIndex, (V, AIndexSet<HyperedgeIndex>)>,
 
-    /// Hyperedges are stored as a set whose unique keys are a combination of
-    /// vertices indexes and a weight. Two or more hyperedges can contain
-    /// the exact same vertices (non-simple hypergraph).
-    hyperedges: AIndexSet<HyperedgeKey<HE>>,
+    /// Hyperedges keyed by their stable index.
+    /// Each entry holds the ordered vertex list and the weight.
+    pub(crate) hyperedges: AIndexMap<HyperedgeIndex, (Vec<VertexIndex>, HE)>,
 
-    /// Bi-directional map for hyperedges.
-    hyperedges_mapping: BiHashMap<HyperedgeIndex>,
+    /// Monotonically increasing counter used to generate unique [`VertexIndex`] values.
+    pub(crate) vertices_count: usize,
 
-    /// Bi-directional map for vertices.
-    vertices_mapping: BiHashMap<VertexIndex>,
-
-    /// Stable index generation counter for hyperedges.
-    hyperedges_count: usize,
-
-    /// Stable index generation counter for vertices.
-    vertices_count: usize,
+    /// Monotonically increasing counter used to generate unique [`HyperedgeIndex`] values.
+    pub(crate) hyperedges_count: usize,
 }
 
 impl<V, HE> Debug for Hypergraph<V, HE>
@@ -194,17 +168,13 @@ where
         self.vertices.is_empty()
     }
 
-    /// Clears the hypergraph.
+    /// Removes all vertices and hyperedges from the hypergraph.
+    ///
+    /// Both internal maps are emptied and the monotonic index counters are
+    /// reset to zero, so the next insertion will start from index `0` again.
     pub fn clear(&mut self) {
-        // Clear the hyperedges and vertices sets while keeping their capacities.
         self.hyperedges.clear();
         self.vertices.clear();
-
-        // Reset the mappings.
-        self.hyperedges_mapping = BiHashMap::default();
-        self.vertices_mapping = BiHashMap::default();
-
-        // Reset the counters.
         self.hyperedges_count = 0;
         self.vertices_count = 0;
     }
@@ -219,12 +189,10 @@ where
     #[must_use]
     pub fn with_capacity(vertices: usize, hyperedges: usize) -> Self {
         Hypergraph {
-            hyperedges_count: 0,
-            hyperedges_mapping: BiHashMap::default(),
-            hyperedges: AIndexSet::with_capacity_and_hasher(hyperedges, ARandomState::default()),
+            vertices: AIndexMap::with_capacity_and_hasher(vertices, ARandomState::default()),
+            hyperedges: AIndexMap::with_capacity_and_hasher(hyperedges, ARandomState::default()),
             vertices_count: 0,
-            vertices_mapping: BiHashMap::default(),
-            vertices: Vec::with_capacity(vertices),
+            hyperedges_count: 0,
         }
     }
 }

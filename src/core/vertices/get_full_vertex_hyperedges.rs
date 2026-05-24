@@ -13,7 +13,16 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the hyperedges of a vertex as a vector of vectors of `VertexIndex`.
+    /// Returns the vertex list of every hyperedge that includes `vertex_index`.
+    ///
+    /// Each element of the outer `Vec` is the ordered vertex list of one
+    /// hyperedge, in the same order as returned by
+    /// [`get_vertex_hyperedges`](Self::get_vertex_hyperedges).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `vertex_index` does
+    /// not exist.
     pub fn get_full_vertex_hyperedges(
         &self,
         vertex_index: VertexIndex,

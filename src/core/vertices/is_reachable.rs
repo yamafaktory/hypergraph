@@ -25,8 +25,12 @@ where
         from: VertexIndex,
         to: VertexIndex,
     ) -> Result<bool, HypergraphError<V, HE>> {
-        self.get_internal_vertex(from)?;
-        self.get_internal_vertex(to)?;
+        if !self.vertices.contains_key(&from) {
+            return Err(HypergraphError::VertexIndexNotFound(from));
+        }
+        if !self.vertices.contains_key(&to) {
+            return Err(HypergraphError::VertexIndexNotFound(to));
+        }
 
         if from == to {
             return Ok(true);

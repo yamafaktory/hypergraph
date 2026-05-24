@@ -1,11 +1,9 @@
 use crate::{
     HyperedgeIndex,
-    HyperedgeKey,
     HyperedgeTrait,
     Hypergraph,
     VertexIndex,
     VertexTrait,
-    errors::HypergraphError,
 };
 
 impl<V, HE> IntoIterator for Hypergraph<V, HE>
@@ -54,31 +52,13 @@ where
     /// Returns an iterator over all vertices as `(VertexIndex, &V)` pairs, in insertion order.
     #[must_use = "the iterator is lazy and must be consumed"]
     pub fn vertices_iter(&self) -> impl Iterator<Item = (VertexIndex, &V)> + '_ {
-        self.vertices
-            .iter()
-            .enumerate()
-            .filter_map(|(internal, (weight, _))| {
-                self.vertices_mapping
-                    .left
-                    .get(&internal)
-                    .copied()
-                    .map(|stable| (stable, weight))
-            })
+        self.vertices.iter().map(|(&idx, (weight, _))| (idx, weight))
     }
 
     /// Returns an iterator over all hyperedges as `(HyperedgeIndex, &HE)` pairs, in insertion order.
     #[must_use = "the iterator is lazy and must be consumed"]
     pub fn hyperedges_iter(&self) -> impl Iterator<Item = (HyperedgeIndex, &HE)> + '_ {
-        self.hyperedges
-            .iter()
-            .enumerate()
-            .filter_map(|(internal, key)| {
-                self.hyperedges_mapping
-                    .left
-                    .get(&internal)
-                    .copied()
-                    .map(|stable| (stable, &**key))
-            })
+        self.hyperedges.iter().map(|(&idx, (_, weight))| (idx, weight))
     }
 }
 
@@ -101,24 +81,15 @@ where
     type Item = (HE, Vec<V>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.hypergraph.hyperedges.get_index(self.index) {
-            Some(HyperedgeKey { vertices, weight }) => {
-                if let Ok(indexes) = self.hypergraph.get_vertices(&vertices.clone()) {
-                    indexes
-                        .iter()
-                        .map(|index| self.hypergraph.get_vertex_weight(*index))
-                        .collect::<Result<Vec<&V>, HypergraphError<V, HE>>>()
-                        .ok()
-                        .map(|vertices_weights| {
-                            self.index += 1;
-                            (*weight, vertices_weights.into_iter().copied().collect())
-                        })
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
+        let (_, (vertices, weight)) = self.hypergraph.hyperedges.get_index(self.index)?;
+        self.index += 1;
+
+        let vertex_weights: Option<Vec<V>> = vertices
+            .iter()
+            .map(|v_idx| self.hypergraph.vertices.get(v_idx).map(|(w, _)| *w))
+            .collect();
+
+        vertex_weights.map(|vw| (*weight, vw))
     }
 }
 
@@ -141,25 +112,14 @@ where
     type Item = (&'s HE, Vec<&'s V>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.hypergraph.hyperedges.get_index(self.index) {
-            Some(HyperedgeKey { vertices, weight }) => {
-                let hypergraph = self.hypergraph;
+        let (_, (vertices, weight)) = self.hypergraph.hyperedges.get_index(self.index)?;
+        self.index += 1;
 
-                if let Ok(indexes) = hypergraph.get_vertices(vertices) {
-                    indexes
-                        .iter()
-                        .map(|index| hypergraph.get_vertex_weight(*index))
-                        .collect::<Result<Vec<&'s V>, HypergraphError<V, HE>>>()
-                        .ok()
-                        .map(|vertex_weights| {
-                            self.index += 1;
-                            (weight, vertex_weights)
-                        })
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
+        let vertex_weights: Option<Vec<&'s V>> = vertices
+            .iter()
+            .map(|v_idx| self.hypergraph.vertices.get(v_idx).map(|(w, _)| w))
+            .collect();
+
+        vertex_weights.map(|vw| (weight, vw))
     }
 }

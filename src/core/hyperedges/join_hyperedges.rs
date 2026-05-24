@@ -12,8 +12,17 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Joins two or more hyperedges from the hypergraph into one single entity.
-    /// All the vertices are moved to the first hyperedge in the provided order.
+    /// Merges two or more hyperedges into the first one and removes the rest.
+    ///
+    /// The vertex lists of all provided hyperedges are concatenated (in the
+    /// order they appear in `hyperedges`) and assigned to `hyperedges[0]`. The
+    /// remaining hyperedges are then deleted from the graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::HyperedgesInvalidJoin`] if fewer than two
+    /// indices are provided, or [`HypergraphError::HyperedgeIndexNotFound`] if
+    /// any index does not exist.
     pub fn join_hyperedges(
         &mut self,
         hyperedges: &[HyperedgeIndex],

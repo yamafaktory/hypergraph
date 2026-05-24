@@ -34,25 +34,19 @@ where
         &self,
         connections: &Connection,
     ) -> Result<Connections, HypergraphError<V, HE>> {
-        let internal_index = self.get_internal_vertex(match connections {
+        let vertex_index = match connections {
             Connection::InAndOut(vertex_index, _)
             | Connection::In(vertex_index)
             | Connection::Out(vertex_index) => *vertex_index,
-        })?;
+        };
 
-        let (_, hyperedges_index_set) = self
-            .vertices
-            .get(internal_index)
-            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
+        let hyperedge_indices = self.get_vertex_hyperedges(vertex_index)?;
 
-        let hyperedges =
-            self.get_hyperedges(&hyperedges_index_set.iter().copied().collect_vec())?;
-
-        let hyperedges_with_vertices = hyperedges
+        let hyperedges_with_vertices = hyperedge_indices
             .into_par_iter()
-            .map(|hyperedge_index| {
-                self.get_hyperedge_vertices(hyperedge_index)
-                    .map(|vertices| (hyperedge_index, vertices))
+            .map(|he_index| {
+                self.get_hyperedge_vertices(he_index)
+                    .map(|vertices| (he_index, vertices))
             })
             .collect::<Result<Vec<(HyperedgeIndex, Vec<VertexIndex>)>, HypergraphError<V, HE>>>()?;
 

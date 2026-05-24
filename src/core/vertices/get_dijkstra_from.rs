@@ -16,11 +16,11 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Visitor {
     distance: usize,
-    index: usize,
+    index: VertexIndex,
 }
 
 impl Visitor {
-    fn new(distance: usize, index: usize) -> Self {
+    fn new(distance: usize, index: VertexIndex) -> Self {
         Self { distance, index }
     }
 }
@@ -56,25 +56,24 @@ where
         &self,
         from: VertexIndex,
     ) -> Result<AHashMap<VertexIndex, usize>, HypergraphError<V, HE>> {
-        let internal_from = self.get_internal_vertex(from)?;
+        if !self.vertices.contains_key(&from) {
+            return Err(HypergraphError::VertexIndexNotFound(from));
+        }
 
-        let mut distances: AHashMap<usize, usize> = AHashMap::new();
+        let mut distances: AHashMap<VertexIndex, usize> = AHashMap::new();
         let mut to_traverse = BinaryHeap::new();
 
-        distances.insert(internal_from, 0);
-        to_traverse.push(Visitor::new(0, internal_from));
+        distances.insert(from, 0);
+        to_traverse.push(Visitor::new(0, from));
 
         while let Some(Visitor { distance, index }) = to_traverse.pop() {
             if distance > distances[&index] {
                 continue;
             }
 
-            let mapped_index = self.get_vertex(index)?;
-            let neighbors = self.get_full_adjacent_vertices_from(mapped_index)?;
+            let neighbors = self.get_full_adjacent_vertices_from(index)?;
 
             for (vertex_index, hyperedge_indexes) in neighbors {
-                let internal_neighbor = self.get_internal_vertex(vertex_index)?;
-
                 let mut min_cost = usize::MAX;
                 for hyperedge_index in hyperedge_indexes {
                     let cost: usize = self
@@ -88,19 +87,16 @@ where
 
                 let next_distance = distance + min_cost;
                 let is_shorter = distances
-                    .get(&internal_neighbor)
+                    .get(&vertex_index)
                     .is_none_or(|&current| next_distance < current);
 
                 if is_shorter {
-                    distances.insert(internal_neighbor, next_distance);
-                    to_traverse.push(Visitor::new(next_distance, internal_neighbor));
+                    distances.insert(vertex_index, next_distance);
+                    to_traverse.push(Visitor::new(next_distance, vertex_index));
                 }
             }
         }
 
-        distances
-            .into_iter()
-            .map(|(internal, dist)| self.get_vertex(internal).map(|stable| (stable, dist)))
-            .collect()
+        Ok(distances)
     }
 }

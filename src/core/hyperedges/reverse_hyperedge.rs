@@ -13,7 +13,15 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Reverses the vertices of a hyperedge by index.
+    /// Reverses the vertex order of the hyperedge at `hyperedge_index`.
+    ///
+    /// This inverts the direction of the hyperedge without changing which
+    /// vertices it connects. The weight is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::HyperedgeIndexNotFound`] if `hyperedge_index`
+    /// does not exist.
     pub fn reverse_hyperedge(
         &mut self,
         hyperedge_index: HyperedgeIndex,

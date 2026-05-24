@@ -21,26 +21,21 @@ where
         vertex_index: VertexIndex,
         weight: V,
     ) -> Result<(), HypergraphError<V, HE>> {
-        let internal_index = self.get_internal_vertex(vertex_index)?;
-
-        let (previous_weight, index_set) = self
+        let (current_weight, _) = self
             .vertices
-            .get(internal_index)
-            .map(|(w, s)| (*w, s.clone()))
-            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
+            .get(&vertex_index)
+            .ok_or(HypergraphError::VertexIndexNotFound(vertex_index))?;
 
-        if weight == previous_weight {
+        if weight == *current_weight {
             return Err(HypergraphError::VertexWeightUnchanged {
                 index: vertex_index,
                 weight,
             });
         }
 
-        // Append the new entry at the end, then swap-remove the old position so
-        // that the new entry lands at `internal_index`. The BiHashMap mapping is
-        // unchanged — `internal_index` still maps to `vertex_index`.
-        self.vertices.push((weight, index_set));
-        self.vertices.swap_remove(internal_index);
+        if let Some((w, _)) = self.vertices.get_mut(&vertex_index) {
+            *w = weight;
+        }
 
         Ok(())
     }

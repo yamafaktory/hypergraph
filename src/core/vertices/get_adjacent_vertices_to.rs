@@ -14,7 +14,15 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the list of all vertices connected to a given vertex.
+    /// Returns the unique set of vertices that have a directed hyperedge leading
+    /// into `to` (i.e. vertices that immediately precede `to` in some hyperedge's
+    /// vertex list).
+    ///
+    /// The result is sorted by [`VertexIndex`] and deduplicated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `to` does not exist.
     pub fn get_adjacent_vertices_to(
         &self,
         to: VertexIndex,

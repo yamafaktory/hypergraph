@@ -1,10 +1,7 @@
-use rayon::prelude::*;
-
 use crate::{
     HyperedgeTrait,
     Hypergraph,
     VertexTrait,
-    bi_hash_map::BiHashMap,
     errors::HypergraphError,
 };
 
@@ -13,22 +10,17 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Clears all the hyperedges from the hypergraph.
+    /// Removes all hyperedges from the hypergraph.
+    ///
+    /// Vertices are retained with their weights, but their hyperedge
+    /// back-reference sets are cleared. Always returns `Ok(())`.
     pub fn clear_hyperedges(&mut self) -> Result<(), HypergraphError<V, HE>> {
-        // Clear the set while keeping its capacity.
         self.hyperedges.clear();
-
-        // Reset the hyperedges mapping.
-        self.hyperedges_mapping = BiHashMap::default();
-
-        // Reset the hyperedges counter.
         self.hyperedges_count = 0;
 
-        // Update the vertices accordingly.
-        self.vertices
-            .par_iter_mut()
-            // Clear the sets while keeping their capacities.
-            .for_each(|(_, hyperedges)| hyperedges.clear());
+        for (_, he_set) in self.vertices.values_mut() {
+            he_set.clear();
+        }
 
         Ok(())
     }

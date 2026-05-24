@@ -21,11 +21,12 @@ where
     /// Duplicate weights are allowed — vertex identity is the returned
     /// [`VertexIndex`], not the weight value.
     pub fn add_vertex(&mut self, weight: V) -> Result<VertexIndex, HypergraphError<V, HE>> {
-        let internal_index = self.vertices.len();
-        self.vertices.push((
-            weight,
-            AIndexSet::with_capacity_and_hasher(0, ARandomState::default()),
-        ));
-        Ok(self.add_vertex_index(internal_index))
+        let index = VertexIndex(self.vertices_count);
+        self.vertices_count += 1;
+        self.vertices.insert(
+            index,
+            (weight, AIndexSet::with_capacity_and_hasher(0, ARandomState::default())),
+        );
+        Ok(index)
     }
 }

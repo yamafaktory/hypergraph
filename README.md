@@ -27,6 +27,7 @@ And to compute:
 - Shortest paths: **Dijkstra** point-to-point and single-source
 - Structural analysis: strongly connected components, weakly connected components, all simple paths, subgraph extraction, cycle detection
 - Filtered views: `retain_vertices`, `retain_hyperedges`
+- Generic query interface: `HypergraphQuery` trait works over both `Hypergraph` and `PersistentHypergraph`
 
 ## ⚗️ Implementation
 
@@ -34,6 +35,7 @@ And to compute:
 - Proper error handling
 - Stable indexes for each hyperedge and each vertex — identity is the index, not the weight; duplicate weights are allowed on both sides
 - Parallelism (with Rayon)
+- `HypergraphQuery<V, HE>` trait — implement 9 primitives to get all graph algorithms for free; use it for generic functions and trait objects that work with either backend
 - Optional `serde` support (`features = ["serde"]` in `Cargo.toml`)
 - Optional `persistence` support (`features = ["persistence"]` in `Cargo.toml`)
 

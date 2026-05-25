@@ -19,6 +19,8 @@
 //! - Shortest paths: Dijkstra point-to-point and single-source
 //! - Structural analysis: strongly connected components, weakly connected components, subgraph extraction, cycle detection
 //! - Filtered views: `retain_vertices`, `retain_hyperedges`
+//! - Generic query interface: [`HypergraphQuery`] trait — implement 9 primitives to get all
+//!   graph algorithms for free; write generic code that works with either backend
 //! - Optional **`serde`** feature for serialization/deserialization support
 //!   (enable with `features = ["serde"]` in `Cargo.toml`)
 //! - Optional **`persistence`** feature for disk-backed graphs larger than RAM

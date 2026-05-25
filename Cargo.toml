@@ -43,6 +43,7 @@ nonstandard_style = { level = "deny", priority= -1 }
 rust_2024_compatibility = { level = "forbid", priority= -1 }
 unreachable_pub = "warn"
 unsafe_code = "deny"
+unused_imports = "deny"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }

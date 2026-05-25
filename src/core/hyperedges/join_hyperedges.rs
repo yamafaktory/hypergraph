@@ -63,14 +63,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Hypergraph,
-        core::test_support::{
-            E,
-            W,
-            build,
-        },
-    };
+    use crate::core::test_support::build;
 
     #[test]
     fn joins_two_hyperedges() {

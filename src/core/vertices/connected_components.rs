@@ -24,8 +24,7 @@ where
     ///
     /// Returns an empty `Vec` for an empty hypergraph.
     pub fn connected_components(&self) -> Result<Vec<Vec<VertexIndex>>, HypergraphError<V, HE>> {
-        let mut all_vertices: Vec<VertexIndex> =
-            self.vertices_mapping.left.values().copied().collect();
+        let mut all_vertices: Vec<VertexIndex> = self.vertices.keys().copied().collect();
         all_vertices.sort();
 
         let mut visited: AHashSet<VertexIndex> = AHashSet::new();
@@ -45,7 +44,6 @@ where
             while let Some(current) = queue.pop_front() {
                 component.push(current);
 
-                // Treat edges as undirected: follow both outgoing and incoming.
                 for neighbor in self.get_adjacent_vertices_from(current)? {
                     if visited.insert(neighbor) {
                         queue.push_back(neighbor);
@@ -63,5 +61,35 @@ where
         }
 
         Ok(components)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn two_disconnected_components() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let a = g.add_vertex(W(0)).unwrap();
+        let b = g.add_vertex(W(1)).unwrap();
+        let c = g.add_vertex(W(2)).unwrap();
+        let d = g.add_vertex(W(3)).unwrap();
+        g.add_hyperedge(vec![a, b], E(1)).unwrap();
+        g.add_hyperedge(vec![c, d], E(1)).unwrap();
+        let components = g.connected_components().unwrap();
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn empty_graph_returns_empty_vec() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.connected_components().unwrap().is_empty());
     }
 }

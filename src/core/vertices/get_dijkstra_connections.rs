@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     collections::BinaryHeap,
     iter::successors,
 };
@@ -12,36 +11,9 @@ use crate::{
     Hypergraph,
     VertexIndex,
     VertexTrait,
+    core::shared::Visitor,
     errors::HypergraphError,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Visitor {
-    distance: usize,
-    index: usize,
-}
-
-impl Visitor {
-    fn new(distance: usize, index: usize) -> Self {
-        Self { distance, index }
-    }
-}
-
-// Use a custom implementation of Ord as we want a min-heap BinaryHeap.
-impl Ord for Visitor {
-    fn cmp(&self, other: &Visitor) -> Ordering {
-        other
-            .distance
-            .cmp(&self.distance)
-            .then_with(|| self.index.cmp(&other.index))
-    }
-}
-
-impl PartialOrd for Visitor {
-    fn partial_cmp(&self, other: &Visitor) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 type DijkstraResult<V, HE> =
     Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>>;
@@ -53,50 +25,45 @@ where
     HE: HyperedgeTrait,
 {
     fn dijkstra_impl(&self, from: VertexIndex, to: VertexIndex) -> DijkstraResult<V, HE> {
-        let internal_from = self.get_internal_vertex(from)?;
-        let internal_to = self.get_internal_vertex(to)?;
+        if !self.vertices.contains_key(&from) {
+            return Err(HypergraphError::VertexIndexNotFound(from));
+        }
+        if !self.vertices.contains_key(&to) {
+            return Err(HypergraphError::VertexIndexNotFound(to));
+        }
 
-        let mut distances: AHashMap<usize, usize> = AHashMap::new();
-        // Maps each internal vertex index to its (predecessor, hyperedge used to arrive).
-        let mut predecessors: AHashMap<usize, (usize, Option<HyperedgeIndex>)> = AHashMap::new();
+        let mut distances: AHashMap<VertexIndex, usize> = AHashMap::new();
+        let mut predecessors: AHashMap<VertexIndex, (VertexIndex, Option<HyperedgeIndex>)> =
+            AHashMap::new();
         let mut to_traverse = BinaryHeap::new();
 
-        distances.insert(internal_from, 0);
-        to_traverse.push(Visitor::new(0, internal_from));
+        distances.insert(from, 0);
+        to_traverse.push(Visitor::new(0, from));
 
         while let Some(Visitor { distance, index }) = to_traverse.pop() {
-            if index == internal_to {
-                // Walk the predecessor chain from destination back to source,
-                // then reverse to get source-to-destination order.
-                let path = successors(Some(internal_to), |&current| {
-                    (current != internal_from).then(|| predecessors[&current].0)
+            if index == to {
+                let path = successors(Some(to), |&current| {
+                    (current != from).then(|| predecessors[&current].0)
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
                 .rev()
-                .map(|internal| {
-                    Ok((
-                        self.get_vertex(internal)?,
-                        predecessors.get(&internal).and_then(|&(_, he)| he),
-                    ))
+                .map(|v| {
+                    let he = predecessors.get(&v).and_then(|&(_, he)| he);
+                    Ok((v, he))
                 })
                 .collect::<Result<Vec<_>, HypergraphError<V, HE>>>()?;
 
                 return Ok((distance, path));
             }
 
-            // Skip stale heap entries.
             if distance > distances[&index] {
                 continue;
             }
 
-            let mapped_index = self.get_vertex(index)?;
-            let neighbors = self.get_full_adjacent_vertices_from(mapped_index)?;
+            let neighbors = self.get_full_adjacent_vertices_from(index)?;
 
             for (vertex_index, hyperedge_indexes) in neighbors {
-                let internal_neighbor = self.get_internal_vertex(vertex_index)?;
-
-                // Find the minimum-cost hyperedge to this neighbor.
                 let mut min_cost = usize::MAX;
                 let mut best_hyperedge: Option<HyperedgeIndex> = None;
 
@@ -114,13 +81,13 @@ where
 
                 let next_distance = distance + min_cost;
                 let is_shorter = distances
-                    .get(&internal_neighbor)
+                    .get(&vertex_index)
                     .is_none_or(|&current| next_distance < current);
 
                 if is_shorter {
-                    distances.insert(internal_neighbor, next_distance);
-                    predecessors.insert(internal_neighbor, (index, best_hyperedge));
-                    to_traverse.push(Visitor::new(next_distance, internal_neighbor));
+                    distances.insert(vertex_index, next_distance);
+                    predecessors.insert(vertex_index, (index, best_hyperedge));
+                    to_traverse.push(Visitor::new(next_distance, vertex_index));
                 }
             }
         }
@@ -154,5 +121,36 @@ where
         to: VertexIndex,
     ) -> Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>> {
         self.dijkstra_impl(from, to)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn finds_shortest_path() {
+        let (g, [v0, _v1, v2, _v3], [e0, e1, _e2]) = build();
+        assert_eq!(
+            g.get_dijkstra_connections(v0, v2).unwrap(),
+            vec![(v0, None), (_v1, Some(e0)), (v2, Some(e1))]
+        );
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(
+            g.get_dijkstra_connections(VertexIndex(0), VertexIndex(1))
+                .is_err()
+        );
     }
 }

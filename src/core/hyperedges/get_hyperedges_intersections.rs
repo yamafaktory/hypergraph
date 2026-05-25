@@ -1,12 +1,10 @@
-use itertools::Itertools;
-
 use crate::{
     HyperedgeIndex,
-    HyperedgeKey,
     HyperedgeTrait,
     Hypergraph,
     VertexIndex,
     VertexTrait,
+    core::types::AIndexSet,
     errors::HypergraphError,
 };
 
@@ -15,60 +13,71 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the intersections of a set of hyperedges as a vector of vertices.
+    /// Returns the vertices present in every hyperedge in `hyperedges`.
+    ///
+    /// The result is sorted by [`VertexIndex`] and deduplicated. An empty `Vec`
+    /// is returned when the hyperedges share no common vertices.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::HyperedgesInvalidIntersections`] if fewer than
+    /// two hyperedge indices are provided, or
+    /// [`HypergraphError::HyperedgeIndexNotFound`] if any index does not exist.
     pub fn get_hyperedges_intersections(
         &self,
-        hyperedges: Vec<HyperedgeIndex>,
+        hyperedges: &[HyperedgeIndex],
     ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        // Keep track of the number of hyperedges.
-        let number_of_hyperedges = hyperedges.len();
+        let n = hyperedges.len();
 
-        // Early exit if less than two hyperedges are provided.
-        if number_of_hyperedges < 2 {
+        if n < 2 {
             return Err(HypergraphError::HyperedgesInvalidIntersections);
         }
 
-        // Get the internal vertices of the hyperedges and keep the eventual error.
-        let vertices = hyperedges
-            .into_iter()
-            .map(|hyperedge_index| {
-                self.get_internal_hyperedge(hyperedge_index)
-                    .and_then(|internal_index| {
-                        self.hyperedges
-                            .get_index(internal_index)
-                            .ok_or(HypergraphError::InternalHyperedgeIndexNotFound(
-                                internal_index,
-                            ))
-                            .map(|HyperedgeKey { vertices, .. }| {
-                                vertices.iter().unique().copied().collect_vec()
-                            })
-                    })
+        // Build a unique vertex set per hyperedge.
+        let vertex_sets = hyperedges
+            .iter()
+            .map(|&he_index| {
+                self.hyperedges
+                    .get(&he_index)
+                    .map(|(v, _)| v.iter().copied().collect::<AIndexSet<VertexIndex>>())
+                    .ok_or(HypergraphError::HyperedgeIndexNotFound(he_index))
             })
-            .collect::<Result<Vec<Vec<usize>>, HypergraphError<V, HE>>>();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        vertices.and_then(|vertices| {
-            self.get_vertices(
-                &vertices
-                    .into_iter()
-                    // Flatten and sort the vertices.
-                    .flatten()
-                    .sorted()
-                    // Map the result to tuples where the second term is an arbitrary value.
-                    // The goal is to group them by indexes.
-                    .map(|index| (index, 0))
-                    .into_group_map()
-                    .into_iter()
-                    // Filter the groups having the same size as the hyperedge.
-                    .filter_map(|(index, occurences)| {
-                        if occurences.len() == number_of_hyperedges {
-                            Some(index)
-                        } else {
-                            None
-                        }
-                    })
-                    .sorted()
-                    .collect_vec(),
-            )
-        })
+        // Intersection: vertices present in every hyperedge's set.
+        let mut result: Vec<VertexIndex> = vertex_sets[0]
+            .iter()
+            .filter(|v| vertex_sets[1..].iter().all(|s| s.contains(*v)))
+            .copied()
+            .collect();
+
+        result.sort();
+        Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_common_vertices() {
+        let (g, [_v0, v1, _v2, _v3], [e0, e1, e2]) = build();
+        let mut got = g.get_hyperedges_intersections(&[e0, e1, e2]).unwrap();
+        got.sort();
+        assert_eq!(got, vec![v1]);
+    }
+
+    #[test]
+    fn too_few_hyperedges_returns_error() {
+        let (g, _, [e0, _e1, _e2]) = build();
+        assert!(g.get_hyperedges_intersections(&[e0]).is_err());
     }
 }

@@ -32,12 +32,12 @@ where
     #[error("HyperedgeIndex {0} vertices are unchanged (no-op)")]
     HyperedgeVerticesUnchanged(HyperedgeIndex),
 
-    /// Error when a hyperedge is updated with no vertices.
-    #[error("HyperedgeIndex {0} vertices are missing")]
+    /// Error when a hyperedge cannot be created because no vertices were provided.
+    #[error("Hyperedge with weight {0} cannot be created: no vertices provided")]
     HyperedgeCreationNoVertices(HE),
 
-    /// Error when a hyperedge is updated with no vertices.
-    #[error("HyperedgeIndex {0} vertices are missing")]
+    /// Error when a hyperedge cannot be updated because no vertices were provided.
+    #[error("HyperedgeIndex {0} cannot be updated: no vertices provided")]
     HyperedgeUpdateNoVertices(HyperedgeIndex),
 
     /// Error when a hyperedge doesn't contain some vertices.
@@ -105,4 +105,8 @@ where
     /// Error when the hypergraph contains a cycle and a topological sort is requested.
     #[error("Hypergraph contains a cycle and cannot be topologically sorted")]
     HypergraphContainsCycle,
+
+    /// Error from the persistent storage backend.
+    #[error("Storage error: {0}")]
+    StorageError(String),
 }

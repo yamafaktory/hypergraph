@@ -19,8 +19,74 @@
 //! - Shortest paths: Dijkstra point-to-point and single-source
 //! - Structural analysis: strongly connected components, weakly connected components, subgraph extraction, cycle detection
 //! - Filtered views: `retain_vertices`, `retain_hyperedges`
+//! - Generic query interface: [`HypergraphQuery`] trait — implement 9 primitives to get all
+//!   graph algorithms for free; write generic code that works with either backend
 //! - Optional **`serde`** feature for serialization/deserialization support
 //!   (enable with `features = ["serde"]` in `Cargo.toml`)
+//! - Optional **`persistence`** feature for disk-backed graphs larger than RAM
+//!   (enable with `features = ["persistence"]` in `Cargo.toml`)
+//!
+//! ## Persistent disk-backed graphs
+//!
+//! Enable the `persistence` feature to unlock [`PersistentHypergraph`], a variant
+//! backed by an [LSM-tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree)
+//! (via [fjall](https://github.com/fjall-rs/fjall)) with an in-memory hot-data
+//! cache. It supports graphs that exceed available RAM and survives process
+//! restarts without any manual serialization step.
+//!
+//! ```toml
+//! # Cargo.toml
+//! [dependencies]
+//! hypergraph = { version = "*", features = ["persistence"] }
+//! ```
+//!
+//! ### Vertex and hyperedge types
+//!
+//! In addition to the usual [`VertexTrait`] / [`HyperedgeTrait`] bounds, both
+//! types must implement `serde::Serialize + serde::DeserializeOwned` so they
+//! can be encoded to disk.
+//!
+//! ### Opening a graph
+//!
+//! [`PersistentHypergraph::open`] creates the database directory if it does not
+//! exist, or recovers all data if it does.
+//!
+//! ```ignore
+//! use std::sync::Arc;
+//! use hypergraph::PersistentHypergraph;
+//!
+//! // Open (or create) a persistent graph.
+//! let g = Arc::new(PersistentHypergraph::<MyVertex, MyEdge>::open("/var/data/my-graph")?);
+//!
+//! // All write methods take &self, so the Arc can be shared across threads.
+//! let g2 = Arc::clone(&g);
+//! std::thread::spawn(move || -> anyhow::Result<()> {
+//!     g2.add_vertex(my_vertex)?;
+//!     Ok(())
+//! });
+//! ```
+//!
+//! ### Thread safety
+//!
+//! [`PersistentHypergraph`] is `Send + Sync`. All write methods take `&self` and use
+//! atomic counters internally, so the same instance can be shared across threads
+//! via an `Arc` without an external `Mutex`.
+//!
+//! > **Note**: individual multi-step operations such as `add_hyperedge` are not
+//! > serializable with respect to concurrent writers. If full operation-level
+//! > isolation is required, wrap the `Arc<PersistentHypergraph>` in a `Mutex`.
+//!
+//! ### Persistence
+//!
+//! Writes are appended to the WAL immediately and are durable on process crash.
+//! Call [`PersistentHypergraph::persist`] to additionally fsync to the physical
+//! medium when you need a hard durability guarantee.
+//!
+//! ### Cache capacity
+//!
+//! By default the hot-data cache holds up to 10 000 entries per layer (vertices
+//! and hyperedges). Use [`PersistentHypergraph::open_with_capacity`] to tune this for
+//! your workload.
 //!
 //! ## Example
 //!
@@ -137,7 +203,7 @@
 //!     assert_eq!(graph.get_full_vertex_hyperedges(VertexIndex(0)), Ok(vec![vec![faarooq, ava, ghanda], vec![faarooq, ava, ghanda], vec![ewan, ava, bianca]]));
 //!     
 //!     // Get the intersection of some hyperedges.
-//!     assert_eq!(graph.get_hyperedges_intersections(vec![second_relation, third_relation]), Ok(vec![ava]));
+//!     assert_eq!(graph.get_hyperedges_intersections(&[second_relation, third_relation]), Ok(vec![ava]));
 //!
 //!     // Find a hyperedge containing a connection between two vertices.
 //!     assert_eq!(graph.get_hyperedges_connecting(bianca, bianca), Ok(vec![fifth_relation]));

@@ -20,8 +20,18 @@ where
     V: VertexTrait,
     HE: HyperedgeTrait,
 {
-    /// Gets the list of all vertices connected from a given vertex as tuples
-    /// of the form (`VertexIndex`, `Vec<HyperedgeIndex>`).
+    /// Returns all vertices directly reachable from `from`, grouped with the
+    /// hyperedges through which they are reached.
+    ///
+    /// Each element of the result is `(neighbor, hyperedges)` where `hyperedges`
+    /// lists every hyperedge that connects `from` to `neighbor`. Use this
+    /// over [`get_adjacent_vertices_from`](Self::get_adjacent_vertices_from) when
+    /// you also need to know which hyperedges carry each connection (e.g. for
+    /// Dijkstra).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `from` does not exist.
     pub fn get_full_adjacent_vertices_from(
         &self,
         from: VertexIndex,
@@ -43,5 +53,33 @@ where
         )
         .into_iter()
         .collect_vec())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_neighbor_with_hyperedges() {
+        let (g, [v0, v1, _v2, _v3], [e0, _e1, _e2]) = build();
+        let got = g.get_full_adjacent_vertices_from(v0).unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].0, v1);
+        assert_eq!(got[0].1, vec![e0]);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_full_adjacent_vertices_from(VertexIndex(99)).is_err());
     }
 }

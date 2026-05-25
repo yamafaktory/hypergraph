@@ -1,4 +1,3 @@
-#![deny(unsafe_code, nonstandard_style)]
 #![allow(missing_docs)]
 
 use std::fmt::{
@@ -68,23 +67,24 @@ fn criterion_benchmark(criterion: &mut Criterion) {
     let graph = build_graph();
 
     criterion.bench_function("get-hyperedge-vertices", |bencher| {
-        bencher.iter(|| graph.get_hyperedge_vertices(HyperedgeIndex(VERTICES / 2)))
+        bencher.iter(|| graph.get_hyperedge_vertices(HyperedgeIndex(VERTICES / 2)));
     });
 
     criterion.bench_function("get-hyperedges-connecting", |bencher| {
         bencher.iter(|| {
             graph
                 .get_hyperedges_connecting(VertexIndex(VERTICES / 2), VertexIndex(VERTICES / 2 + 1))
-        })
+        });
     });
 
     criterion.bench_function("get-hyperedges-intersections", |bencher| {
-        bencher
-            .iter(|| graph.get_hyperedges_intersections((0..10).map(HyperedgeIndex).collect_vec()))
+        bencher.iter(|| {
+            graph.get_hyperedges_intersections(&(0..10).map(HyperedgeIndex).collect_vec())
+        });
     });
 
     criterion.bench_function("dijkstra", |bencher| {
-        bencher.iter(|| graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(VERTICES - 1)))
+        bencher.iter(|| graph.get_dijkstra_connections(VertexIndex(0), VertexIndex(VERTICES - 1)));
     });
 
     criterion.bench_function("remove-vertex", |bencher| {
@@ -92,7 +92,7 @@ fn criterion_benchmark(criterion: &mut Criterion) {
             build_graph,
             |mut g| g.remove_vertex(VertexIndex(VERTICES - 1)),
             BatchSize::LargeInput,
-        )
+        );
     });
 
     criterion.bench_function("remove-hyperedge", |bencher| {
@@ -100,7 +100,7 @@ fn criterion_benchmark(criterion: &mut Criterion) {
             build_graph,
             |mut g| g.remove_hyperedge(HyperedgeIndex(VERTICES - 2)),
             BatchSize::LargeInput,
-        )
+        );
     });
 }
 

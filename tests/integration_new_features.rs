@@ -1,11 +1,13 @@
 //! Integration tests for features added in the modernization pass:
-//! is_empty, Clone, vertices_iter, hyperedges_iter, IntoIterator for &Hypergraph,
-//! BFS, DFS, is_reachable, topological_sort, get_dijkstra_connections_with_cost,
-//! contains_vertex, get_vertex_index, is_acyclic, Display, connected_components,
-//! get_dijkstra_from.
+//! [`Hypergraph::is_empty`], [`Clone`], [`Hypergraph::vertices_iter`],
+//! [`Hypergraph::hyperedges_iter`], [`IntoIterator`] for `&Hypergraph`, BFS, DFS,
+//! [`Hypergraph::is_reachable`], [`Hypergraph::topological_sort`],
+//! [`Hypergraph::get_dijkstra_connections_with_cost`],
+//! [`Hypergraph::contains_vertex`], [`Hypergraph::get_vertex_index`],
+//! [`Hypergraph::is_acyclic`], [`Display`], [`Hypergraph::connected_components`],
+//! [`Hypergraph::get_dijkstra_from`].
 
-#![deny(unsafe_code, nonstandard_style)]
-#![allow(missing_docs)]
+#![allow(clippy::many_single_char_names, missing_docs)]
 
 mod common;
 
@@ -133,7 +135,7 @@ fn ref_into_iterator() {
 
 #[test]
 fn bfs_from_source() {
-    let (g, a, b, c, _, ..) = build_graph();
+    let (g, a, b, c, ..) = build_graph();
     let bfs = g.get_bfs(a).unwrap();
     // a must come first; b and c must both appear.
     assert_eq!(bfs[0], a);
@@ -160,7 +162,7 @@ fn bfs_invalid_vertex() {
 
 #[test]
 fn dfs_from_source() {
-    let (g, a, b, c, _, ..) = build_graph();
+    let (g, a, b, c, ..) = build_graph();
     let dfs = g.get_dfs(a).unwrap();
     assert_eq!(dfs[0], a);
     assert!(dfs.contains(&b));
@@ -186,26 +188,26 @@ fn dfs_invalid_vertex() {
 #[test]
 fn is_reachable_self() {
     let (g, a, ..) = build_graph();
-    assert_eq!(g.is_reachable(a, a).unwrap(), true);
+    assert!(g.is_reachable(a, a).unwrap());
 }
 
 #[test]
 fn is_reachable_direct_edge() {
     let (g, a, b, ..) = build_graph();
-    assert_eq!(g.is_reachable(a, b).unwrap(), true);
+    assert!(g.is_reachable(a, b).unwrap());
 }
 
 #[test]
 fn is_reachable_transitive() {
     let (g, a, _, c, ..) = build_graph();
-    assert_eq!(g.is_reachable(a, c).unwrap(), true);
+    assert!(g.is_reachable(a, c).unwrap());
 }
 
 #[test]
 fn is_reachable_false() {
     let (g, a, _, _, d, ..) = build_graph();
     // d has no incoming edges, only a has outgoing ones.
-    assert_eq!(g.is_reachable(d, a).unwrap(), false);
+    assert!(!g.is_reachable(d, a).unwrap());
 }
 
 #[test]
@@ -366,10 +368,10 @@ fn is_acyclic_empty() {
 fn display_contains_vertex_weights() {
     let (g, ..) = build_graph();
     let s = g.to_string();
-    assert!(s.contains("a"), "missing vertex a in: {s}");
-    assert!(s.contains("b"), "missing vertex b in: {s}");
-    assert!(s.contains("c"), "missing vertex c in: {s}");
-    assert!(s.contains("d"), "missing vertex d in: {s}");
+    assert!(s.contains('a'), "missing vertex a in: {s}");
+    assert!(s.contains('b'), "missing vertex b in: {s}");
+    assert!(s.contains('c'), "missing vertex c in: {s}");
+    assert!(s.contains('d'), "missing vertex d in: {s}");
 }
 
 #[test]
@@ -529,8 +531,7 @@ fn scc_dag_all_singletons() {
     for v in [a, b, c, d] {
         assert!(
             sccs.iter().any(|s| s == &vec![v]),
-            "expected singleton SCC for {:?}",
-            v
+            "expected singleton SCC for {v:?}"
         );
     }
 }

@@ -26,12 +26,9 @@ where
     /// Returns [`HypergraphError::HypergraphContainsCycle`] if the hypergraph
     /// contains a cycle.
     pub fn topological_sort(&self) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
-        // Collect all stable vertex indexes.
-        let all_vertices: Vec<VertexIndex> = self.vertices_mapping.left.values().copied().collect();
-
+        let all_vertices: Vec<VertexIndex> = self.vertices.keys().copied().collect();
         let vertex_count = all_vertices.len();
 
-        // Compute in-degree for each vertex (number of directed edges arriving at it).
         let mut in_degree: AHashMap<VertexIndex, usize> =
             all_vertices.iter().map(|&v| (v, 0)).collect();
 
@@ -41,7 +38,6 @@ where
             }
         }
 
-        // Seed the min-heap with all zero-in-degree vertices.
         let mut heap: BinaryHeap<Reverse<VertexIndex>> = in_degree
             .iter()
             .filter_map(|(&v, &deg)| (deg == 0).then_some(Reverse(v)))
@@ -66,5 +62,36 @@ where
         } else {
             Err(HypergraphError::HypergraphContainsCycle)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn dag_produces_valid_order() {
+        let (g, [v0, v1, _v2, _v3], _) = build();
+        let order = g.topological_sort().unwrap();
+        let pos0 = order.iter().position(|&v| v == v0).unwrap();
+        let pos1 = order.iter().position(|&v| v == v1).unwrap();
+        assert!(pos0 < pos1);
+    }
+
+    #[test]
+    fn cyclic_graph_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let a = g.add_vertex(W(0)).unwrap();
+        let b = g.add_vertex(W(1)).unwrap();
+        g.add_hyperedge(vec![a, b], E(1)).unwrap();
+        g.add_hyperedge(vec![b, a], E(1)).unwrap();
+        assert!(g.topological_sort().is_err());
     }
 }

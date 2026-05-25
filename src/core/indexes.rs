@@ -41,3 +41,41 @@ impl From<usize> for HyperedgeIndex {
         HyperedgeIndex(index)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        HyperedgeIndex,
+        VertexIndex,
+    };
+
+    #[test]
+    fn vertex_index_display() {
+        assert_eq!(VertexIndex(7).to_string(), "7");
+    }
+
+    #[test]
+    fn hyperedge_index_display() {
+        assert_eq!(HyperedgeIndex(42).to_string(), "42");
+    }
+
+    #[test]
+    fn vertex_index_from_usize() {
+        assert_eq!(VertexIndex::from(3usize), VertexIndex(3));
+    }
+
+    #[test]
+    fn hyperedge_index_from_usize() {
+        assert_eq!(HyperedgeIndex::from(9usize), HyperedgeIndex(9));
+    }
+
+    #[test]
+    fn vertex_index_ordering() {
+        assert!(VertexIndex(0) < VertexIndex(1));
+    }
+
+    #[test]
+    fn hyperedge_index_ordering() {
+        assert!(HyperedgeIndex(2) > HyperedgeIndex(1));
+    }
+}

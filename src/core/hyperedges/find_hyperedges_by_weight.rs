@@ -21,3 +21,27 @@ where
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn finds_by_weight() {
+        let (g, _, [e0, _e1, _e2]) = build();
+        assert_eq!(g.find_hyperedges_by_weight(E(1)), vec![e0]);
+    }
+
+    #[test]
+    fn returns_empty_for_missing() {
+        let (g, _, _) = build();
+        assert!(g.find_hyperedges_by_weight(E(99)).is_empty());
+    }
+}

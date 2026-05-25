@@ -21,27 +21,55 @@ where
         vertex_index: VertexIndex,
         weight: V,
     ) -> Result<(), HypergraphError<V, HE>> {
-        let internal_index = self.get_internal_vertex(vertex_index)?;
-
-        let (previous_weight, index_set) = self
+        let (current_weight, _) = self
             .vertices
-            .get(internal_index)
-            .map(|(w, s)| (*w, s.clone()))
-            .ok_or(HypergraphError::InternalVertexIndexNotFound(internal_index))?;
+            .get(&vertex_index)
+            .ok_or(HypergraphError::VertexIndexNotFound(vertex_index))?;
 
-        if weight == previous_weight {
+        if weight == *current_weight {
             return Err(HypergraphError::VertexWeightUnchanged {
                 index: vertex_index,
                 weight,
             });
         }
 
-        // Append the new entry at the end, then swap-remove the old position so
-        // that the new entry lands at `internal_index`. The BiHashMap mapping is
-        // unchanged — `internal_index` still maps to `vertex_index`.
-        self.vertices.push((weight, index_set));
-        self.vertices.swap_remove(internal_index);
+        if let Some((w, _)) = self.vertices.get_mut(&vertex_index) {
+            *w = weight;
+        }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn updates_weight() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let idx = g.add_vertex(W(1)).unwrap();
+        g.update_vertex_weight(idx, W(2)).unwrap();
+        assert_eq!(g.get_vertex_weight(idx).unwrap(), &W(2));
+    }
+
+    #[test]
+    fn unchanged_weight_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let idx = g.add_vertex(W(1)).unwrap();
+        assert!(g.update_vertex_weight(idx, W(1)).is_err());
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.update_vertex_weight(VertexIndex(99), W(1)).is_err());
     }
 }

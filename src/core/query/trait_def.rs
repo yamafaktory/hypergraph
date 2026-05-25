@@ -589,4 +589,157 @@ where
     ) -> Result<AHashMap<VertexIndex, f64>, HypergraphError<V, HE>> {
         super::projections::compute_page_rank(self, damping, iterations)
     }
+
+    /// Returns `true` if the hypergraph is connected (undirected / clique-expansion sense).
+    ///
+    /// BFS from the first vertex, treating hyperedges as undirected cliques.
+    /// An empty graph is considered connected.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn is_connected(&self) -> Result<bool, HypergraphError<V, HE>> {
+        super::structural::is_connected(self)
+    }
+
+    /// Returns the neighbourhood of `v`: all vertices co-occurring in any hyperedge with `v`.
+    ///
+    /// The result excludes `v` itself, is deduplicated, and sorted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `v` does not exist.
+    fn get_vertex_neighborhood(
+        &self,
+        v: VertexIndex,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        super::lookups::get_vertex_neighborhood(self, v)
+    }
+
+    /// Returns the transitive closure as directed reachability pairs `(src, dst)`.
+    ///
+    /// For each source vertex, follows directed (consecutive-pair) edges via
+    /// [`get_adjacent_vertices_from`](Self::get_adjacent_vertices_from). Self-pairs
+    /// are excluded. The result is sorted and deduplicated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_transitive_closure(
+        &self,
+    ) -> Result<Vec<(VertexIndex, VertexIndex)>, HypergraphError<V, HE>> {
+        super::structural::get_transitive_closure(self)
+    }
+
+    /// Returns the nestedness profile: per-size statistics about hyperedge inclusion.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_nestedness_profile(
+        &self,
+    ) -> Result<Vec<super::NestednessEntry>, HypergraphError<V, HE>> {
+        super::properties::get_nestedness_profile(self)
+    }
+
+    /// Computes degree, closeness, and betweenness centrality for every vertex.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn compute_centrality(
+        &self,
+    ) -> Result<AHashMap<VertexIndex, super::CentralityScores>, HypergraphError<V, HE>> {
+        super::projections::compute_centrality(self)
+    }
+
+    /// Performs a random walk of `steps` from `start` using an Xorshift64 PRNG seeded by `seed`.
+    ///
+    /// Returns a path of length `steps + 1` including the start vertex.
+    /// Seed value `0` is treated as `1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError::VertexIndexNotFound`] if `start` does not exist.
+    fn random_walk(
+        &self,
+        start: VertexIndex,
+        steps: usize,
+        seed: u64,
+    ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        super::traversal::random_walk(self, start, steps, seed)
+    }
+
+    /// Returns the incidence matrix as `(vertex_order, edge_order, matrix)`.
+    ///
+    /// `matrix[i][j] == 1` iff `vertex_order[i]` appears in `edge_order[j]`.
+    /// Both orders are sorted by index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    #[allow(clippy::type_complexity)]
+    fn to_incidence_matrix(
+        &self,
+    ) -> Result<(Vec<VertexIndex>, Vec<HyperedgeIndex>, Vec<Vec<u8>>), HypergraphError<V, HE>> {
+        super::projections::to_incidence_matrix(self)
+    }
+
+    /// Returns the sparse (COO) incidence matrix as `(vertex_order, edge_order, coords)`.
+    ///
+    /// Only `(row, col)` pairs where the value is 1 are included, sorted by `(row, col)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    #[allow(clippy::type_complexity)]
+    fn to_incidence_matrix_coo(
+        &self,
+    ) -> Result<(Vec<VertexIndex>, Vec<HyperedgeIndex>, Vec<(usize, usize)>), HypergraphError<V, HE>>
+    {
+        super::projections::to_incidence_matrix_coo(self)
+    }
+
+    /// Returns the hypergraph Laplacian as `(vertex_order, n×n matrix)`.
+    ///
+    /// Uses clique-expansion with hyperedge weights. If `normalized` is `true`,
+    /// the normalised Laplacian is returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    #[allow(clippy::type_complexity)]
+    fn to_laplacian(
+        &self,
+        normalized: bool,
+    ) -> Result<(Vec<VertexIndex>, Vec<Vec<f64>>), HypergraphError<V, HE>> {
+        super::projections::to_laplacian(self, normalized)
+    }
+
+    /// Returns the line graph: pairs of hyperedges sharing at least one vertex.
+    ///
+    /// Pairs are unordered `(min, max)`, sorted and deduplicated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_line_graph(
+        &self,
+    ) -> Result<Vec<(HyperedgeIndex, HyperedgeIndex)>, HypergraphError<V, HE>> {
+        super::projections::get_line_graph(self)
+    }
+
+    /// Returns the dual hypergraph representation.
+    ///
+    /// For each original vertex (sorted by index), returns the list of incident
+    /// hyperedges (sorted). This is the dual: original vertices become "hyperedges"
+    /// and original hyperedges become "vertices".
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    #[allow(clippy::type_complexity)]
+    fn get_dual(&self) -> Result<Vec<(VertexIndex, Vec<HyperedgeIndex>)>, HypergraphError<V, HE>> {
+        super::projections::get_dual(self)
+    }
 }

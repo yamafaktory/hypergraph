@@ -102,6 +102,25 @@ where
     #[error("Vertex weight {0} was already assigned")]
     VertexWeightAlreadyAssigned(V),
 
+    /// Error when a hyperedge insert position is out of bounds.
+    #[error("HyperedgeIndex {index:?} insert position {position} is out of bounds")]
+    HyperedgeInsertIndexOutOfBounds {
+        index: HyperedgeIndex,
+        position: usize,
+    },
+
+    /// Error when a hyperedge split position is out of bounds.
+    #[error("HyperedgeIndex {index:?} split position {at} is out of bounds")]
+    HyperedgeSplitIndexOutOfBounds { index: HyperedgeIndex, at: usize },
+
+    /// Error when `split_vertex` is called with an empty hyperedge list.
+    #[error("split_vertex requires at least one hyperedge")]
+    HyperedgesInvalidSplit,
+
+    /// Error when `merge_vertices` is called with fewer than two vertices.
+    #[error("merge_vertices requires at least two vertices")]
+    NotEnoughVerticesProvided,
+
     /// Error when the hypergraph contains a cycle and a topological sort is requested.
     #[error("Hypergraph contains a cycle and cannot be topologically sorted")]
     HypergraphContainsCycle,

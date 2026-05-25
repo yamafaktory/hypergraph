@@ -13,6 +13,73 @@ use crate::{
     errors::HypergraphError,
 };
 
+pub(super) fn is_connected<V, HE, Q>(q: &Q) -> Result<bool, HypergraphError<V, HE>>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+    Q: HypergraphQuery<V, HE> + ?Sized,
+{
+    let all_vertices = q.vertex_indices()?;
+    if all_vertices.is_empty() {
+        return Ok(true);
+    }
+    let total = all_vertices.len();
+    let start = all_vertices[0];
+
+    let mut visited: AHashSet<VertexIndex> = AHashSet::new();
+    let mut queue: VecDeque<VertexIndex> = VecDeque::new();
+    visited.insert(start);
+    queue.push_back(start);
+
+    while let Some(current) = queue.pop_front() {
+        for he_idx in q.get_vertex_hyperedges(current)? {
+            for co_member in q.get_hyperedge_vertices(he_idx)? {
+                if visited.insert(co_member) {
+                    queue.push_back(co_member);
+                }
+            }
+        }
+    }
+
+    Ok(visited.len() == total)
+}
+
+pub(super) fn get_transitive_closure<V, HE, Q>(
+    q: &Q,
+) -> Result<Vec<(VertexIndex, VertexIndex)>, HypergraphError<V, HE>>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+    Q: HypergraphQuery<V, HE> + ?Sized,
+{
+    let all_vertices = q.vertex_indices()?;
+    let mut pairs: AHashSet<(VertexIndex, VertexIndex)> = AHashSet::new();
+
+    for &src in &all_vertices {
+        let mut visited: AHashSet<VertexIndex> = AHashSet::new();
+        let mut queue: VecDeque<VertexIndex> = VecDeque::new();
+        visited.insert(src);
+        queue.push_back(src);
+
+        while let Some(current) = queue.pop_front() {
+            for neighbor in q.get_adjacent_vertices_from(current)? {
+                if visited.insert(neighbor) {
+                    queue.push_back(neighbor);
+                    if neighbor != src {
+                        pairs.insert((src, neighbor));
+                    }
+                } else if neighbor != src {
+                    pairs.insert((src, neighbor));
+                }
+            }
+        }
+    }
+
+    let mut result: Vec<(VertexIndex, VertexIndex)> = pairs.into_iter().collect();
+    result.sort_unstable();
+    Ok(result)
+}
+
 pub(super) fn is_acyclic<V, HE, Q>(q: &Q) -> bool
 where
     V: VertexTrait,
@@ -177,6 +244,7 @@ where
 mod tests {
     use crate::{
         Hypergraph,
+        HypergraphQuery,
         core::test_support::{
             E,
             W,
@@ -253,5 +321,40 @@ mod tests {
         let _ = v2;
         let comps = g.connected_components().unwrap();
         assert_eq!(comps.len(), 2);
+    }
+
+    #[test]
+    fn is_connected_true() {
+        let (g, _, _) = build();
+        assert!(HypergraphQuery::is_connected(&g).unwrap());
+    }
+
+    #[test]
+    fn is_connected_false() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let _v0 = g.add_vertex(W(0)).unwrap();
+        let _v1 = g.add_vertex(W(1)).unwrap();
+        // No hyperedge connecting them.
+        assert!(!HypergraphQuery::is_connected(&g).unwrap());
+    }
+
+    #[test]
+    fn is_connected_empty() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(HypergraphQuery::is_connected(&g).unwrap());
+    }
+
+    #[test]
+    fn get_transitive_closure_basic() {
+        let (g, [v0, v1, v2, v3], _) = build();
+        let closure = HypergraphQuery::get_transitive_closure(&g).unwrap();
+        assert!(closure.contains(&(v0, v1)));
+        assert!(closure.contains(&(v0, v2)));
+        assert!(closure.contains(&(v0, v3)));
+        // v1 can reach v2 and v3
+        assert!(closure.contains(&(v1, v2)));
+        assert!(closure.contains(&(v1, v3)));
+        // v0→v0 self-pair should not be present
+        assert!(!closure.contains(&(v0, v0)));
     }
 }

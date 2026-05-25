@@ -10,4 +10,6 @@ mod traversal;
 #[cfg(feature = "persistence")]
 mod persistent_impl;
 
+pub use projections::CentralityScores;
+pub use properties::NestednessEntry;
 pub use trait_def::HypergraphQuery;

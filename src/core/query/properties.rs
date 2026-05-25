@@ -12,6 +12,17 @@ use crate::{
     errors::HypergraphError,
 };
 
+/// A single row of the nestedness profile for a hyperedge size class.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NestednessEntry {
+    /// Distinct-vertex count defining this size class.
+    pub size: usize,
+    /// Hyperedges of this size that are a strict subset of some other hyperedge.
+    pub included: usize,
+    /// Total hyperedges of this size.
+    pub total: usize,
+}
+
 pub(super) fn get_orphan_vertices<V, HE, Q>(
     q: &Q,
 ) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>>
@@ -207,6 +218,48 @@ where
     Ok(result)
 }
 
+pub(super) fn get_nestedness_profile<V, HE, Q>(
+    q: &Q,
+) -> Result<Vec<NestednessEntry>, HypergraphError<V, HE>>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+    Q: HypergraphQuery<V, HE> + ?Sized,
+{
+    let he_indices = q.hyperedge_indices()?;
+    let mut size_of: AHashMap<HyperedgeIndex, usize> = AHashMap::new();
+    let mut total_by_size: AHashMap<usize, usize> = AHashMap::new();
+
+    for &hei in &he_indices {
+        let verts = q.get_hyperedge_vertices(hei)?;
+        let distinct: AHashSet<VertexIndex> = verts.into_iter().collect();
+        let sz = distinct.len();
+        size_of.insert(hei, sz);
+        *total_by_size.entry(sz).or_insert(0) += 1;
+    }
+
+    let subsets = q.get_inclusions()?;
+    let mut included_by_size: AHashMap<usize, usize> = AHashMap::new();
+    let mut counted: AHashSet<HyperedgeIndex> = AHashSet::new();
+    for (subset, _superset) in subsets {
+        if counted.insert(subset) {
+            let sz = size_of[&subset];
+            *included_by_size.entry(sz).or_insert(0) += 1;
+        }
+    }
+
+    let mut entries: Vec<NestednessEntry> = total_by_size
+        .into_iter()
+        .map(|(size, total)| NestednessEntry {
+            size,
+            included: *included_by_size.get(&size).unwrap_or(&0),
+            total,
+        })
+        .collect();
+    entries.sort_by_key(|e| e.size);
+    Ok(entries)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -287,5 +340,34 @@ mod tests {
         g.add_hyperedge(vec![v1, v2], E(1)).unwrap();
         g.add_hyperedge(vec![v2, v0], E(1)).unwrap();
         assert!(g.find_cut_vertices().unwrap().is_empty());
+    }
+
+    #[test]
+    fn get_nestedness_profile_no_inclusions() {
+        let (g, _, _) = build();
+        let profile = HypergraphQuery::get_nestedness_profile(&g).unwrap();
+        // All edges have size 2, none are subsets of each other.
+        assert_eq!(profile.len(), 1);
+        assert_eq!(profile[0].size, 2);
+        assert_eq!(profile[0].total, 3);
+        assert_eq!(profile[0].included, 0);
+    }
+
+    #[test]
+    fn get_nestedness_profile_with_inclusion() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v0 = g.add_vertex(W(0)).unwrap();
+        let v1 = g.add_vertex(W(1)).unwrap();
+        let v2 = g.add_vertex(W(2)).unwrap();
+        g.add_hyperedge(vec![v0, v1, v2], E(1)).unwrap();
+        g.add_hyperedge(vec![v0, v1], E(2)).unwrap();
+        let profile = HypergraphQuery::get_nestedness_profile(&g).unwrap();
+        // size=2 edge is included; size=3 edge is superset.
+        let size2 = profile.iter().find(|e| e.size == 2).unwrap();
+        assert_eq!(size2.included, 1);
+        assert_eq!(size2.total, 1);
+        let size3 = profile.iter().find(|e| e.size == 3).unwrap();
+        assert_eq!(size3.included, 0);
+        assert_eq!(size3.total, 1);
     }
 }

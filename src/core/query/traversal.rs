@@ -10,6 +10,90 @@ use crate::{
     errors::HypergraphError,
 };
 
+fn xorshift64(state: &mut u64) -> u64 {
+    let mut x = *state;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    *state = x;
+    x
+}
+
+#[allow(clippy::cast_precision_loss)]
+pub(super) fn random_walk<V, HE, Q>(
+    q: &Q,
+    start: VertexIndex,
+    steps: usize,
+    seed: u64,
+) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+    Q: HypergraphQuery<V, HE> + ?Sized,
+{
+    // Validate start vertex.
+    q.get_vertex_weight(start)?;
+
+    let mut rng_state: u64 = if seed == 0 { 1 } else { seed };
+    let mut path: Vec<VertexIndex> = vec![start];
+    let mut current = start;
+
+    for _ in 0..steps {
+        let hyperedges = q.get_vertex_hyperedges(current)?;
+        if hyperedges.is_empty() {
+            path.push(current);
+            continue;
+        }
+
+        // Weighted sampling of hyperedge.
+        let weights: Vec<f64> = hyperedges
+            .iter()
+            .map(|&e| {
+                let w = q.get_hyperedge_weight(e)?;
+                Ok(Into::<usize>::into(w) as f64)
+            })
+            .collect::<Result<Vec<_>, HypergraphError<V, HE>>>()?;
+
+        let total: f64 = weights.iter().sum();
+        let sample = xorshift64(&mut rng_state) as f64 / u64::MAX as f64 * total;
+
+        let mut chosen_he = *hyperedges.last().unwrap();
+        let mut cumulative = 0.0;
+        for (i, &w) in weights.iter().enumerate() {
+            cumulative += w;
+            if sample < cumulative {
+                chosen_he = hyperedges[i];
+                break;
+            }
+        }
+
+        // Get distinct vertices of chosen hyperedge excluding current.
+        let verts = q.get_hyperedge_vertices(chosen_he)?;
+        let distinct: Vec<VertexIndex> = {
+            let mut visited: AHashSet<VertexIndex> = AHashSet::new();
+            let mut uniq: Vec<VertexIndex> = Vec::new();
+            for v in verts {
+                if v != current && visited.insert(v) {
+                    uniq.push(v);
+                }
+            }
+            uniq
+        };
+
+        if distinct.is_empty() {
+            path.push(current);
+            continue;
+        }
+
+        #[allow(clippy::cast_possible_truncation)]
+        let next_idx = xorshift64(&mut rng_state) as usize % distinct.len();
+        current = distinct[next_idx];
+        path.push(current);
+    }
+
+    Ok(path)
+}
+
 pub(super) fn get_bfs<V, HE, Q>(
     q: &Q,
     from: VertexIndex,
@@ -235,5 +319,33 @@ mod tests {
         let (g, _, _) = build();
         let bad = VertexIndex::from(999usize);
         assert!(g.get_dfs(bad).is_err());
+    }
+
+    #[test]
+    fn random_walk_length() {
+        use crate::HypergraphQuery;
+        let (g, [v0, _, _, _], _) = build();
+        let path = HypergraphQuery::random_walk(&g, v0, 5, 42).unwrap();
+        assert_eq!(path.len(), 6); // steps + 1
+        assert_eq!(path[0], v0);
+    }
+
+    #[test]
+    fn random_walk_not_found() {
+        use crate::{
+            HypergraphQuery,
+            VertexIndex,
+        };
+        let (g, _, _) = build();
+        assert!(HypergraphQuery::random_walk(&g, VertexIndex(999), 1, 1).is_err());
+    }
+
+    #[test]
+    fn random_walk_seed_zero() {
+        use crate::HypergraphQuery;
+        let (g, [v0, _, _, _], _) = build();
+        // seed 0 treated as 1 — should not panic
+        let path = HypergraphQuery::random_walk(&g, v0, 3, 0).unwrap();
+        assert_eq!(path.len(), 4);
     }
 }

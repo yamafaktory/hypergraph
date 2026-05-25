@@ -30,7 +30,11 @@ pub use crate::core::{
         HypergraphBorrowingIterator,
         HypergraphIterator,
     },
-    query::HypergraphQuery,
+    query::{
+        CentralityScores,
+        HypergraphQuery,
+        NestednessEntry,
+    },
     traits::{
         HyperedgeTrait,
         VertexTrait,

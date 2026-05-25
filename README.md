@@ -23,10 +23,12 @@ This library enables you to represent:
 
 And to compute:
 
-- Graph traversal: **BFS**, **DFS**, reachability, topological sort
+- Graph traversal: **BFS**, **DFS**, reachability, topological sort, random walks
 - Shortest paths: **Dijkstra** point-to-point and single-source
-- Structural analysis: strongly connected components, weakly connected components, all simple paths, subgraph extraction, cycle detection
+- Structural analysis: strongly connected components, weakly connected components, all simple paths, subgraph extraction, cycle detection, connectivity, transitive closure
 - Filtered views: `retain_vertices`, `retain_hyperedges`
+- Graph projections: incidence matrix (dense and COO sparse), Laplacian, line graph, dual hypergraph
+- Analytics: PageRank, centrality scores (degree, closeness, betweenness), nestedness profile
 - Generic query interface: `HypergraphQuery` trait works over both `Hypergraph` and `PersistentHypergraph`
 
 ## 📐 API reference
@@ -59,6 +61,7 @@ Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQu
 | `get_vertex_degree_in(v)` / `get_vertex_degree_out(v)` | In/out degree |
 | `get_hyperedges_intersections(edges)` | Shared vertices across multiple hyperedges |
 | `get_hyperedges_connecting(from, to)` | Hyperedges that contain a directed `from→to` pair |
+| `get_vertex_neighborhood(v)` | All co-members of `v` across every hyperedge it belongs to |
 
 ### Graph traversal
 
@@ -69,6 +72,7 @@ Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQu
 | `is_reachable(from, to)` | Whether `to` is reachable from `from` |
 | `get_all_paths(from, to)` | All simple paths between two vertices |
 | `topological_sort()` | Kahn's algorithm; returns an error on cycles |
+| `random_walk(from, steps, seed)` | Random walk of `steps` hops from a vertex |
 
 ### Shortest paths
 
@@ -87,6 +91,8 @@ Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQu
 | `is_acyclic()` | Cycle detection |
 | `find_cut_vertices()` | Articulation points via iterative Tarjan DFS |
 | `subgraph(vertices)` | Induced subgraph over a vertex set |
+| `is_connected()` | Whether the hypergraph is connected (clique-expansion BFS) |
+| `get_transitive_closure()` | All directed reachability pairs `(from, to)` |
 
 ### Graph properties
 
@@ -98,6 +104,7 @@ Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQu
 | `get_inclusions()` | All proper subset/superset pairs of hyperedges |
 | `is_k_uniform(k)` | Whether every hyperedge has exactly `k` vertices |
 | `get_core(min_degree, min_size)` | k-core decomposition via iterative peeling |
+| `get_nestedness_profile()` | Per-size inclusion statistics as `Vec<NestednessEntry>` |
 
 ### Graph projections
 
@@ -105,12 +112,18 @@ Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQu
 |---|---|
 | `expand_to_graph()` | Directed graph from consecutive vertex pairs |
 | `expand_to_star()` | Bipartite vertex–hyperedge membership pairs |
+| `to_incidence_matrix()` | Dense vertex × hyperedge incidence matrix |
+| `to_incidence_matrix_coo()` | Sparse COO (row, col) pairs for the incidence matrix |
+| `to_laplacian(normalized)` | Clique-expansion Laplacian (raw or normalized) |
+| `get_line_graph()` | Pairs of hyperedges sharing at least one vertex |
+| `get_dual()` | Dual hypergraph: per-vertex sorted list of incident hyperedges |
 
 ### Analytics
 
 | Method | Description |
 |---|---|
 | `compute_page_rank(damping, iterations)` | Iterative PageRank power method |
+| `compute_centrality(v)` | Degree, closeness, and betweenness centrality for a vertex |
 
 ### Mutations (`Hypergraph` only)
 
@@ -131,6 +144,15 @@ Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQu
 | `reverse_hyperedge(edge)` | Reverse the vertex ordering of a hyperedge |
 | `clear_hyperedges()` | Remove all hyperedges, keeping vertices |
 | `clear()` | Remove everything |
+| `append_vertex_to_hyperedge(edge, vertex)` | Append a vertex to the end of a hyperedge |
+| `prepend_vertex_to_hyperedge(edge, vertex)` | Prepend a vertex to the start of a hyperedge |
+| `insert_vertex_into_hyperedge(edge, vertex, pos)` | Insert a vertex at a given position |
+| `delete_vertex_from_hyperedge(edge, vertex)` | Remove the first occurrence of a vertex from a hyperedge |
+| `split_hyperedge(edge, at, weight)` | Split a hyperedge at an index into two new hyperedges |
+| `split_vertex(vertex, edges, weight)` | Create a new vertex replacing `vertex` in specified hyperedges |
+| `merge_vertices(primary, secondaries, weight)` | Merge multiple vertices into one |
+| `get_k_skeleton(k)` | Subhypergraph of all hyperedges with at most `k` vertices (stable indices) |
+| `get_edge_induced_subhypergraph(edges)` | Subhypergraph induced by specified hyperedges (reassigned indices) |
 
 ### Iterators (`Hypergraph` only)
 

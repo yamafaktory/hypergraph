@@ -11,9 +11,11 @@ use common::{
     Vertex,
 };
 use hypergraph::{
+    CentralityScores,
     HyperedgeIndex,
     Hypergraph,
     HypergraphQuery,
+    NestednessEntry,
     VertexIndex,
 };
 
@@ -571,4 +573,182 @@ fn query_compute_page_rank() {
     assert!(ranks[&b] > ranks[&a], "b is more central than a");
     let total: f64 = ranks.values().sum();
     assert!((total - 1.0).abs() < 0.01, "ranks should sum to ~1.0");
+}
+
+#[test]
+fn query_is_connected_true() {
+    let (g, _, _) = build_acyclic();
+    assert!(HypergraphQuery::is_connected(&g).unwrap());
+}
+
+#[test]
+fn query_is_connected_false() {
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let _a = g.add_vertex(Vertex::new("a")).unwrap();
+    let _b = g.add_vertex(Vertex::new("b")).unwrap();
+    // No hyperedges: two isolated vertices.
+    assert!(!HypergraphQuery::is_connected(&g).unwrap());
+}
+
+#[test]
+fn query_is_connected_empty() {
+    let g = Hypergraph::<Vertex, Hyperedge>::new();
+    assert!(HypergraphQuery::is_connected(&g).unwrap());
+}
+
+#[test]
+fn query_get_vertex_neighborhood_basic() {
+    let (g, [a, b, c, d], _) = build_acyclic();
+    // b is in e0=[a,b], e1=[b,c], e2=[b,d]
+    let mut nbrs = HypergraphQuery::get_vertex_neighborhood(&g, b).unwrap();
+    nbrs.sort();
+    let mut expected = vec![a, c, d];
+    expected.sort();
+    assert_eq!(nbrs, expected);
+}
+
+#[test]
+fn query_get_vertex_neighborhood_not_found() {
+    let (g, _, _) = build_acyclic();
+    assert!(HypergraphQuery::get_vertex_neighborhood(&g, VertexIndex(999)).is_err());
+}
+
+#[test]
+fn query_get_transitive_closure_basic() {
+    let (g, [a, b, c, d], _) = build_acyclic();
+    let closure = HypergraphQuery::get_transitive_closure(&g).unwrap();
+    // a can reach b, c, d
+    assert!(closure.contains(&(a, b)));
+    assert!(closure.contains(&(a, c)));
+    assert!(closure.contains(&(a, d)));
+    // b can reach c, d
+    assert!(closure.contains(&(b, c)));
+    assert!(closure.contains(&(b, d)));
+    // c and d are sinks
+    assert!(!closure.contains(&(c, a)));
+    assert!(!closure.contains(&(d, a)));
+    // no self-pairs
+    assert!(!closure.contains(&(a, a)));
+}
+
+#[test]
+fn query_get_nestedness_profile_no_inclusions() {
+    let (g, _, _) = build_acyclic();
+    let profile: Vec<NestednessEntry> = HypergraphQuery::get_nestedness_profile(&g).unwrap();
+    // All edges have size 2, none are subsets of each other.
+    assert_eq!(profile.len(), 1);
+    assert_eq!(profile[0].size, 2);
+    assert_eq!(profile[0].total, 3);
+    assert_eq!(profile[0].included, 0);
+}
+
+#[test]
+fn query_get_nestedness_profile_with_inclusion() {
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    let c = g.add_vertex(Vertex::new("c")).unwrap();
+    g.add_hyperedge(vec![a, b, c], Hyperedge::new("big", 1))
+        .unwrap();
+    g.add_hyperedge(vec![a, b], Hyperedge::new("small", 1))
+        .unwrap();
+    let profile: Vec<NestednessEntry> = HypergraphQuery::get_nestedness_profile(&g).unwrap();
+    let size2 = profile.iter().find(|e| e.size == 2).unwrap();
+    assert_eq!(size2.included, 1);
+    let size3 = profile.iter().find(|e| e.size == 3).unwrap();
+    assert_eq!(size3.included, 0);
+}
+
+#[test]
+fn query_compute_centrality_basic() {
+    let (g, [a, b, c, d], _) = build_acyclic();
+    let scores: std::collections::HashMap<VertexIndex, CentralityScores> =
+        HypergraphQuery::compute_centrality(&g)
+            .unwrap()
+            .into_iter()
+            .collect();
+    assert!(scores.contains_key(&a));
+    assert!(scores.contains_key(&b));
+    assert!(scores.contains_key(&c));
+    assert!(scores.contains_key(&d));
+    // b has edges to c and d; it should have higher betweenness than a
+    assert!(scores[&b].betweenness >= scores[&a].betweenness);
+}
+
+#[test]
+fn query_random_walk_length() {
+    let (g, [a, _, _, _], _) = build_acyclic();
+    let path = HypergraphQuery::random_walk(&g, a, 5, 42).unwrap();
+    assert_eq!(path.len(), 6); // steps + 1
+    assert_eq!(path[0], a);
+}
+
+#[test]
+fn query_random_walk_not_found() {
+    let (g, _, _) = build_acyclic();
+    assert!(HypergraphQuery::random_walk(&g, VertexIndex(999), 1, 1).is_err());
+}
+
+#[test]
+fn query_to_incidence_matrix_dimensions() {
+    let (g, _, _) = build_acyclic();
+    let (vord, eord, mat) = HypergraphQuery::to_incidence_matrix(&g).unwrap();
+    assert_eq!(vord.len(), 4);
+    assert_eq!(eord.len(), 3);
+    assert_eq!(mat.len(), 4);
+    assert!(mat.iter().all(|row| row.len() == 3));
+}
+
+#[test]
+fn query_to_incidence_matrix_coo_count() {
+    let (g, _, _) = build_acyclic();
+    let (vord, eord, coords) = HypergraphQuery::to_incidence_matrix_coo(&g).unwrap();
+    assert_eq!(vord.len(), 4);
+    assert_eq!(eord.len(), 3);
+    // 6 memberships: a-e0, b-e0, b-e1, c-e1, b-e2, d-e2
+    assert_eq!(coords.len(), 6);
+    // coords are sorted
+    let mut sorted = coords.clone();
+    sorted.sort_unstable();
+    assert_eq!(coords, sorted);
+}
+
+#[test]
+fn query_to_laplacian_row_sum_zero() {
+    let (g, _, _) = build_acyclic();
+    let (_vord, mat) = HypergraphQuery::to_laplacian(&g, false).unwrap();
+    for row in &mat {
+        let sum: f64 = row.iter().sum();
+        assert!(sum.abs() < 1e-10, "row sum should be 0, got {sum}");
+    }
+}
+
+#[test]
+fn query_get_line_graph_basic() {
+    let (g, _, [e0, e1, e2]) = build_acyclic();
+    let lg = HypergraphQuery::get_line_graph(&g).unwrap();
+    // e0=[a,b], e1=[b,c], e2=[b,d] — all share b
+    assert!(lg.contains(&(e0, e1)));
+    assert!(lg.contains(&(e0, e2)));
+    assert!(lg.contains(&(e1, e2)));
+}
+
+#[test]
+fn query_get_dual_basic() {
+    let (g, [a, b, c, d], [e0, e1, e2]) = build_acyclic();
+    let dual = HypergraphQuery::get_dual(&g).unwrap();
+    assert_eq!(dual.len(), 4);
+    // vertices are sorted by index
+    assert_eq!(dual[0].0, a);
+    assert_eq!(dual[1].0, b);
+    assert_eq!(dual[2].0, c);
+    assert_eq!(dual[3].0, d);
+    // a is in e0 only
+    assert_eq!(dual[0].1, vec![e0]);
+    // b is in e0, e1, e2
+    assert_eq!(dual[1].1, vec![e0, e1, e2]);
+    // c is in e1
+    assert_eq!(dual[2].1, vec![e1]);
+    // d is in e2
+    assert_eq!(dual[3].1, vec![e2]);
 }

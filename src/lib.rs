@@ -56,6 +56,7 @@
 //! | [`get_vertex_degree_in`](HypergraphQuery::get_vertex_degree_in) / [`get_vertex_degree_out`](HypergraphQuery::get_vertex_degree_out) | In/out degree |
 //! | [`get_hyperedges_intersections`](HypergraphQuery::get_hyperedges_intersections) | Shared vertices across multiple hyperedges |
 //! | [`get_hyperedges_connecting`](HypergraphQuery::get_hyperedges_connecting) | Hyperedges containing a directed pair |
+//! | [`get_vertex_neighborhood`](HypergraphQuery::get_vertex_neighborhood) | Co-members of a vertex across all its hyperedges |
 //!
 //! ### Graph traversal
 //!
@@ -66,6 +67,7 @@
 //! | [`is_reachable`](HypergraphQuery::is_reachable) | Whether one vertex can reach another |
 //! | [`get_all_paths`](HypergraphQuery::get_all_paths) | All simple paths between two vertices |
 //! | [`topological_sort`](HypergraphQuery::topological_sort) | Kahn's algorithm; errors on cycles |
+//! | [`random_walk`](HypergraphQuery::random_walk) | Weighted random walk from a starting vertex |
 //!
 //! ### Shortest paths
 //!
@@ -82,6 +84,8 @@
 //! | [`strongly_connected_components`](HypergraphQuery::strongly_connected_components) | Kosaraju's algorithm |
 //! | [`connected_components`](HypergraphQuery::connected_components) | Weakly connected components |
 //! | [`is_acyclic`](HypergraphQuery::is_acyclic) | Cycle detection |
+//! | [`is_connected`](HypergraphQuery::is_connected) | Undirected connectivity (clique-expansion BFS) |
+//! | [`get_transitive_closure`](HypergraphQuery::get_transitive_closure) | All directed reachability pairs |
 //! | [`find_cut_vertices`](HypergraphQuery::find_cut_vertices) | Articulation points via iterative Tarjan DFS |
 //! | [`subgraph`](crate::core::Hypergraph::subgraph) | Induced subgraph over a vertex set |
 //!
@@ -95,6 +99,7 @@
 //! | [`get_inclusions`](HypergraphQuery::get_inclusions) | Proper subset/superset pairs of hyperedges |
 //! | [`is_k_uniform`](HypergraphQuery::is_k_uniform) | Whether every hyperedge has exactly `k` vertices |
 //! | [`get_core`](HypergraphQuery::get_core) | k-core decomposition via iterative peeling |
+//! | [`get_nestedness_profile`](HypergraphQuery::get_nestedness_profile) | Per-size inclusion statistics ([`NestednessEntry`]) |
 //!
 //! ### Graph projections
 //!
@@ -102,12 +107,18 @@
 //! |---|---|
 //! | [`expand_to_graph`](HypergraphQuery::expand_to_graph) | Directed graph from consecutive vertex pairs |
 //! | [`expand_to_star`](HypergraphQuery::expand_to_star) | Bipartite vertex–hyperedge membership pairs |
+//! | [`to_incidence_matrix`](HypergraphQuery::to_incidence_matrix) | Dense vertex×hyperedge incidence matrix |
+//! | [`to_incidence_matrix_coo`](HypergraphQuery::to_incidence_matrix_coo) | Sparse COO incidence matrix |
+//! | [`to_laplacian`](HypergraphQuery::to_laplacian) | Clique-expansion Laplacian (normalised or raw) |
+//! | [`get_line_graph`](HypergraphQuery::get_line_graph) | Hyperedge pairs sharing at least one vertex |
+//! | [`get_dual`](HypergraphQuery::get_dual) | Dual: per-vertex list of incident hyperedges |
 //!
 //! ### Analytics
 //!
 //! | Method | Description |
 //! |---|---|
 //! | [`compute_page_rank`](HypergraphQuery::compute_page_rank) | Iterative `PageRank` power method |
+//! | [`compute_centrality`](HypergraphQuery::compute_centrality) | Degree, closeness, and betweenness ([`CentralityScores`]) |
 //!
 //! ### Mutations (`Hypergraph` only)
 //!
@@ -126,6 +137,15 @@
 //! | [`contract_hyperedge_vertices`](Hypergraph::contract_hyperedge_vertices) | Contract a set of vertices to one |
 //! | [`join_hyperedges`](Hypergraph::join_hyperedges) | Merge hyperedges into their union |
 //! | [`reverse_hyperedge`](Hypergraph::reverse_hyperedge) | Reverse the vertex ordering of a hyperedge |
+//! | [`append_vertex_to_hyperedge`](Hypergraph::append_vertex_to_hyperedge) | Append a vertex to a hyperedge |
+//! | [`prepend_vertex_to_hyperedge`](Hypergraph::prepend_vertex_to_hyperedge) | Prepend a vertex to a hyperedge |
+//! | [`insert_vertex_into_hyperedge`](Hypergraph::insert_vertex_into_hyperedge) | Insert a vertex at a given position |
+//! | [`delete_vertex_from_hyperedge`](Hypergraph::delete_vertex_from_hyperedge) | Remove the first occurrence of a vertex from a hyperedge |
+//! | [`split_hyperedge`](Hypergraph::split_hyperedge) | Split a hyperedge at a position into two |
+//! | [`split_vertex`](Hypergraph::split_vertex) | Duplicate a vertex into selected hyperedges |
+//! | [`merge_vertices`](Hypergraph::merge_vertices) | Merge a set of vertices into one |
+//! | [`get_k_skeleton`](Hypergraph::get_k_skeleton) | Sub-hypergraph of edges with at most `k` vertices |
+//! | [`get_edge_induced_subhypergraph`](Hypergraph::get_edge_induced_subhypergraph) | Sub-hypergraph induced by a set of edges |
 //! | [`clear_hyperedges`](Hypergraph::clear_hyperedges) | Remove all hyperedges, keeping vertices |
 //! | [`clear`](Hypergraph::clear) | Remove everything |
 //!

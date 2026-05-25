@@ -242,6 +242,31 @@ where
     Ok(false)
 }
 
+pub(super) fn get_vertex_neighborhood<V, HE, Q>(
+    q: &Q,
+    v: VertexIndex,
+) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>>
+where
+    V: VertexTrait,
+    HE: HyperedgeTrait,
+    Q: HypergraphQuery<V, HE> + ?Sized,
+{
+    // Validate the vertex exists.
+    q.get_vertex_weight(v)?;
+
+    let he_indices = q.get_vertex_hyperedges(v)?;
+    let mut neighbors: Vec<VertexIndex> = Vec::new();
+    for he_idx in he_indices {
+        for co_member in q.get_hyperedge_vertices(he_idx)? {
+            if co_member != v && !neighbors.contains(&co_member) {
+                neighbors.push(co_member);
+            }
+        }
+    }
+    neighbors.sort();
+    Ok(neighbors)
+}
+
 pub(super) fn get_vertex_index<V, HE, Q>(
     q: &Q,
     weight: V,
@@ -265,6 +290,7 @@ mod tests {
     use crate::{
         Hypergraph,
         HypergraphQuery,
+        VertexIndex,
         core::test_support::{
             E,
             W,
@@ -393,5 +419,27 @@ mod tests {
         let v1 = g.add_vertex(W(1)).unwrap();
         g.add_hyperedge(vec![v0], E(1)).unwrap();
         assert_eq!(g.get_orphan_vertices().unwrap(), vec![v1]);
+    }
+
+    #[test]
+    fn get_vertex_neighborhood_basic() {
+        let (g, [v0, v1, v2, v3], _) = build();
+        // v1 is in e0=[v0,v1], e1=[v1,v2], e2=[v1,v3]
+        let mut nbrs = HypergraphQuery::get_vertex_neighborhood(&g, v1).unwrap();
+        nbrs.sort();
+        assert_eq!(nbrs, vec![v0, v2, v3]);
+    }
+
+    #[test]
+    fn get_vertex_neighborhood_excludes_self() {
+        let (g, [v0, _, _, _], _) = build();
+        let nbrs = HypergraphQuery::get_vertex_neighborhood(&g, v0).unwrap();
+        assert!(!nbrs.contains(&v0));
+    }
+
+    #[test]
+    fn get_vertex_neighborhood_not_found() {
+        let (g, _, _) = build();
+        assert!(HypergraphQuery::get_vertex_neighborhood(&g, VertexIndex(999)).is_err());
     }
 }

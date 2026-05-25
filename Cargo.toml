@@ -10,7 +10,7 @@ name = "hypergraph"
 readme = "README.md"
 repository = "https://github.com/yamafaktory/hypergraph"
 rust-version = "1.95"
-version = "3.0.0"
+version = "4.0.0"
 
 [features]
 serde = ["dep:serde", "indexmap/serde"]

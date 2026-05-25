@@ -29,6 +29,118 @@ And to compute:
 - Filtered views: `retain_vertices`, `retain_hyperedges`
 - Generic query interface: `HypergraphQuery` trait works over both `Hypergraph` and `PersistentHypergraph`
 
+## 📐 API reference
+
+### Graph primitives
+
+Available on both `Hypergraph` and `PersistentHypergraph` via the [`HypergraphQuery`](https://docs.rs/hypergraph) trait.
+
+| Method | Description |
+|---|---|
+| `count_vertices()` / `count_hyperedges()` | Number of elements |
+| `is_empty()` | Whether the graph has any vertices |
+| `vertex_indices()` / `hyperedge_indices()` | All stable indices |
+| `get_vertex_weight(idx)` / `get_hyperedge_weight(idx)` | Weight lookup by index |
+| `get_vertex_hyperedges(idx)` | Hyperedge indices that include a vertex |
+| `get_hyperedge_vertices(idx)` | Ordered vertex list of a hyperedge |
+
+### Vertex and hyperedge lookups
+
+| Method | Description |
+|---|---|
+| `contains_vertex(weight)` | Whether any vertex has the given weight |
+| `get_vertex_index(weight)` | Indices of all vertices with the given weight |
+| `find_hyperedges_by_weight(weight)` | Indices of all hyperedges with the given weight |
+| `get_adjacent_vertices_from(v)` | Vertices directly reachable from `v` |
+| `get_adjacent_vertices_to(v)` | Vertices with a direct edge into `v` |
+| `get_full_adjacent_vertices_from(v)` | Neighbours from `v` paired with their connecting hyperedges |
+| `get_full_adjacent_vertices_to(v)` | Predecessors of `v` paired with their connecting hyperedges |
+| `get_full_vertex_hyperedges(v)` | Vertex lists of every hyperedge containing `v` |
+| `get_vertex_degree_in(v)` / `get_vertex_degree_out(v)` | In/out degree |
+| `get_hyperedges_intersections(edges)` | Shared vertices across multiple hyperedges |
+| `get_hyperedges_connecting(from, to)` | Hyperedges that contain a directed `from→to` pair |
+
+### Graph traversal
+
+| Method | Description |
+|---|---|
+| `get_bfs(from)` | Breadth-first traversal order from a vertex |
+| `get_dfs(from)` | Depth-first traversal order from a vertex |
+| `is_reachable(from, to)` | Whether `to` is reachable from `from` |
+| `get_all_paths(from, to)` | All simple paths between two vertices |
+| `topological_sort()` | Kahn's algorithm; returns an error on cycles |
+
+### Shortest paths
+
+| Method | Description |
+|---|---|
+| `get_dijkstra_connections(from, to)` | Cheapest path with hyperedge trace |
+| `get_dijkstra_connections_with_cost(from, to)` | Same, plus the total cost |
+| `get_dijkstra_from(from)` | Cheapest cost to every reachable vertex |
+
+### Structural analysis
+
+| Method | Description |
+|---|---|
+| `strongly_connected_components()` | Kosaraju's algorithm |
+| `connected_components()` | Weakly connected components |
+| `is_acyclic()` | Cycle detection |
+| `find_cut_vertices()` | Articulation points via iterative Tarjan DFS |
+| `subgraph(vertices)` | Induced subgraph over a vertex set |
+
+### Graph properties
+
+| Method | Description |
+|---|---|
+| `get_orphan_vertices()` | Vertices belonging to no hyperedge |
+| `get_orphan_hyperedges()` | Hyperedges with an empty vertex list |
+| `get_endpoints()` | `(sources, sinks)` — in-degree 0 / out-degree 0 |
+| `get_inclusions()` | All proper subset/superset pairs of hyperedges |
+| `is_k_uniform(k)` | Whether every hyperedge has exactly `k` vertices |
+| `get_core(min_degree, min_size)` | k-core decomposition via iterative peeling |
+
+### Graph projections
+
+| Method | Description |
+|---|---|
+| `expand_to_graph()` | Directed graph from consecutive vertex pairs |
+| `expand_to_star()` | Bipartite vertex–hyperedge membership pairs |
+
+### Analytics
+
+| Method | Description |
+|---|---|
+| `compute_page_rank(damping, iterations)` | Iterative PageRank power method |
+
+### Mutations (`Hypergraph` only)
+
+| Method | Description |
+|---|---|
+| `new()` / `with_capacity(n)` | Create an empty graph |
+| `add_vertex(weight)` | Add a vertex; returns its stable `VertexIndex` |
+| `add_hyperedge(vertices, weight)` | Add a hyperedge; returns its stable `HyperedgeIndex` |
+| `remove_vertex(idx)` | Remove a vertex and all hyperedges that contain it |
+| `remove_hyperedge(idx)` | Remove a hyperedge |
+| `update_vertex_weight(idx, weight)` | Replace a vertex's weight |
+| `update_hyperedge_weight(idx, weight)` | Replace a hyperedge's weight |
+| `update_hyperedge_vertices(idx, vertices)` | Replace a hyperedge's vertex list |
+| `retain_vertices(predicate)` | Remove vertices that fail the predicate |
+| `retain_hyperedges(predicate)` | Remove hyperedges that fail the predicate |
+| `contract_hyperedge_vertices(edge, merge, into)` | Contract a set of vertices to one |
+| `join_hyperedges(edges)` | Merge hyperedges into their union |
+| `reverse_hyperedge(edge)` | Reverse the vertex ordering of a hyperedge |
+| `clear_hyperedges()` | Remove all hyperedges, keeping vertices |
+| `clear()` | Remove everything |
+
+### Iterators (`Hypergraph` only)
+
+| Method | Description |
+|---|---|
+| `iter()` | Borrowing iterator over `(&HE, Vec<&V>)` tuples |
+| `vertices_iter()` | Iterator over `(VertexIndex, &V)` pairs |
+| `hyperedges_iter()` | Iterator over `(HyperedgeIndex, &HE)` pairs |
+| `into_iter()` | Consuming iterator over `(HE, Vec<V>)` tuples |
+
 ## ⚗️ Implementation
 
 - 100% safe Rust

@@ -106,3 +106,20 @@ where
             .finish_non_exhaustive()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+
+    use crate::core::test_support::disk::build_persistent;
+
+    #[test]
+    fn debug_contains_counts() {
+        let dir = TempDir::new().unwrap();
+        let (g, _, _) = build_persistent(dir.path());
+        let s = format!("{g:?}");
+        assert!(s.contains("PersistentHypergraph"));
+        assert!(s.contains("vertices: 4"));
+        assert!(s.contains("hyperedges: 3"));
+    }
+}

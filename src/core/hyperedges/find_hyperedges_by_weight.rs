@@ -24,13 +24,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Hypergraph,
-        core::test_support::{
-            E,
-            W,
-            build,
-        },
+    use crate::core::test_support::{
+        E,
+        build,
     };
 
     #[test]

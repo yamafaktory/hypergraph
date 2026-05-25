@@ -3,19 +3,25 @@
 #[cfg(feature = "persistence")]
 mod disk_tests {
     use std::{
-        fmt::{Display, Formatter, Result},
+        fmt::{
+            Display,
+            Formatter,
+            Result,
+        },
         sync::Arc,
     };
 
-    use hypergraph::{HyperedgeIndex, PersistentHypergraph, VertexIndex};
+    use hypergraph::{
+        HyperedgeIndex,
+        PersistentHypergraph,
+        VertexIndex,
+    };
 
     // ──────────────────────────────────────────────────────────────────────
     // Minimal vertex / hyperedge types
     // ──────────────────────────────────────────────────────────────────────
 
-    #[derive(
-        Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize,
-    )]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
     struct V(u32);
 
     impl Display for V {
@@ -24,9 +30,7 @@ mod disk_tests {
         }
     }
 
-    #[derive(
-        Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize,
-    )]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
     struct HE(u32);
 
     impl Display for HE {
@@ -182,10 +186,7 @@ mod disk_tests {
         let he0 = g.add_hyperedge(&[v0, v1], HE(1)).expect("he0");
 
         g.update_hyperedge_vertices(he0, &[v0, v2]).expect("update");
-        assert_eq!(
-            g.get_hyperedge_vertices(he0).expect("verts"),
-            vec![v0, v2]
-        );
+        assert_eq!(g.get_hyperedge_vertices(he0).expect("verts"), vec![v0, v2]);
 
         // v1 should no longer reference he0.
         assert!(g.get_vertex_hyperedges(v1).expect("v1 hes").is_empty());
@@ -288,7 +289,11 @@ mod disk_tests {
         assert_eq!(all_indices.len(), total);
         all_indices.sort_unstable();
         all_indices.dedup();
-        assert_eq!(all_indices.len(), total, "duplicate vertex indices detected");
+        assert_eq!(
+            all_indices.len(),
+            total,
+            "duplicate vertex indices detected"
+        );
         assert_eq!(g.count_vertices(), total);
     }
 
@@ -326,7 +331,11 @@ mod disk_tests {
         assert_eq!(all_indices.len(), total);
         all_indices.sort_unstable();
         all_indices.dedup();
-        assert_eq!(all_indices.len(), total, "duplicate hyperedge indices detected");
+        assert_eq!(
+            all_indices.len(),
+            total,
+            "duplicate hyperedge indices detected"
+        );
         assert_eq!(g.count_hyperedges(), total);
     }
 }

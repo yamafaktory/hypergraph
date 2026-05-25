@@ -25,7 +25,10 @@ where
         self.vertices_count += 1;
         self.vertices.insert(
             index,
-            (weight, AIndexSet::with_capacity_and_hasher(0, ARandomState::default())),
+            (
+                weight,
+                AIndexSet::with_capacity_and_hasher(0, ARandomState::default()),
+            ),
         );
         Ok(index)
     }

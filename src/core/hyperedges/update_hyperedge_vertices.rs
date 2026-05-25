@@ -56,14 +56,18 @@ where
 
         // Add hyperedge ref to newly included vertices.
         for &v in &new_unique {
-            if !prev_unique.contains(&v) && let Some((_, he_set)) = self.vertices.get_mut(&v) {
+            if !prev_unique.contains(&v)
+                && let Some((_, he_set)) = self.vertices.get_mut(&v)
+            {
                 he_set.insert(hyperedge_index);
             }
         }
 
         // Remove hyperedge ref from vertices no longer included.
         for &v in &prev_unique {
-            if !new_unique.contains(&v) && let Some((_, he_set)) = self.vertices.get_mut(&v) {
+            if !new_unique.contains(&v)
+                && let Some((_, he_set)) = self.vertices.get_mut(&v)
+            {
                 he_set.swap_remove(&hyperedge_index);
             }
         }

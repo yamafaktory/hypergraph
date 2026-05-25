@@ -1,10 +1,18 @@
 use std::sync::atomic::Ordering;
 
-use serde::{Serialize, de::DeserializeOwned};
-
-use crate::{HyperedgeIndex, HyperedgeTrait, VertexIndex, VertexTrait, errors::HypergraphError};
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
 
 use super::PersistentHypergraph;
+use crate::{
+    HyperedgeIndex,
+    HyperedgeTrait,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> PersistentHypergraph<V, HE>
 where
@@ -39,9 +47,8 @@ where
         }
 
         #[allow(clippy::cast_possible_truncation)]
-        let he_idx = HyperedgeIndex(
-            self.hyperedges_next_idx.fetch_add(1, Ordering::Relaxed) as usize,
-        );
+        let he_idx =
+            HyperedgeIndex(self.hyperedges_next_idx.fetch_add(1, Ordering::Relaxed) as usize);
         self.hyperedges_count.fetch_add(1, Ordering::Relaxed);
 
         self.store_hyperedge(he_idx, vertices, weight)?;

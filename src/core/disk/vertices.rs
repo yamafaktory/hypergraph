@@ -1,10 +1,18 @@
 use std::sync::atomic::Ordering;
 
-use serde::{Serialize, de::DeserializeOwned};
-
-use crate::{HyperedgeIndex, HyperedgeTrait, VertexIndex, VertexTrait, errors::HypergraphError};
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
 
 use super::PersistentHypergraph;
+use crate::{
+    HyperedgeIndex,
+    HyperedgeTrait,
+    VertexIndex,
+    VertexTrait,
+    errors::HypergraphError,
+};
 
 impl<V, HE> PersistentHypergraph<V, HE>
 where
@@ -21,9 +29,7 @@ where
     /// Returns [`HypergraphError::StorageError`] on I/O failure.
     pub fn add_vertex(&self, weight: V) -> Result<VertexIndex, HypergraphError<V, HE>> {
         #[allow(clippy::cast_possible_truncation)]
-        let idx = VertexIndex(
-            self.vertices_next_idx.fetch_add(1, Ordering::Relaxed) as usize,
-        );
+        let idx = VertexIndex(self.vertices_next_idx.fetch_add(1, Ordering::Relaxed) as usize);
         self.vertices_count.fetch_add(1, Ordering::Relaxed);
         self.store_vertex(idx, weight)?;
         self.flush_meta()?;
@@ -119,8 +125,10 @@ where
                 self.delete_hyperedge(he_idx)?;
                 self.hyperedges_count.fetch_sub(1, Ordering::Relaxed);
             } else {
-                let new_verts: Vec<VertexIndex> =
-                    vertices.into_iter().filter(|&v| v != vertex_index).collect();
+                let new_verts: Vec<VertexIndex> = vertices
+                    .into_iter()
+                    .filter(|&v| v != vertex_index)
+                    .collect();
                 let he_weight = self.load_hyperedge(he_idx)?.1;
                 self.store_hyperedge(he_idx, &new_verts, he_weight)?;
             }

@@ -52,13 +52,17 @@ where
     /// Returns an iterator over all vertices as `(VertexIndex, &V)` pairs, in insertion order.
     #[must_use = "the iterator is lazy and must be consumed"]
     pub fn vertices_iter(&self) -> impl Iterator<Item = (VertexIndex, &V)> + '_ {
-        self.vertices.iter().map(|(&idx, (weight, _))| (idx, weight))
+        self.vertices
+            .iter()
+            .map(|(&idx, (weight, _))| (idx, weight))
     }
 
     /// Returns an iterator over all hyperedges as `(HyperedgeIndex, &HE)` pairs, in insertion order.
     #[must_use = "the iterator is lazy and must be consumed"]
     pub fn hyperedges_iter(&self) -> impl Iterator<Item = (HyperedgeIndex, &HE)> + '_ {
-        self.hyperedges.iter().map(|(&idx, (_, weight))| (idx, weight))
+        self.hyperedges
+            .iter()
+            .map(|(&idx, (_, weight))| (idx, weight))
     }
 }
 

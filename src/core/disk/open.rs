@@ -1,14 +1,35 @@
-use std::{marker::PhantomData, path::Path, sync::atomic::AtomicU64};
+use std::{
+    marker::PhantomData,
+    path::Path,
+    sync::atomic::AtomicU64,
+};
 
-use fjall::{Database, KeyspaceCreateOptions};
+use fjall::{
+    Database,
+    KeyspaceCreateOptions,
+};
 use quick_cache::sync::Cache;
-use serde::{Serialize, de::DeserializeOwned};
-
-use crate::{HyperedgeTrait, VertexTrait, errors::HypergraphError};
+use serde::{
+    Serialize,
+    de::DeserializeOwned,
+};
 
 use super::{
-    DEFAULT_CACHE_CAPACITY, PersistentHypergraph, META_HYPEREDGE_COUNT, META_HYPEREDGE_IDX,
-    META_VERTEX_COUNT, META_VERTEX_IDX, decode_u64, storage_err,
+    PersistentHypergraph,
+    helpers::{
+        DEFAULT_CACHE_CAPACITY,
+        META_HYPEREDGE_COUNT,
+        META_HYPEREDGE_IDX,
+        META_VERTEX_COUNT,
+        META_VERTEX_IDX,
+        decode_u64,
+        storage_err,
+    },
+};
+use crate::{
+    HyperedgeTrait,
+    VertexTrait,
+    errors::HypergraphError,
 };
 
 impl<V, HE> PersistentHypergraph<V, HE>

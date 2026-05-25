@@ -37,8 +37,10 @@ where
             if unique_verts.len() == 1 {
                 self.remove_hyperedge(he_index)?;
             } else {
-                let updated: Vec<VertexIndex> =
-                    vertices.into_iter().filter(|&v| v != vertex_index).collect();
+                let updated: Vec<VertexIndex> = vertices
+                    .into_iter()
+                    .filter(|&v| v != vertex_index)
+                    .collect();
                 self.update_hyperedge_vertices(he_index, updated)?;
             }
         }

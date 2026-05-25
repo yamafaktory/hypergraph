@@ -15,3 +15,29 @@ where
         self.hyperedges.len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn empty_graph_is_zero() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert_eq!(g.count_hyperedges(), 0);
+    }
+
+    #[test]
+    fn after_additions() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v = g.add_vertex(W(0)).unwrap();
+        g.add_hyperedge(vec![v], E(1)).unwrap();
+        g.add_hyperedge(vec![v], E(2)).unwrap();
+        assert_eq!(g.count_hyperedges(), 2);
+    }
+}

@@ -27,3 +27,28 @@ where
             .ok_or(HypergraphError::HyperedgeIndexNotFound(hyperedge_index))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        HyperedgeIndex,
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_weight() {
+        let (g, _, [e0, _e1, _e2]) = build();
+        assert_eq!(g.get_hyperedge_weight(e0).unwrap(), &E(1));
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_hyperedge_weight(HyperedgeIndex(99)).is_err());
+    }
+}

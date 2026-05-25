@@ -25,3 +25,23 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn clears_all_hyperedges_keeps_vertices() {
+        let (mut g, _, _) = build();
+        g.clear_hyperedges().unwrap();
+        assert_eq!(g.count_hyperedges(), 0);
+        assert_eq!(g.count_vertices(), 4);
+    }
+}

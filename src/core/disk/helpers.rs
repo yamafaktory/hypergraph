@@ -23,20 +23,12 @@ use crate::{
     errors::HypergraphError,
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Constants
-// ──────────────────────────────────────────────────────────────────────────────
-
 pub(super) const META_VERTEX_IDX: &[u8] = b"vi";
 pub(super) const META_VERTEX_COUNT: &[u8] = b"vc";
 pub(super) const META_HYPEREDGE_IDX: &[u8] = b"hi";
 pub(super) const META_HYPEREDGE_COUNT: &[u8] = b"hc";
 
 pub(super) const DEFAULT_CACHE_CAPACITY: usize = 10_000;
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Key helpers
-// ──────────────────────────────────────────────────────────────────────────────
 
 pub(super) fn decode_u64(bytes: &[u8]) -> u64 {
     bytes
@@ -95,10 +87,6 @@ where
 {
     HypergraphError::StorageError(e.to_string())
 }
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ──────────────────────────────────────────────────────────────────────────────
 
 impl<V, HE> PersistentHypergraph<V, HE>
 where
@@ -198,13 +186,13 @@ where
         let keys: Vec<[u8; 16]> = self
             .vertex_refs_ks
             .prefix(vertex_key(v))
-            .filter_map(|guard| {
-                guard
-                    .into_inner()
-                    .ok()
-                    .and_then(|(k, _)| k.get(..16).and_then(|b| b.try_into().ok()))
+            .map(|guard| {
+                let (k, _) = guard.into_inner().map_err(storage_err)?;
+                k.get(..16).and_then(|b| b.try_into().ok()).ok_or_else(|| {
+                    HypergraphError::StorageError("invalid vertex ref key length".into())
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         for key in keys {
             self.vertex_refs_ks.remove(key).map_err(storage_err)?;
@@ -285,5 +273,85 @@ where
             hc.to_be_bytes().as_slice(),
         );
         batch.commit().map_err(storage_err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::{
+        decode_u64,
+        hyperedge_key,
+        key_to_hyperedge,
+        key_to_vertex,
+        vertex_key,
+        vertex_ref_key,
+    };
+    use crate::{
+        HyperedgeIndex,
+        VertexIndex,
+        core::test_support::disk::{
+            EP,
+            WP,
+            build_persistent,
+        },
+    };
+
+    #[test]
+    fn decode_u64_roundtrip() {
+        let n: u64 = 0xDEAD_BEEF_1234_5678;
+        assert_eq!(decode_u64(&n.to_be_bytes()), n);
+    }
+
+    #[test]
+    fn decode_u64_short_slice_returns_zero() {
+        assert_eq!(decode_u64(&[1, 2, 3]), 0);
+    }
+
+    #[test]
+    fn vertex_key_roundtrip() {
+        let idx = VertexIndex(42);
+        assert_eq!(key_to_vertex(&vertex_key(idx)), Some(idx));
+    }
+
+    #[test]
+    fn hyperedge_key_roundtrip() {
+        let idx = HyperedgeIndex(7);
+        assert_eq!(key_to_hyperedge(&hyperedge_key(idx)), Some(idx));
+    }
+
+    #[test]
+    fn vertex_ref_key_encodes_both_indices() {
+        let v = VertexIndex(1);
+        let he = HyperedgeIndex(2);
+        let key = vertex_ref_key(v, he);
+        assert_eq!(key_to_vertex(&key[..8]), Some(v));
+        assert_eq!(key_to_hyperedge(&key[8..]), Some(he));
+    }
+
+    #[test]
+    fn load_and_store_vertex() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, _v1, _v2, _v3], _) = build_persistent(dir.path());
+        assert_eq!(g.load_vertex(v0).unwrap(), WP(0));
+    }
+
+    #[test]
+    fn load_vertex_refs_returns_hyperedge_indices() {
+        let dir = tempdir().unwrap();
+        let (g, [_v0, v1, _v2, _v3], [e0, e1, e2]) = build_persistent(dir.path());
+        let mut got = g.load_vertex_refs(v1).unwrap();
+        got.sort();
+        assert_eq!(got, vec![e0, e1, e2]);
+    }
+
+    #[test]
+    fn load_hyperedge_returns_arc() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, v1, _v2, _v3], [e0, _e1, _e2]) = build_persistent(dir.path());
+        let arc = g.load_hyperedge(e0).unwrap();
+        assert_eq!(arc.0, vec![v0, v1]);
+        assert_eq!(arc.1, EP(1));
     }
 }

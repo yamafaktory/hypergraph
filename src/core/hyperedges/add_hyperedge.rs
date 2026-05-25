@@ -62,3 +62,48 @@ where
         Ok(he_index)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        HyperedgeIndex,
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn returns_sequential_indices() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v = g.add_vertex(W(0)).unwrap();
+        let e0 = g.add_hyperedge(vec![v], E(1)).unwrap();
+        let e1 = g.add_hyperedge(vec![v], E(2)).unwrap();
+        assert_eq!(e0, HyperedgeIndex(0));
+        assert_eq!(e1, HyperedgeIndex(1));
+    }
+
+    #[test]
+    fn empty_vertices_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.add_hyperedge(vec![], E(1)).is_err());
+    }
+
+    #[test]
+    fn missing_vertex_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.add_hyperedge(vec![VertexIndex(99)], E(1)).is_err());
+    }
+
+    #[test]
+    fn identical_entry_is_idempotent() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v = g.add_vertex(W(0)).unwrap();
+        let e0 = g.add_hyperedge(vec![v], E(1)).unwrap();
+        let e1 = g.add_hyperedge(vec![v], E(1)).unwrap();
+        assert_eq!(e0, e1);
+        assert_eq!(g.count_hyperedges(), 1);
+    }
+}

@@ -16,7 +16,7 @@ use hypergraph::{
 };
 
 #[test]
-fn integration_contration() {
+fn integration_contraction() {
     // Create a new hypergraph.
     let mut graph = Hypergraph::<Vertex, Hyperedge>::new();
 

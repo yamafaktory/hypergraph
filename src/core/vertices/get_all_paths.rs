@@ -82,3 +82,37 @@ where
         Ok(all_paths)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn finds_path_between_vertices() {
+        let (g, [v0, _v1, v2, _v3], _) = build();
+        let paths = g.get_all_paths(v0, v2).unwrap();
+        assert!(!paths.is_empty());
+        assert_eq!(paths[0][0], v0);
+        assert_eq!(*paths[0].last().unwrap(), v2);
+    }
+
+    #[test]
+    fn same_vertex_returns_singleton() {
+        let (g, [v0, _v1, _v2, _v3], _) = build();
+        assert_eq!(g.get_all_paths(v0, v0).unwrap(), vec![vec![v0]]);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_all_paths(VertexIndex(0), VertexIndex(1)).is_err());
+    }
+}

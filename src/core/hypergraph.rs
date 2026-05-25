@@ -150,3 +150,53 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn new_is_empty() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.is_empty());
+        assert_eq!(g.count_vertices(), 0);
+        assert_eq!(g.count_hyperedges(), 0);
+    }
+
+    #[test]
+    fn with_capacity_is_empty() {
+        let g: Hypergraph<W, E> = Hypergraph::with_capacity(10, 10);
+        assert!(g.is_empty());
+    }
+
+    #[test]
+    fn is_empty_false_after_add() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        g.add_vertex(W(0)).unwrap();
+        assert!(!g.is_empty());
+    }
+
+    #[test]
+    fn clear_empties_everything() {
+        let (mut g, _, _) = build();
+        g.clear();
+        assert!(g.is_empty());
+        assert_eq!(g.count_hyperedges(), 0);
+        // Counters reset — next insertion starts at 0
+        let idx = g.add_vertex(W(0)).unwrap();
+        assert_eq!(idx.0, 0);
+    }
+
+    #[test]
+    fn default_is_empty() {
+        let g: Hypergraph<W, E> = Hypergraph::default();
+        assert!(g.is_empty());
+    }
+}

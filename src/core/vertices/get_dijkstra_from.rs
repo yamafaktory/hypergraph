@@ -1,7 +1,4 @@
-use std::{
-    cmp::Ordering,
-    collections::BinaryHeap,
-};
+use std::collections::BinaryHeap;
 
 use ahash::AHashMap;
 
@@ -10,35 +7,9 @@ use crate::{
     Hypergraph,
     VertexIndex,
     VertexTrait,
+    core::shared::Visitor,
     errors::HypergraphError,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Visitor {
-    distance: usize,
-    index: VertexIndex,
-}
-
-impl Visitor {
-    fn new(distance: usize, index: VertexIndex) -> Self {
-        Self { distance, index }
-    }
-}
-
-impl Ord for Visitor {
-    fn cmp(&self, other: &Visitor) -> Ordering {
-        other
-            .distance
-            .cmp(&self.distance)
-            .then_with(|| self.index.cmp(&other.index))
-    }
-}
-
-impl PartialOrd for Visitor {
-    fn partial_cmp(&self, other: &Visitor) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 impl<V, HE> Hypergraph<V, HE>
 where
@@ -98,5 +69,34 @@ where
         }
 
         Ok(distances)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_distances_from_source() {
+        let (g, [v0, v1, v2, v3], _) = build();
+        let dist = g.get_dijkstra_from(v0).unwrap();
+        assert_eq!(dist[&v0], 0);
+        assert_eq!(dist[&v1], 1); // cost of e0
+        assert_eq!(dist[&v2], 3); // e0(1) + e1(2)
+        assert_eq!(dist[&v3], 4); // e0(1) + e2(3)
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_dijkstra_from(VertexIndex(99)).is_err());
     }
 }

@@ -93,3 +93,31 @@ where
         self.get_hyperedge_vertices(hyperedge_index)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn contracts_vertices() {
+        let (mut g, [v0, v1, v2, _v3], [e0, _e1, _e2]) = build();
+        // e0 = [v0, v1]; contract v0 and v1 into v0
+        let result = g.contract_hyperedge_vertices(e0, vec![v0, v1], v0).unwrap();
+        // both v0 and v1 map to v0; consecutive duplicates deduped → [v0]
+        assert_eq!(result, vec![v0]);
+        let _ = v2;
+    }
+
+    #[test]
+    fn target_not_in_set_returns_error() {
+        let (mut g, [v0, v1, v2, _v3], [e0, _e1, _e2]) = build();
+        assert!(g.contract_hyperedge_vertices(e0, vec![v0, v1], v2).is_err());
+    }
+}

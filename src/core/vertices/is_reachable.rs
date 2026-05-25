@@ -56,3 +56,41 @@ where
         Ok(false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn reachable_via_path() {
+        let (g, [v0, _v1, v2, _v3], _) = build();
+        assert!(g.is_reachable(v0, v2).unwrap());
+    }
+
+    #[test]
+    fn self_is_reachable() {
+        let (g, [v0, _v1, _v2, _v3], _) = build();
+        assert!(g.is_reachable(v0, v0).unwrap());
+    }
+
+    #[test]
+    fn unreachable_returns_false() {
+        let (g, [v0, _v1, _v2, v3], _) = build();
+        // v3 has no outgoing edges
+        assert!(!g.is_reachable(v3, v0).unwrap());
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.is_reachable(VertexIndex(0), VertexIndex(1)).is_err());
+    }
+}

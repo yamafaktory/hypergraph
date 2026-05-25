@@ -63,3 +63,31 @@ where
         Ok(sub)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn induced_subgraph_has_correct_vertices_and_edges() {
+        let (g, [v0, v1, v2, _v3], _) = build();
+        let sub = g.subgraph(&[v0, v1, v2]).unwrap();
+        assert_eq!(sub.count_vertices(), 3);
+        // e0 = [v0,v1] and e1 = [v1,v2] are both fully within {v0,v1,v2}
+        assert_eq!(sub.count_hyperedges(), 2);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.subgraph(&[VertexIndex(99)]).is_err());
+    }
+}

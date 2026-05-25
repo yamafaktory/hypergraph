@@ -79,3 +79,45 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        HyperedgeIndex,
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn updates_vertex_list() {
+        let (mut g, [v0, _v1, v2, _v3], [e0, _e1, _e2]) = build();
+        g.update_hyperedge_vertices(e0, vec![v0, v2]).unwrap();
+        assert_eq!(g.get_hyperedge_vertices(e0).unwrap(), vec![v0, v2]);
+    }
+
+    #[test]
+    fn empty_vertices_returns_error() {
+        let (mut g, _, [e0, _e1, _e2]) = build();
+        assert!(g.update_hyperedge_vertices(e0, vec![]).is_err());
+    }
+
+    #[test]
+    fn unchanged_vertices_returns_error() {
+        let (mut g, [v0, v1, _v2, _v3], [e0, _e1, _e2]) = build();
+        assert!(g.update_hyperedge_vertices(e0, vec![v0, v1]).is_err());
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v = g.add_vertex(W(0)).unwrap();
+        assert!(
+            g.update_hyperedge_vertices(HyperedgeIndex(99), vec![v])
+                .is_err()
+        );
+    }
+}

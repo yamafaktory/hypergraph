@@ -31,3 +31,29 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn retains_matching_removes_rest() {
+        let (mut g, _, [e0, _e1, _e2]) = build();
+        g.retain_hyperedges(|idx, _| idx == e0).unwrap();
+        assert_eq!(g.count_hyperedges(), 1);
+    }
+
+    #[test]
+    fn keep_all_leaves_graph_intact() {
+        let (mut g, _, _) = build();
+        g.retain_hyperedges(|_, _| true).unwrap();
+        assert_eq!(g.count_hyperedges(), 3);
+    }
+}

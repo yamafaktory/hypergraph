@@ -60,3 +60,29 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn joins_two_hyperedges() {
+        let (mut g, [v0, v1, v2, _v3], [e0, e1, _e2]) = build();
+        g.join_hyperedges(&[e0, e1]).unwrap();
+        assert_eq!(g.count_hyperedges(), 2); // e0+e1 merged, e2 remains
+        assert_eq!(g.get_hyperedge_vertices(e0).unwrap(), vec![v0, v1, v1, v2]);
+    }
+
+    #[test]
+    fn too_few_hyperedges_returns_error() {
+        let (mut g, _, [e0, _e1, _e2]) = build();
+        assert!(g.join_hyperedges(&[e0]).is_err());
+    }
+}

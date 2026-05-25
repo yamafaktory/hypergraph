@@ -9,7 +9,10 @@ pub(crate) mod hypergraph;
 pub(crate) mod indexes;
 #[doc(hidden)]
 pub mod iterator;
+pub mod query;
 pub(crate) mod shared;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub(crate) mod traits;
 pub(crate) mod types;
 #[doc(hidden)]
@@ -27,6 +30,7 @@ pub use crate::core::{
         HypergraphBorrowingIterator,
         HypergraphIterator,
     },
+    query::HypergraphQuery,
     traits::{
         HyperedgeTrait,
         VertexTrait,

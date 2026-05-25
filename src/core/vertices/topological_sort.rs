@@ -64,3 +64,34 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn dag_produces_valid_order() {
+        let (g, [v0, v1, _v2, _v3], _) = build();
+        let order = g.topological_sort().unwrap();
+        let pos0 = order.iter().position(|&v| v == v0).unwrap();
+        let pos1 = order.iter().position(|&v| v == v1).unwrap();
+        assert!(pos0 < pos1);
+    }
+
+    #[test]
+    fn cyclic_graph_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let a = g.add_vertex(W(0)).unwrap();
+        let b = g.add_vertex(W(1)).unwrap();
+        g.add_hyperedge(vec![a, b], E(1)).unwrap();
+        g.add_hyperedge(vec![b, a], E(1)).unwrap();
+        assert!(g.topological_sort().is_err());
+    }
+}

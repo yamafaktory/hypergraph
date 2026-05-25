@@ -55,3 +55,29 @@ where
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_common_vertices() {
+        let (g, [_v0, v1, _v2, _v3], [e0, e1, e2]) = build();
+        let mut got = g.get_hyperedges_intersections(&[e0, e1, e2]).unwrap();
+        got.sort();
+        assert_eq!(got, vec![v1]);
+    }
+
+    #[test]
+    fn too_few_hyperedges_returns_error() {
+        let (g, _, [e0, _e1, _e2]) = build();
+        assert!(g.get_hyperedges_intersections(&[e0]).is_err());
+    }
+}

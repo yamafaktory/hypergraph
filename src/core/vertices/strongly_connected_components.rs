@@ -85,3 +85,36 @@ where
         Ok(sccs)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn detects_scc_in_cyclic_graph() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let a = g.add_vertex(W(0)).unwrap();
+        let b = g.add_vertex(W(1)).unwrap();
+        let c = g.add_vertex(W(2)).unwrap();
+        g.add_hyperedge(vec![a, b], E(1)).unwrap();
+        g.add_hyperedge(vec![b, c], E(1)).unwrap();
+        g.add_hyperedge(vec![c, a], E(1)).unwrap();
+        let sccs = g.strongly_connected_components().unwrap();
+        let mut big = vec![a, b, c];
+        big.sort();
+        assert!(sccs.contains(&big));
+    }
+
+    #[test]
+    fn dag_has_singleton_sccs() {
+        let (g, _, _) = super::super::super::test_support::build();
+        let sccs = g.strongly_connected_components().unwrap();
+        assert!(sccs.iter().all(|scc| scc.len() == 1));
+    }
+}

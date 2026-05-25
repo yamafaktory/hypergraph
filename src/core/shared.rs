@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use itertools::Itertools;
 use rayon::prelude::*;
 
@@ -9,6 +11,34 @@ use crate::{
     VertexTrait,
     errors::HypergraphError,
 };
+
+/// Min-heap entry used by Dijkstra implementations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Visitor {
+    pub(crate) distance: usize,
+    pub(crate) index: VertexIndex,
+}
+
+impl Visitor {
+    pub(crate) fn new(distance: usize, index: VertexIndex) -> Self {
+        Self { distance, index }
+    }
+}
+
+impl Ord for Visitor {
+    fn cmp(&self, other: &Visitor) -> Ordering {
+        other
+            .distance
+            .cmp(&self.distance)
+            .then_with(|| self.index.cmp(&other.index))
+    }
+}
+
+impl PartialOrd for Visitor {
+    fn partial_cmp(&self, other: &Visitor) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 /// Enumeration of the different types of connection.
 /// Only used as a guard argument for the `get_connections` method.
@@ -86,5 +116,43 @@ where
             .collect::<Connections>();
 
         Ok(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BinaryHeap;
+
+    use crate::{
+        VertexIndex,
+        core::shared::Visitor,
+    };
+
+    #[test]
+    fn new_sets_fields() {
+        let v = Visitor::new(5, VertexIndex(3));
+        assert_eq!(v.distance, 5);
+        assert_eq!(v.index, VertexIndex(3));
+    }
+
+    #[test]
+    fn min_heap_pops_smallest_distance_first() {
+        let mut heap = BinaryHeap::new();
+        heap.push(Visitor::new(10, VertexIndex(0)));
+        heap.push(Visitor::new(1, VertexIndex(1)));
+        heap.push(Visitor::new(5, VertexIndex(2)));
+        assert_eq!(heap.pop().unwrap().distance, 1);
+        assert_eq!(heap.pop().unwrap().distance, 5);
+        assert_eq!(heap.pop().unwrap().distance, 10);
+    }
+
+    #[test]
+    fn equal_distance_breaks_tie_by_larger_index_first() {
+        let mut heap = BinaryHeap::new();
+        heap.push(Visitor::new(3, VertexIndex(2)));
+        heap.push(Visitor::new(3, VertexIndex(5)));
+        // tie-break is self.index.cmp(&other.index) — not reversed — so
+        // the larger index wins in the underlying max-heap and pops first.
+        assert_eq!(heap.pop().unwrap().index, VertexIndex(5));
     }
 }

@@ -52,3 +52,35 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn removes_vertex_and_fixes_hyperedges() {
+        let (mut g, [v0, v1, v2, v3], [e0, e1, e2]) = build();
+        // v0 only appears in e0; removing it should drop e0 (sole unique member? no: e0 has v0,v1)
+        // e0 = [v0, v1]: v0 removed → e0 becomes [v1], a unary
+        g.remove_vertex(v0).unwrap();
+        assert_eq!(g.count_vertices(), 3);
+        // e1 and e2 are untouched (don't contain v0)
+        assert_eq!(g.get_hyperedge_vertices(e1).unwrap(), vec![v1, v2]);
+        assert_eq!(g.get_hyperedge_vertices(e2).unwrap(), vec![v1, v3]);
+        let _ = (e0,); // silence unused warning
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.remove_vertex(VertexIndex(99)).is_err());
+    }
+}

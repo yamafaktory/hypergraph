@@ -40,3 +40,35 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        HyperedgeIndex,
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn updates_weight() {
+        let (mut g, _, [e0, _e1, _e2]) = build();
+        g.update_hyperedge_weight(e0, E(99)).unwrap();
+        assert_eq!(g.get_hyperedge_weight(e0).unwrap(), &E(99));
+    }
+
+    #[test]
+    fn unchanged_weight_returns_error() {
+        let (mut g, _, [e0, _e1, _e2]) = build();
+        assert!(g.update_hyperedge_weight(e0, E(1)).is_err());
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.update_hyperedge_weight(HyperedgeIndex(99), E(1)).is_err());
+    }
+}

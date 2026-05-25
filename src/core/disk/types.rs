@@ -19,16 +19,8 @@ use crate::{
     VertexTrait,
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Type aliases
-// ──────────────────────────────────────────────────────────────────────────────
-
 /// Cached hyperedge entry: ordered vertex list + weight.
 pub(super) type HyperedgeArc<HE> = Arc<(Vec<VertexIndex>, HE)>;
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Struct definition
-// ──────────────────────────────────────────────────────────────────────────────
 
 /// A directed hypergraph persisted on disk via fjall (LSM-tree) with a
 /// [`quick_cache`] hot-data layer.

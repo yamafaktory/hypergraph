@@ -21,10 +21,6 @@ use crate::{
     errors::HypergraphError,
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Graph-level utilities
-// ──────────────────────────────────────────────────────────────────────────────
-
 impl<V, HE> PersistentHypergraph<V, HE>
 where
     V: VertexTrait + Serialize + DeserializeOwned,
@@ -86,6 +82,8 @@ where
         self.hyperedge_cache.clear();
         self.vertices_count.store(0, Ordering::Relaxed);
         self.hyperedges_count.store(0, Ordering::Relaxed);
+        self.vertices_next_idx.store(0, Ordering::Relaxed);
+        self.hyperedges_next_idx.store(0, Ordering::Relaxed);
 
         self.flush_meta()
     }
@@ -122,5 +120,73 @@ where
                 })
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use crate::core::test_support::disk::{
+        EP,
+        WP,
+        build_persistent,
+    };
+
+    #[test]
+    fn count_vertices_and_hyperedges() {
+        let dir = tempdir().unwrap();
+        let (g, _, _) = build_persistent(dir.path());
+        assert_eq!(g.count_vertices(), 4);
+        assert_eq!(g.count_hyperedges(), 3);
+    }
+
+    #[test]
+    fn is_empty_false_after_add() {
+        let dir = tempdir().unwrap();
+        let (g, _, _) = build_persistent(dir.path());
+        assert!(!g.is_empty());
+    }
+
+    #[test]
+    fn is_empty_true_for_new_graph() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.is_empty());
+    }
+
+    #[test]
+    fn vertex_indices_returns_all() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, v1, v2, v3], _) = build_persistent(dir.path());
+        let mut got = g.vertex_indices().unwrap();
+        got.sort();
+        assert_eq!(got, vec![v0, v1, v2, v3]);
+    }
+
+    #[test]
+    fn hyperedge_indices_returns_all() {
+        let dir = tempdir().unwrap();
+        let (g, _, [e0, e1, e2]) = build_persistent(dir.path());
+        let mut got = g.hyperedge_indices().unwrap();
+        got.sort();
+        assert_eq!(got, vec![e0, e1, e2]);
+    }
+
+    #[test]
+    fn clear_resets_everything() {
+        let dir = tempdir().unwrap();
+        let (g, _, _) = build_persistent(dir.path());
+        g.clear().unwrap();
+        assert_eq!(g.count_vertices(), 0);
+        assert_eq!(g.count_hyperedges(), 0);
+        assert!(g.is_empty());
+    }
+
+    #[test]
+    fn persist_does_not_error() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.persist().is_ok());
     }
 }

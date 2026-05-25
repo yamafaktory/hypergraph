@@ -141,3 +141,73 @@ where
         self.flush_meta()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use crate::{
+        VertexIndex,
+        core::test_support::disk::{
+            EP,
+            WP,
+            build_persistent,
+        },
+    };
+
+    #[test]
+    fn add_vertex_returns_sequential_indices() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        let i0 = g.add_vertex(WP(0)).unwrap();
+        let i1 = g.add_vertex(WP(1)).unwrap();
+        assert_eq!(i0, VertexIndex(0));
+        assert_eq!(i1, VertexIndex(1));
+    }
+
+    #[test]
+    fn get_vertex_weight_returns_value() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, _v1, _v2, _v3], _) = build_persistent(dir.path());
+        assert_eq!(g.get_vertex_weight(v0).unwrap(), WP(0));
+    }
+
+    #[test]
+    fn get_vertex_weight_not_found() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.get_vertex_weight(VertexIndex(99)).is_err());
+    }
+
+    #[test]
+    fn update_vertex_weight() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, _v1, _v2, _v3], _) = build_persistent(dir.path());
+        g.update_vertex_weight(v0, WP(99)).unwrap();
+        assert_eq!(g.get_vertex_weight(v0).unwrap(), WP(99));
+    }
+
+    #[test]
+    fn update_vertex_weight_unchanged_returns_error() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, _v1, _v2, _v3], _) = build_persistent(dir.path());
+        assert!(g.update_vertex_weight(v0, WP(0)).is_err());
+    }
+
+    #[test]
+    fn get_vertex_hyperedges_returns_indices() {
+        let dir = tempdir().unwrap();
+        let (g, [_v0, v1, _v2, _v3], [e0, e1, e2]) = build_persistent(dir.path());
+        let mut got = g.get_vertex_hyperedges(v1).unwrap();
+        got.sort();
+        assert_eq!(got, vec![e0, e1, e2]);
+    }
+
+    #[test]
+    fn remove_vertex_decrements_count() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, _v1, _v2, _v3], _) = build_persistent(dir.path());
+        g.remove_vertex(v0).unwrap();
+        assert_eq!(g.count_vertices(), 3);
+    }
+}

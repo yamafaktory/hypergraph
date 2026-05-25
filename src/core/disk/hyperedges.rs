@@ -201,3 +201,99 @@ where
         self.flush_meta()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use crate::{
+        HyperedgeIndex,
+        VertexIndex,
+        core::test_support::disk::{
+            EP,
+            WP,
+            build_persistent,
+        },
+    };
+
+    #[test]
+    fn add_hyperedge_returns_index() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, v1, _v2, _v3], _) = build_persistent(dir.path());
+        let e = g.add_hyperedge(&[v0, v1], EP(99)).unwrap();
+        assert!(e.0 >= 3); // already have 3 edges from build_persistent
+    }
+
+    #[test]
+    fn add_hyperedge_empty_vertices_returns_error() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.add_hyperedge(&[], EP(1)).is_err());
+    }
+
+    #[test]
+    fn add_hyperedge_missing_vertex_returns_error() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.add_hyperedge(&[VertexIndex(99)], EP(1)).is_err());
+    }
+
+    #[test]
+    fn get_hyperedge_weight() {
+        let dir = tempdir().unwrap();
+        let (g, _, [e0, _e1, _e2]) = build_persistent(dir.path());
+        assert_eq!(g.get_hyperedge_weight(e0).unwrap(), EP(1));
+    }
+
+    #[test]
+    fn get_hyperedge_weight_not_found() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.get_hyperedge_weight(HyperedgeIndex(99)).is_err());
+    }
+
+    #[test]
+    fn get_hyperedge_vertices() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, v1, _v2, _v3], [e0, _e1, _e2]) = build_persistent(dir.path());
+        assert_eq!(g.get_hyperedge_vertices(e0).unwrap(), vec![v0, v1]);
+    }
+
+    #[test]
+    fn update_hyperedge_weight() {
+        let dir = tempdir().unwrap();
+        let (g, _, [e0, _e1, _e2]) = build_persistent(dir.path());
+        g.update_hyperedge_weight(e0, EP(99)).unwrap();
+        assert_eq!(g.get_hyperedge_weight(e0).unwrap(), EP(99));
+    }
+
+    #[test]
+    fn update_hyperedge_weight_unchanged_returns_error() {
+        let dir = tempdir().unwrap();
+        let (g, _, [e0, _e1, _e2]) = build_persistent(dir.path());
+        assert!(g.update_hyperedge_weight(e0, EP(1)).is_err());
+    }
+
+    #[test]
+    fn update_hyperedge_vertices() {
+        let dir = tempdir().unwrap();
+        let (g, [v0, _v1, v2, _v3], [e0, _e1, _e2]) = build_persistent(dir.path());
+        g.update_hyperedge_vertices(e0, &[v0, v2]).unwrap();
+        assert_eq!(g.get_hyperedge_vertices(e0).unwrap(), vec![v0, v2]);
+    }
+
+    #[test]
+    fn remove_hyperedge_decrements_count() {
+        let dir = tempdir().unwrap();
+        let (g, _, [e0, _e1, _e2]) = build_persistent(dir.path());
+        g.remove_hyperedge(e0).unwrap();
+        assert_eq!(g.count_hyperedges(), 2);
+    }
+
+    #[test]
+    fn remove_hyperedge_not_found_returns_error() {
+        let dir = tempdir().unwrap();
+        let g = crate::core::disk::PersistentHypergraph::<WP, EP>::open(dir.path()).unwrap();
+        assert!(g.remove_hyperedge(HyperedgeIndex(99)).is_err());
+    }
+}

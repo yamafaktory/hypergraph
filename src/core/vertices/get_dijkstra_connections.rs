@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     collections::BinaryHeap,
     iter::successors,
 };
@@ -12,36 +11,9 @@ use crate::{
     Hypergraph,
     VertexIndex,
     VertexTrait,
+    core::shared::Visitor,
     errors::HypergraphError,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Visitor {
-    distance: usize,
-    index: VertexIndex,
-}
-
-impl Visitor {
-    fn new(distance: usize, index: VertexIndex) -> Self {
-        Self { distance, index }
-    }
-}
-
-// Custom Ord for a min-heap by distance, with VertexIndex as tiebreaker.
-impl Ord for Visitor {
-    fn cmp(&self, other: &Visitor) -> Ordering {
-        other
-            .distance
-            .cmp(&self.distance)
-            .then_with(|| self.index.cmp(&other.index))
-    }
-}
-
-impl PartialOrd for Visitor {
-    fn partial_cmp(&self, other: &Visitor) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 type DijkstraResult<V, HE> =
     Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>>;
@@ -149,5 +121,36 @@ where
         to: VertexIndex,
     ) -> Result<(usize, Vec<(VertexIndex, Option<HyperedgeIndex>)>), HypergraphError<V, HE>> {
         self.dijkstra_impl(from, to)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn finds_shortest_path() {
+        let (g, [v0, _v1, v2, _v3], [e0, e1, _e2]) = build();
+        assert_eq!(
+            g.get_dijkstra_connections(v0, v2).unwrap(),
+            vec![(v0, None), (_v1, Some(e0)), (v2, Some(e1))]
+        );
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(
+            g.get_dijkstra_connections(VertexIndex(0), VertexIndex(1))
+                .is_err()
+        );
     }
 }

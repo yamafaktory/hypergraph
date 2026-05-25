@@ -54,3 +54,31 @@ where
         .collect_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_predecessor_with_hyperedges() {
+        let (g, [v0, v1, _v2, _v3], [e0, _e1, _e2]) = build();
+        let got = g.get_full_adjacent_vertices_to(v1).unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].0, v0);
+        assert_eq!(got[0].1, vec![e0]);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_full_adjacent_vertices_to(VertexIndex(99)).is_err());
+    }
+}

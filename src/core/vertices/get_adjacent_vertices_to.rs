@@ -42,3 +42,29 @@ where
         Ok(results)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn returns_predecessors() {
+        let (g, [v0, v1, _v2, _v3], _) = build();
+        let got = g.get_adjacent_vertices_to(v1).unwrap();
+        assert_eq!(got, vec![v0]);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_adjacent_vertices_to(VertexIndex(99)).is_err());
+    }
+}

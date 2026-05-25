@@ -42,3 +42,29 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        HyperedgeIndex,
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn removes_hyperedge() {
+        let (mut g, _, [e0, _e1, _e2]) = build();
+        g.remove_hyperedge(e0).unwrap();
+        assert_eq!(g.count_hyperedges(), 2);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.remove_hyperedge(HyperedgeIndex(99)).is_err());
+    }
+}

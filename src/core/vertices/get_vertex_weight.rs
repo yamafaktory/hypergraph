@@ -27,3 +27,28 @@ where
             .ok_or(HypergraphError::VertexIndexNotFound(vertex_index))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn returns_weight() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let idx = g.add_vertex(W(5)).unwrap();
+        assert_eq!(g.get_vertex_weight(idx).unwrap(), &W(5));
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_vertex_weight(VertexIndex(99)).is_err());
+    }
+}

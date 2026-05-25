@@ -63,3 +63,33 @@ where
         Ok(components)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn two_disconnected_components() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let a = g.add_vertex(W(0)).unwrap();
+        let b = g.add_vertex(W(1)).unwrap();
+        let c = g.add_vertex(W(2)).unwrap();
+        let d = g.add_vertex(W(3)).unwrap();
+        g.add_hyperedge(vec![a, b], E(1)).unwrap();
+        g.add_hyperedge(vec![c, d], E(1)).unwrap();
+        let components = g.connected_components().unwrap();
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn empty_graph_returns_empty_vec() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.connected_components().unwrap().is_empty());
+    }
+}

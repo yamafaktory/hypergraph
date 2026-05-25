@@ -27,3 +27,34 @@ where
         Ok(results.len())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn counts_incoming_edges() {
+        let (g, [_v0, v1, _v2, _v3], _) = build();
+        assert_eq!(g.get_vertex_degree_in(v1).unwrap(), 1);
+    }
+
+    #[test]
+    fn source_vertex_has_zero_in_degree() {
+        let (g, [v0, _v1, _v2, _v3], _) = build();
+        assert_eq!(g.get_vertex_degree_in(v0).unwrap(), 0);
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.get_vertex_degree_in(VertexIndex(99)).is_err());
+    }
+}

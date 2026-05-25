@@ -40,3 +40,36 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        VertexIndex,
+        core::test_support::{
+            E,
+            W,
+        },
+    };
+
+    #[test]
+    fn updates_weight() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let idx = g.add_vertex(W(1)).unwrap();
+        g.update_vertex_weight(idx, W(2)).unwrap();
+        assert_eq!(g.get_vertex_weight(idx).unwrap(), &W(2));
+    }
+
+    #[test]
+    fn unchanged_weight_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let idx = g.add_vertex(W(1)).unwrap();
+        assert!(g.update_vertex_weight(idx, W(1)).is_err());
+    }
+
+    #[test]
+    fn not_found_returns_error() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        assert!(g.update_vertex_weight(VertexIndex(99), W(1)).is_err());
+    }
+}

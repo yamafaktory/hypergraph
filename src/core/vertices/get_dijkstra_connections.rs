@@ -138,10 +138,10 @@ mod tests {
 
     #[test]
     fn finds_shortest_path() {
-        let (g, [v0, _v1, v2, _v3], [e0, e1, _e2]) = build();
+        let (g, [v0, v1, v2, _v3], [e0, e1, _e2]) = build();
         assert_eq!(
             g.get_dijkstra_connections(v0, v2).unwrap(),
-            vec![(v0, None), (_v1, Some(e0)), (v2, Some(e1))]
+            vec![(v0, None), (v1, Some(e0)), (v2, Some(e1))]
         );
     }
 

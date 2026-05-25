@@ -431,3 +431,144 @@ fn query_get_dijkstra_from() {
     assert_eq!(distances[&c], 3); // a→b(1) + b→c(2)
     assert_eq!(distances[&d], 4); // a→b(1) + b→d(3)
 }
+
+#[test]
+fn query_get_orphan_vertices_none() {
+    let (g, _, _) = build_acyclic();
+    assert!(HypergraphQuery::get_orphan_vertices(&g).unwrap().is_empty());
+}
+
+#[test]
+fn query_get_orphan_vertices_some() {
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    g.add_hyperedge(vec![a], Hyperedge::new("e0", 1)).unwrap();
+    let orphans = HypergraphQuery::get_orphan_vertices(&g).unwrap();
+    assert_eq!(orphans, vec![b]);
+}
+
+#[test]
+fn query_get_orphan_hyperedges_none() {
+    let (g, _, _) = build_acyclic();
+    assert!(
+        HypergraphQuery::get_orphan_hyperedges(&g)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn query_get_endpoints() {
+    let (g, [a, _, c, d], _) = build_acyclic();
+    let (sources, sinks) = HypergraphQuery::get_endpoints(&g).unwrap();
+    assert_eq!(sources, vec![a]);
+    let mut sinks_sorted = sinks;
+    sinks_sorted.sort();
+    assert_eq!(sinks_sorted, vec![c, d]);
+}
+
+#[test]
+fn query_get_inclusions_none() {
+    let (g, _, _) = build_acyclic();
+    assert!(HypergraphQuery::get_inclusions(&g).unwrap().is_empty());
+}
+
+#[test]
+fn query_get_inclusions_some() {
+    let mut g = Hypergraph::<Vertex, Hyperedge>::new();
+    let a = g.add_vertex(Vertex::new("a")).unwrap();
+    let b = g.add_vertex(Vertex::new("b")).unwrap();
+    let c = g.add_vertex(Vertex::new("c")).unwrap();
+    let big = g
+        .add_hyperedge(vec![a, b, c], Hyperedge::new("big", 1))
+        .unwrap();
+    let small = g
+        .add_hyperedge(vec![a, b], Hyperedge::new("small", 1))
+        .unwrap();
+    let pairs = HypergraphQuery::get_inclusions(&g).unwrap();
+    assert!(pairs.contains(&(small, big)));
+    assert!(!pairs.contains(&(big, small)));
+}
+
+#[test]
+fn query_is_k_uniform_true() {
+    let (g, _, _) = build_acyclic();
+    assert!(HypergraphQuery::is_k_uniform(&g, 2).unwrap());
+}
+
+#[test]
+fn query_is_k_uniform_false() {
+    let (g, _, _) = build_acyclic();
+    assert!(!HypergraphQuery::is_k_uniform(&g, 3).unwrap());
+}
+
+#[test]
+fn query_find_cut_vertices_present() {
+    let (g, [_, b, _, _], _) = build_acyclic();
+    let cuts = HypergraphQuery::find_cut_vertices(&g).unwrap();
+    assert!(cuts.contains(&b));
+}
+
+#[test]
+fn query_find_cut_vertices_none() {
+    let (g, _, _) = build_cyclic();
+    // Triangle a→b→c→a: no articulation points.
+    // Isolated vertex d is also not a cut vertex.
+    let cuts = HypergraphQuery::find_cut_vertices(&g).unwrap();
+    assert!(cuts.is_empty());
+}
+
+#[test]
+fn query_get_core_all() {
+    let (g, [a, b, c, d], [e0, e1, e2]) = build_acyclic();
+    let (vs, hes) = HypergraphQuery::get_core(&g, 1, 1).unwrap();
+    assert_eq!(vs, vec![a, b, c, d]);
+    assert_eq!(hes, vec![e0, e1, e2]);
+}
+
+#[test]
+fn query_get_core_empty() {
+    let (g, _, _) = build_acyclic();
+    // min_edge_size=2: after a,c,d are removed (degree 1<2) the edges shrink
+    // to size 1, then b loses all edges and is removed too.
+    let (vs, hes) = HypergraphQuery::get_core(&g, 2, 2).unwrap();
+    assert!(vs.is_empty());
+    assert!(hes.is_empty());
+}
+
+#[test]
+fn query_expand_to_graph() {
+    let (g, [a, b, c, d], _) = build_acyclic();
+    let pairs = HypergraphQuery::expand_to_graph(&g).unwrap();
+    assert!(pairs.contains(&(a, b)));
+    assert!(pairs.contains(&(b, c)));
+    assert!(pairs.contains(&(b, d)));
+    assert_eq!(pairs.len(), 3);
+}
+
+#[test]
+fn query_expand_to_star() {
+    let (g, [a, b, c, d], [e0, e1, e2]) = build_acyclic();
+    let pairs = HypergraphQuery::expand_to_star(&g).unwrap();
+    assert!(pairs.contains(&(a, e0)));
+    assert!(pairs.contains(&(b, e0)));
+    assert!(pairs.contains(&(b, e1)));
+    assert!(pairs.contains(&(c, e1)));
+    assert!(pairs.contains(&(b, e2)));
+    assert!(pairs.contains(&(d, e2)));
+    assert_eq!(pairs.len(), 6);
+}
+
+#[test]
+fn query_compute_page_rank() {
+    let (g, [a, b, c, d], _) = build_acyclic();
+    let ranks = HypergraphQuery::compute_page_rank(&g, 0.85, 100).unwrap();
+    assert!(ranks.contains_key(&a));
+    assert!(ranks.contains_key(&b));
+    assert!(ranks.contains_key(&c));
+    assert!(ranks.contains_key(&d));
+    assert!(ranks[&b] > ranks[&a], "b is more central than a");
+    let total: f64 = ranks.values().sum();
+    assert!((total - 1.0).abs() < 0.01, "ranks should sum to ~1.0");
+}

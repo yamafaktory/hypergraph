@@ -889,4 +889,548 @@ where
     ) -> Result<AHashMap<VertexIndex, usize>, HypergraphError<V, HE>> {
         dijkstra_from(self, from)
     }
+
+    /// Returns all vertex indices that belong to no hyperedge.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_orphan_vertices(&self) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        let mut result = Vec::new();
+        for idx in self.vertex_indices()? {
+            if self.get_vertex_hyperedges(idx)?.is_empty() {
+                result.push(idx);
+            }
+        }
+        Ok(result)
+    }
+
+    /// Returns all hyperedge indices whose vertex list is empty.
+    ///
+    /// In a well-formed hypergraph this will always be empty, but the method
+    /// is provided for completeness and for custom [`HypergraphQuery`]
+    /// implementations that allow degenerate hyperedges.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_orphan_hyperedges(&self) -> Result<Vec<HyperedgeIndex>, HypergraphError<V, HE>> {
+        let mut result = Vec::new();
+        for idx in self.hyperedge_indices()? {
+            if self.get_hyperedge_vertices(idx)?.is_empty() {
+                result.push(idx);
+            }
+        }
+        Ok(result)
+    }
+
+    /// Returns `(sources, sinks)` where sources have in-degree 0 and sinks
+    /// have out-degree 0.
+    ///
+    /// A vertex may appear in both lists if it is completely isolated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_endpoints(
+        &self,
+    ) -> Result<(Vec<VertexIndex>, Vec<VertexIndex>), HypergraphError<V, HE>> {
+        let mut sources = Vec::new();
+        let mut sinks = Vec::new();
+        for idx in self.vertex_indices()? {
+            if self.get_vertex_degree_in(idx)? == 0 {
+                sources.push(idx);
+            }
+            if self.get_vertex_degree_out(idx)? == 0 {
+                sinks.push(idx);
+            }
+        }
+        Ok((sources, sinks))
+    }
+
+    /// Returns all `(subset, superset)` pairs of hyperedge indices where the
+    /// vertex set of `subset` is a *proper* subset of the vertex set of
+    /// `superset`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_inclusions(
+        &self,
+    ) -> Result<Vec<(HyperedgeIndex, HyperedgeIndex)>, HypergraphError<V, HE>> {
+        let he_indices = self.hyperedge_indices()?;
+        let mut result = Vec::new();
+        for &a in &he_indices {
+            let verts_a: AHashSet<VertexIndex> =
+                self.get_hyperedge_vertices(a)?.into_iter().collect();
+            for &b in &he_indices {
+                if a == b {
+                    continue;
+                }
+                let verts_b: AHashSet<VertexIndex> =
+                    self.get_hyperedge_vertices(b)?.into_iter().collect();
+                if verts_a.len() < verts_b.len() && verts_a.iter().all(|v| verts_b.contains(v)) {
+                    result.push((a, b));
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    /// Returns `true` if every hyperedge contains exactly `k` vertices.
+    ///
+    /// Returns `true` vacuously on an empty hypergraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn is_k_uniform(&self, k: usize) -> Result<bool, HypergraphError<V, HE>> {
+        for idx in self.hyperedge_indices()? {
+            if self.get_hyperedge_vertices(idx)?.len() != k {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Returns the articulation points (cut vertices) of the hypergraph.
+    ///
+    /// Each hyperedge is first expanded into an undirected clique (all pairs
+    /// of its vertices become undirected edges), then the standard iterative
+    /// Tarjan DFS algorithm finds all vertices whose removal would disconnect
+    /// the resulting undirected graph.
+    ///
+    /// The result is sorted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn find_cut_vertices(&self) -> Result<Vec<VertexIndex>, HypergraphError<V, HE>> {
+        let v_indices = self.vertex_indices()?;
+        let he_indices = self.hyperedge_indices()?;
+
+        let mut adj: AHashMap<VertexIndex, AHashSet<VertexIndex>> = AHashMap::default();
+        for &vi in &v_indices {
+            adj.entry(vi).or_default();
+        }
+        for &hei in &he_indices {
+            let verts = self.get_hyperedge_vertices(hei)?;
+            for i in 0..verts.len() {
+                for j in (i + 1)..verts.len() {
+                    adj.entry(verts[i]).or_default().insert(verts[j]);
+                    adj.entry(verts[j]).or_default().insert(verts[i]);
+                }
+            }
+        }
+
+        let mut disc: AHashMap<VertexIndex, usize> = AHashMap::default();
+        let mut low: AHashMap<VertexIndex, usize> = AHashMap::default();
+        let mut is_cut: AHashSet<VertexIndex> = AHashSet::default();
+        let mut timer = 0usize;
+
+        for &start in &v_indices {
+            if disc.contains_key(&start) {
+                continue;
+            }
+            disc.insert(start, timer);
+            low.insert(start, timer);
+            timer += 1;
+
+            let mut init_nbrs: Vec<VertexIndex> = adj[&start].iter().copied().collect();
+            init_nbrs.sort_unstable();
+            // Stack frame: (vertex, parent, sorted_neighbor_list, current_index)
+            let mut stack: Vec<(VertexIndex, Option<VertexIndex>, Vec<VertexIndex>, usize)> =
+                vec![(start, None, init_nbrs, 0)];
+            let mut root_children = 0usize;
+
+            loop {
+                if stack.is_empty() {
+                    break;
+                }
+                let (u, par_u, cur_idx, nbrs_len) = {
+                    let top = stack.last().unwrap();
+                    (top.0, top.1, top.3, top.2.len())
+                };
+
+                if cur_idx < nbrs_len {
+                    let v = stack.last().unwrap().2[cur_idx];
+                    stack.last_mut().unwrap().3 += 1;
+
+                    if !disc.contains_key(&v) {
+                        if par_u.is_none() {
+                            root_children += 1;
+                        }
+                        disc.insert(v, timer);
+                        low.insert(v, timer);
+                        timer += 1;
+                        let mut child_nbrs: Vec<VertexIndex> = adj[&v].iter().copied().collect();
+                        child_nbrs.sort_unstable();
+                        stack.push((v, Some(u), child_nbrs, 0));
+                    } else if Some(v) != par_u {
+                        let dv = disc[&v];
+                        let lu = low.get_mut(&u).unwrap();
+                        if dv < *lu {
+                            *lu = dv;
+                        }
+                    }
+                } else {
+                    stack.pop();
+                    if let Some(pf) = stack.last() {
+                        let p = pf.0;
+                        let lu = low[&u];
+                        {
+                            let lp = low.get_mut(&p).unwrap();
+                            if lu < *lp {
+                                *lp = lu;
+                            }
+                        }
+                        if p != start && lu >= disc[&p] {
+                            is_cut.insert(p);
+                        }
+                    }
+                }
+            }
+
+            if root_children >= 2 {
+                is_cut.insert(start);
+            }
+        }
+
+        let mut result: Vec<VertexIndex> = is_cut.into_iter().collect();
+        result.sort_unstable();
+        Ok(result)
+    }
+
+    /// Computes the k-core of the hypergraph via iterative peeling.
+    ///
+    /// A vertex survives if it participates in at least `min_vertex_degree`
+    /// active hyperedges; a hyperedge survives if it spans at least
+    /// `min_edge_size` active vertices. Peeling continues until stable.
+    ///
+    /// Returns `(surviving_vertices, surviving_hyperedges)`, both sorted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn get_core(
+        &self,
+        min_vertex_degree: usize,
+        min_edge_size: usize,
+    ) -> Result<(Vec<VertexIndex>, Vec<HyperedgeIndex>), HypergraphError<V, HE>> {
+        let mut active_v: AHashSet<VertexIndex> = self.vertex_indices()?.into_iter().collect();
+        let mut active_he: AHashSet<HyperedgeIndex> =
+            self.hyperedge_indices()?.into_iter().collect();
+
+        loop {
+            let mut changed = false;
+
+            let remove_he: Vec<HyperedgeIndex> = {
+                let mut v = Vec::new();
+                for hei in active_he.iter().copied() {
+                    let count = self
+                        .get_hyperedge_vertices(hei)?
+                        .iter()
+                        .filter(|vi| active_v.contains(vi))
+                        .count();
+                    if count < min_edge_size {
+                        v.push(hei);
+                    }
+                }
+                v
+            };
+            for hei in remove_he {
+                active_he.remove(&hei);
+                changed = true;
+            }
+
+            let remove_v: Vec<VertexIndex> = {
+                let mut v = Vec::new();
+                for vi in active_v.iter().copied() {
+                    let degree = self
+                        .get_vertex_hyperedges(vi)?
+                        .iter()
+                        .filter(|he| active_he.contains(he))
+                        .count();
+                    if degree < min_vertex_degree {
+                        v.push(vi);
+                    }
+                }
+                v
+            };
+            for vi in remove_v {
+                active_v.remove(&vi);
+                changed = true;
+            }
+
+            if !changed {
+                break;
+            }
+        }
+
+        let mut vertices: Vec<VertexIndex> = active_v.into_iter().collect();
+        let mut hyperedges: Vec<HyperedgeIndex> = active_he.into_iter().collect();
+        vertices.sort_unstable();
+        hyperedges.sort_unstable();
+        Ok((vertices, hyperedges))
+    }
+
+    /// Projects the hypergraph to a directed graph via consecutive vertex pairs.
+    ///
+    /// For a hyperedge `[v0, v1, v2, …]` the pairs `(v0, v1)`, `(v1, v2)`, …
+    /// are emitted. Duplicate pairs are deduplicated. The result is sorted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn expand_to_graph(&self) -> Result<Vec<(VertexIndex, VertexIndex)>, HypergraphError<V, HE>> {
+        let mut pairs: AHashSet<(VertexIndex, VertexIndex)> = AHashSet::default();
+        for hei in self.hyperedge_indices()? {
+            let verts = self.get_hyperedge_vertices(hei)?;
+            for window in verts.windows(2) {
+                pairs.insert((window[0], window[1]));
+            }
+        }
+        let mut result: Vec<(VertexIndex, VertexIndex)> = pairs.into_iter().collect();
+        result.sort_unstable();
+        Ok(result)
+    }
+
+    /// Returns the bipartite vertex–hyperedge membership pairs.
+    ///
+    /// Each pair `(v, e)` means vertex `v` belongs to hyperedge `e`. Duplicate
+    /// memberships (a vertex appearing multiple times in a hyperedge) are
+    /// deduplicated. The result is sorted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    fn expand_to_star(&self) -> Result<Vec<(VertexIndex, HyperedgeIndex)>, HypergraphError<V, HE>> {
+        let mut pairs: AHashSet<(VertexIndex, HyperedgeIndex)> = AHashSet::default();
+        for hei in self.hyperedge_indices()? {
+            for vi in self.get_hyperedge_vertices(hei)? {
+                pairs.insert((vi, hei));
+            }
+        }
+        let mut result: Vec<(VertexIndex, HyperedgeIndex)> = pairs.into_iter().collect();
+        result.sort_unstable();
+        Ok(result)
+    }
+
+    /// Computes approximate `PageRank` scores via the iterative power method.
+    ///
+    /// Out-neighbours of each vertex are determined by
+    /// [`get_adjacent_vertices_from`](Self::get_adjacent_vertices_from) with
+    /// duplicates removed. Dangling vertices (no out-edges) redistribute their
+    /// rank uniformly. After `iterations` steps the scores sum to
+    /// approximately `1.0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HypergraphError`] if the underlying graph primitives fail.
+    #[allow(clippy::cast_precision_loss)]
+    fn compute_page_rank(
+        &self,
+        damping: f64,
+        iterations: usize,
+    ) -> Result<AHashMap<VertexIndex, f64>, HypergraphError<V, HE>> {
+        let v_indices = self.vertex_indices()?;
+        let n = v_indices.len();
+        if n == 0 {
+            return Ok(AHashMap::default());
+        }
+
+        let initial = 1.0 / n as f64;
+        let mut rank: AHashMap<VertexIndex, f64> =
+            v_indices.iter().map(|&v| (v, initial)).collect();
+
+        let out_neighbors: AHashMap<VertexIndex, Vec<VertexIndex>> = {
+            let mut m: AHashMap<VertexIndex, Vec<VertexIndex>> = AHashMap::default();
+            for &v in &v_indices {
+                let raw = self.get_adjacent_vertices_from(v)?;
+                let mut seen: AHashSet<VertexIndex> = AHashSet::default();
+                let deduped: Vec<VertexIndex> =
+                    raw.into_iter().filter(|&vi| seen.insert(vi)).collect();
+                m.insert(v, deduped);
+            }
+            m
+        };
+
+        for _ in 0..iterations {
+            let dangling_sum: f64 = v_indices
+                .iter()
+                .filter(|&&v| out_neighbors[&v].is_empty())
+                .map(|&v| rank[&v])
+                .sum();
+            let base = (1.0 - damping) / n as f64 + damping * dangling_sum / n as f64;
+
+            let mut new_rank: AHashMap<VertexIndex, f64> =
+                v_indices.iter().map(|&v| (v, base)).collect();
+
+            for &u in &v_indices {
+                let neighbors = &out_neighbors[&u];
+                if neighbors.is_empty() {
+                    continue;
+                }
+                let contrib = damping * rank[&u] / neighbors.len() as f64;
+                for &v in neighbors {
+                    *new_rank.get_mut(&v).unwrap() += contrib;
+                }
+            }
+
+            rank = new_rank;
+        }
+
+        Ok(rank)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Hypergraph,
+        HypergraphQuery,
+        core::test_support::{
+            E,
+            W,
+            build,
+        },
+    };
+
+    #[test]
+    fn get_orphan_vertices_none() {
+        let (g, _, _) = build();
+        assert!(g.get_orphan_vertices().unwrap().is_empty());
+    }
+
+    #[test]
+    fn get_orphan_vertices_some() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v0 = g.add_vertex(W(0)).unwrap();
+        let v1 = g.add_vertex(W(1)).unwrap();
+        g.add_hyperedge(vec![v0], E(1)).unwrap();
+        assert_eq!(g.get_orphan_vertices().unwrap(), vec![v1]);
+    }
+
+    #[test]
+    fn get_orphan_hyperedges_none() {
+        let (g, _, _) = build();
+        assert!(g.get_orphan_hyperedges().unwrap().is_empty());
+    }
+
+    #[test]
+    fn get_endpoints_sources_and_sinks() {
+        let (g, [v0, _, v2, v3], _) = build();
+        let (sources, mut sinks) = g.get_endpoints().unwrap();
+        assert_eq!(sources, vec![v0]);
+        sinks.sort();
+        assert_eq!(sinks, vec![v2, v3]);
+    }
+
+    #[test]
+    fn get_inclusions_empty() {
+        let (g, _, _) = build();
+        assert!(g.get_inclusions().unwrap().is_empty());
+    }
+
+    #[test]
+    fn get_inclusions_found() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v0 = g.add_vertex(W(0)).unwrap();
+        let v1 = g.add_vertex(W(1)).unwrap();
+        let v2 = g.add_vertex(W(2)).unwrap();
+        let big = g.add_hyperedge(vec![v0, v1, v2], E(1)).unwrap();
+        let small = g.add_hyperedge(vec![v0, v1], E(2)).unwrap();
+        let pairs = g.get_inclusions().unwrap();
+        assert!(pairs.contains(&(small, big)));
+        assert!(!pairs.contains(&(big, small)));
+    }
+
+    #[test]
+    fn is_k_uniform_match() {
+        let (g, _, _) = build();
+        assert!(g.is_k_uniform(2).unwrap());
+    }
+
+    #[test]
+    fn is_k_uniform_mismatch() {
+        let (g, _, _) = build();
+        assert!(!g.is_k_uniform(3).unwrap());
+    }
+
+    #[test]
+    fn find_cut_vertices_star_center() {
+        let (g, [_, v1, _, _], _) = build();
+        assert!(g.find_cut_vertices().unwrap().contains(&v1));
+    }
+
+    #[test]
+    fn find_cut_vertices_cycle_empty() {
+        let mut g: Hypergraph<W, E> = Hypergraph::new();
+        let v0 = g.add_vertex(W(0)).unwrap();
+        let v1 = g.add_vertex(W(1)).unwrap();
+        let v2 = g.add_vertex(W(2)).unwrap();
+        g.add_hyperedge(vec![v0, v1], E(1)).unwrap();
+        g.add_hyperedge(vec![v1, v2], E(1)).unwrap();
+        g.add_hyperedge(vec![v2, v0], E(1)).unwrap();
+        assert!(g.find_cut_vertices().unwrap().is_empty());
+    }
+
+    #[test]
+    fn get_core_all_survive() {
+        let (g, [v0, v1, v2, v3], [e0, e1, e2]) = build();
+        let (vs, hes) = g.get_core(1, 1).unwrap();
+        assert_eq!(vs, vec![v0, v1, v2, v3]);
+        assert_eq!(hes, vec![e0, e1, e2]);
+    }
+
+    #[test]
+    fn get_core_peels_to_empty() {
+        let (g, _, _) = build();
+        let (vs, hes) = g.get_core(2, 2).unwrap();
+        assert!(vs.is_empty());
+        assert!(hes.is_empty());
+    }
+
+    #[test]
+    fn expand_to_graph_consecutive_pairs() {
+        let (g, [v0, v1, v2, v3], _) = build();
+        let pairs = g.expand_to_graph().unwrap();
+        assert_eq!(pairs.len(), 3);
+        assert!(pairs.contains(&(v0, v1)));
+        assert!(pairs.contains(&(v1, v2)));
+        assert!(pairs.contains(&(v1, v3)));
+    }
+
+    #[test]
+    fn expand_to_star_membership() {
+        let (g, [v0, v1, v2, v3], [e0, e1, e2]) = build();
+        let pairs = g.expand_to_star().unwrap();
+        assert_eq!(pairs.len(), 6);
+        assert!(pairs.contains(&(v0, e0)));
+        assert!(pairs.contains(&(v1, e0)));
+        assert!(pairs.contains(&(v1, e1)));
+        assert!(pairs.contains(&(v2, e1)));
+        assert!(pairs.contains(&(v1, e2)));
+        assert!(pairs.contains(&(v3, e2)));
+    }
+
+    #[test]
+    fn compute_page_rank_sums_to_one() {
+        let (g, _, _) = build();
+        let ranks = g.compute_page_rank(0.85, 100).unwrap();
+        assert_eq!(ranks.len(), 4);
+        let total: f64 = ranks.values().sum();
+        assert!((total - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn compute_page_rank_central_vertex_highest() {
+        let (g, [_, v1, _, _], _) = build();
+        let ranks = g.compute_page_rank(0.85, 100).unwrap();
+        let v1_rank = ranks[&v1];
+        assert!(
+            ranks.values().all(|&r| r <= v1_rank + 1e-10),
+            "v1 should have the highest rank"
+        );
+    }
 }

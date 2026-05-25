@@ -127,3 +127,63 @@ where
         vertex_weights.map(|vw| (weight, vw))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::core::test_support::{
+        E,
+        W,
+        build,
+    };
+
+    #[test]
+    fn iter_yields_hyperedge_count() {
+        let (g, _, _) = build();
+        assert_eq!(g.iter().count(), 3);
+    }
+
+    #[test]
+    fn iter_yields_correct_vertex_weights() {
+        let (g, _, _) = build();
+        let all_verts: Vec<_> = g.iter().flat_map(|(_, verts)| verts).collect();
+        assert_eq!(all_verts.len(), 6); // 3 hyperedges × 2 vertices each
+    }
+
+    #[test]
+    fn vertices_iter_yields_all() {
+        let (g, [v0, v1, v2, v3], _) = build();
+        let mut indices: Vec<_> = g.vertices_iter().map(|(idx, _)| idx).collect();
+        indices.sort();
+        assert_eq!(indices, vec![v0, v1, v2, v3]);
+    }
+
+    #[test]
+    fn vertices_iter_weight_matches() {
+        let (g, [v0, _, _, _], _) = build();
+        let weight = g.vertices_iter().find(|(idx, _)| *idx == v0).unwrap().1;
+        assert_eq!(*weight, W(0));
+    }
+
+    #[test]
+    fn hyperedges_iter_yields_all() {
+        let (g, _, [e0, e1, e2]) = build();
+        let mut indices: Vec<_> = g.hyperedges_iter().map(|(idx, _)| idx).collect();
+        indices.sort();
+        assert_eq!(indices, vec![e0, e1, e2]);
+    }
+
+    #[test]
+    fn hyperedges_iter_weight_matches() {
+        let (g, _, [e0, _, _]) = build();
+        let weight = g.hyperedges_iter().find(|(idx, _)| *idx == e0).unwrap().1;
+        assert_eq!(*weight, E(1));
+    }
+
+    #[test]
+    fn into_iter_consumes_graph() {
+        let (g, _, _) = build();
+        let items: Vec<_> = g.into_iter().collect();
+        assert_eq!(items.len(), 3);
+        assert!(items.iter().all(|(_, verts)| verts.len() == 2));
+    }
+}

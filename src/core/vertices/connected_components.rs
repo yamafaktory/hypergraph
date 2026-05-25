@@ -75,6 +75,7 @@ mod tests {
     };
 
     #[test]
+    #[allow(clippy::many_single_char_names)]
     fn two_disconnected_components() {
         let mut g: Hypergraph<W, E> = Hypergraph::new();
         let a = g.add_vertex(W(0)).unwrap();
